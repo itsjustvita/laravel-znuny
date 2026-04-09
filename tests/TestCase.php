@@ -2,11 +2,19 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests;
 
+use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\ZnunyServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
+
     protected function getPackageProviders($app): array
     {
         return [ZnunyServiceProvider::class];
