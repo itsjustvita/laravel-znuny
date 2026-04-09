@@ -119,4 +119,29 @@ final class TicketResourceTest extends TestCase
             && ($r['Article']['CommunicationChannel'] ?? null) === 'Internal'
             && ! isset($r['Ticket']));
     }
+
+    public function test_close_sets_state_to_closed_successful(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '42', 'TicketNumber' => '00042']),
+        ]);
+
+        Znuny::tickets()->close('42');
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'TicketUpdate/42')
+            && ($r['Ticket']['State'] ?? null) === 'closed successful');
+    }
+
+    public function test_close_accepts_custom_state(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '42', 'TicketNumber' => '00042']),
+        ]);
+
+        Znuny::tickets()->close('42', state: 'closed unsuccessful');
+
+        Http::assertSent(fn ($r) => ($r['Ticket']['State'] ?? null) === 'closed unsuccessful');
+    }
 }

@@ -68,4 +68,9 @@ class TicketResource extends Resource
             'Article'  => TicketInputMapper::mapArticle($article),
         ]);
     }
+
+    public function close(string $ticketId, string $state = 'closed successful'): void
+    {
+        $this->update($ticketId, ['state' => $state]);
+    }
 }
