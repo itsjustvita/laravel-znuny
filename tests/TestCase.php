@@ -1,0 +1,33 @@
+<?php
+
+namespace ItsJustVita\LaravelZnuny\Tests;
+
+use ItsJustVita\LaravelZnuny\ZnunyServiceProvider;
+use Orchestra\Testbench\TestCase as BaseTestCase;
+
+abstract class TestCase extends BaseTestCase
+{
+    protected function getPackageProviders($app): array
+    {
+        return [ZnunyServiceProvider::class];
+    }
+
+    protected function getPackageAliases($app): array
+    {
+        return [
+            'Znuny' => \ItsJustVita\LaravelZnuny\Facades\Znuny::class,
+        ];
+    }
+
+    protected function defineEnvironment($app): void
+    {
+        $app['config']->set('cache.default', 'array');
+        $app['config']->set('znuny.connections.default', [
+            'base_url' => 'https://znuny.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'testuser',
+            'password' => 'testpass',
+            'verify_ssl' => false,
+            'timeout' => 5,
+        ]);
+    }
+}
