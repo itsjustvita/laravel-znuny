@@ -1,0 +1,30 @@
+{
+  "TicketID": "42",
+  "TicketNumber": "202604080001",
+  "Title": "Connection issue",
+  "QueueID": "803",
+  "Queue": "Support",
+  "State": "open",
+  "Priority": "3 normal",
+  "Type": "Incident",
+  "CustomerID": "12345",
+  "CustomerUserID": "customer@example.com",
+  "Created": "2026-04-08 10:00:00",
+  "Changed": "2026-04-08 10:05:00",
+  "Article": [
+    {
+      "ArticleID": "501",
+      "Subject": "Initial",
+      "Body": "Customer reports...",
+      "ContentType": "text/plain; charset=utf8",
+      "CommunicationChannel": "Email",
+      "SenderType": "customer",
+      "From": "customer@example.com",
+      "CreateTime": "2026-04-08 10:00:00"
+    }
+  ],
+  "DynamicField": [
+    { "Name": "OrderId", "Value": "ORD-001" },
+    { "Name": "Severity", "Value": "high" }
+  ]
+}
