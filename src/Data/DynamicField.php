@@ -6,7 +6,7 @@ final readonly class DynamicField
 {
     public function __construct(
         public string $name,
-        public string|int|float|bool|array|null $value,
+        public mixed $value,
     ) {}
 
     public static function fromZnunyResponse(array $data): self

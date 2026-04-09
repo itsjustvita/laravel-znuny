@@ -19,4 +19,19 @@ final class PriorityTest extends TestCase
         $this->assertSame('3 normal', $priority->name);
         $this->assertTrue($priority->valid);
     }
+
+    public function test_it_serializes_to_array(): void
+    {
+        $priority = Priority::fromZnunyResponse([
+            'PriorityID' => '3',
+            'Name'       => '3 normal',
+            'ValidID'    => '1',
+        ]);
+
+        $this->assertSame([
+            'PriorityID' => '3',
+            'Name'       => '3 normal',
+            'ValidID'    => '1',
+        ], $priority->toArray());
+    }
 }

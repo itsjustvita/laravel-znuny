@@ -19,4 +19,19 @@ final class TypeTest extends TestCase
         $this->assertSame('Incident', $type->name);
         $this->assertTrue($type->valid);
     }
+
+    public function test_it_serializes_to_array(): void
+    {
+        $type = Type::fromZnunyResponse([
+            'TypeID'  => '2',
+            'Name'    => 'Incident',
+            'ValidID' => '1',
+        ]);
+
+        $this->assertSame([
+            'TypeID'  => '2',
+            'Name'    => 'Incident',
+            'ValidID' => '1',
+        ], $type->toArray());
+    }
 }

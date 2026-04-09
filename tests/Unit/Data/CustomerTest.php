@@ -27,4 +27,27 @@ final class CustomerTest extends TestCase
         $this->assertSame('jane@acme.test', $customer->login);
         $this->assertTrue($customer->valid);
     }
+
+    public function test_it_serializes_to_array(): void
+    {
+        $customer = Customer::fromZnunyResponse([
+            'CustomerID'      => '12345',
+            'CustomerCompany' => 'ACME Corp',
+            'UserFirstname'   => 'Jane',
+            'UserLastname'    => 'Doe',
+            'UserEmail'       => 'jane@acme.test',
+            'UserLogin'       => 'jane@acme.test',
+            'ValidID'         => '1',
+        ]);
+
+        $this->assertSame([
+            'CustomerID'      => '12345',
+            'CustomerCompany' => 'ACME Corp',
+            'UserFirstname'   => 'Jane',
+            'UserLastname'    => 'Doe',
+            'UserEmail'       => 'jane@acme.test',
+            'UserLogin'       => 'jane@acme.test',
+            'ValidID'         => '1',
+        ], $customer->toArray());
+    }
 }

@@ -11,11 +11,14 @@ final readonly class Customer
         public ?string $lastName,
         public ?string $email,
         public ?string $login,
+        public string $validId,
         public bool $valid,
     ) {}
 
     public static function fromZnunyResponse(array $data): self
     {
+        $validId = (string) ($data['ValidID'] ?? '1');
+
         return new self(
             id: (string) ($data['CustomerID'] ?? ''),
             company: $data['CustomerCompany'] ?? null,
@@ -23,7 +26,8 @@ final readonly class Customer
             lastName: $data['UserLastname'] ?? null,
             email: $data['UserEmail'] ?? null,
             login: $data['UserLogin'] ?? null,
-            valid: ((string) ($data['ValidID'] ?? '1')) === '1',
+            validId: $validId,
+            valid: $validId === '1',
         );
     }
 
@@ -36,7 +40,7 @@ final readonly class Customer
             'UserLastname'    => $this->lastName,
             'UserEmail'       => $this->email,
             'UserLogin'       => $this->login,
-            'ValidID'         => $this->valid ? '1' : '2',
+            'ValidID'         => $this->validId,
         ];
     }
 }

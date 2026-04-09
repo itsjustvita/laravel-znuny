@@ -36,4 +36,37 @@ final class QueueTest extends TestCase
 
         $this->assertFalse($queue->valid);
     }
+
+    public function test_it_serializes_to_array(): void
+    {
+        $queue = Queue::fromZnunyResponse([
+            'QueueID' => '803',
+            'Name'    => 'Support',
+            'GroupID' => '1',
+            'ValidID' => '1',
+            'Comment' => 'Primary support queue',
+        ]);
+
+        $this->assertSame([
+            'QueueID' => '803',
+            'Name'    => 'Support',
+            'GroupID' => '1',
+            'ValidID' => '1',
+            'Comment' => 'Primary support queue',
+        ], $queue->toArray());
+    }
+
+    public function test_temporarily_invalid_queue_preserves_valid_id(): void
+    {
+        $queue = Queue::fromZnunyResponse([
+            'QueueID' => '5',
+            'Name'    => 'Legacy',
+            'GroupID' => '1',
+            'ValidID' => '3',
+        ]);
+
+        $this->assertSame('3', $queue->validId);
+        $this->assertFalse($queue->valid);
+        $this->assertSame('3', $queue->toArray()['ValidID']);
+    }
 }

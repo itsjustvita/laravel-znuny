@@ -8,16 +8,20 @@ final readonly class State
         public string $id,
         public string $name,
         public ?string $typeName,
+        public string $validId,
         public bool $valid,
     ) {}
 
     public static function fromZnunyResponse(array $data): self
     {
+        $validId = (string) ($data['ValidID'] ?? '1');
+
         return new self(
             id: (string) ($data['StateID'] ?? $data['ID'] ?? ''),
             name: (string) ($data['Name'] ?? ''),
             typeName: $data['TypeName'] ?? null,
-            valid: ((string) ($data['ValidID'] ?? '1')) === '1',
+            validId: $validId,
+            valid: $validId === '1',
         );
     }
 
@@ -27,7 +31,7 @@ final readonly class State
             'StateID'  => $this->id,
             'Name'     => $this->name,
             'TypeName' => $this->typeName,
-            'ValidID'  => $this->valid ? '1' : '2',
+            'ValidID'  => $this->validId,
         ];
     }
 }

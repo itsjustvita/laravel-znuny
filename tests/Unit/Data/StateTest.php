@@ -21,4 +21,21 @@ final class StateTest extends TestCase
         $this->assertSame('open', $state->typeName);
         $this->assertTrue($state->valid);
     }
+
+    public function test_it_serializes_to_array(): void
+    {
+        $state = State::fromZnunyResponse([
+            'StateID'  => '4',
+            'Name'     => 'open',
+            'TypeName' => 'open',
+            'ValidID'  => '1',
+        ]);
+
+        $this->assertSame([
+            'StateID'  => '4',
+            'Name'     => 'open',
+            'TypeName' => 'open',
+            'ValidID'  => '1',
+        ], $state->toArray());
+    }
 }

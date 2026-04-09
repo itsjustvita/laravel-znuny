@@ -35,6 +35,9 @@ final class TicketTest extends TestCase
         $this->assertCount(2, $ticket->dynamicFields);
         $this->assertInstanceOf(DynamicField::class, $ticket->dynamicFields->first());
         $this->assertSame('OrderId', $ticket->dynamicFields->first()->name);
+
+        $this->assertInstanceOf(\Carbon\Carbon::class, $ticket->created);
+        $this->assertSame('2026-04-08 10:00:00', $ticket->created->format('Y-m-d H:i:s'));
     }
 
     public function test_it_handles_minimal_payload(): void
@@ -53,5 +56,21 @@ final class TicketTest extends TestCase
         $this->assertCount(0, $ticket->articles);
         $this->assertCount(0, $ticket->dynamicFields);
         $this->assertNull($ticket->type);
+    }
+
+    public function test_it_handles_missing_created(): void
+    {
+        $ticket = Ticket::fromZnunyResponse([
+            'TicketID'     => '1',
+            'TicketNumber' => '00001',
+            'Title'        => 'no timestamps',
+            'QueueID'      => '1',
+            'Queue'        => 'Misc',
+            'State'        => 'new',
+            'Priority'     => '3 normal',
+        ]);
+
+        $this->assertNull($ticket->created);
+        $this->assertNull($ticket->changed);
     }
 }
