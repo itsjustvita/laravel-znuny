@@ -118,8 +118,8 @@ class ZnunyClient
 
     protected function httpClient(): PendingRequest
     {
-        $retries = max(0, (int) config('znuny.http.retries', 3));
-        $baseDelay = max(10, (int) config('znuny.http.retry_delay', 100));
+        $retries = max(0, (int) ($this->config['retries'] ?? config('znuny.http.retries', 3)));
+        $baseDelay = max(10, (int) ($this->config['retry_delay'] ?? config('znuny.http.retry_delay', 100)));
         $delays = $retries > 0
             ? array_map(fn (int $i) => $baseDelay * (2 ** $i), range(0, $retries - 1))
             : [0];

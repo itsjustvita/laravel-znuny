@@ -117,6 +117,48 @@ final class ZnunyClientTest extends TestCase
         Http::assertSentCount(3); // SessionCreate + TicketGet(503) + TicketGet(200)
     }
 
+    public function test_per_connection_retry_config_overrides_global(): void
+    {
+        config()->set('znuny.http.retries', 5);
+        config()->set('znuny.http.retry_delay', 1000);
+
+        $sequence = Http::sequence()
+            ->push(['SessionID' => 'S1'])
+            ->pushStatus(503)
+            ->push(['Ticket' => [['TicketID' => '1']]]);
+
+        Http::fake(['*' => $sequence]);
+
+        $client = $this->makeClient([
+            'retries' => 1,       // per-connection override: only 1 retry
+            'retry_delay' => 10,  // per-connection override: 10ms
+        ]);
+
+        $result = $client->request('TicketGet', ['TicketID' => '1']);
+
+        $this->assertSame('1', $result['Ticket'][0]['TicketID']);
+        Http::assertSentCount(3); // SessionCreate + TicketGet(503) + TicketGet(200) — succeeded on first retry
+    }
+
+    public function test_it_maps_transport_errors_to_connection_exception(): void
+    {
+        Http::fake(function () {
+            throw new \Illuminate\Http\Client\ConnectionException('Connection refused');
+        });
+
+        $client = $this->makeClient();
+
+        try {
+            $client->request('TicketGet', ['TicketID' => '1']);
+            $this->fail('Expected ZnunyConnectionException');
+        } catch (\ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException $e) {
+            $this->assertSame('SessionCreate', $e->getOperation()); // the first call is SessionCreate
+            $this->assertSame('default', $e->getConnection());
+            $this->assertArrayHasKey('UserLogin', $e->getRequestPayload());
+            $this->assertSame('Connection refused', $e->getMessage());
+        }
+    }
+
     public function test_it_retries_once_on_session_expired_and_succeeds(): void
     {
         $sequence = Http::sequence()
@@ -132,6 +174,12 @@ final class ZnunyClientTest extends TestCase
 
         $this->assertSame(['TicketID' => '42'], $result['Ticket'][0]);
         Http::assertSentCount(4);
+
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), 'TicketGet')
+                && ($request['SessionID'] ?? null) === 'SESS_NEW'
+                && ($request['TicketID'] ?? null) === '42';
+        });
     }
 
     public function test_it_does_not_retry_twice_on_session_expired(): void

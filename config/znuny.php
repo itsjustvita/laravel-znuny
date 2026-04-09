@@ -10,6 +10,7 @@ return [
             'password' => env('ZNUNY_PASSWORD'),
             'verify_ssl' => env('ZNUNY_VERIFY_SSL', true),
             'timeout' => env('ZNUNY_TIMEOUT', 30),
+            'connect_timeout' => env('ZNUNY_CONNECT_TIMEOUT', 3),
         ],
     ],
 
