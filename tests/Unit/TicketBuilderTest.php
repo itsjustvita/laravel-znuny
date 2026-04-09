@@ -96,4 +96,65 @@ final class TicketBuilderTest extends TestCase
 
         $this->assertTrue($ids->isEmpty());
     }
+
+    public function test_get_fetches_all_tickets_in_a_single_batch(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3']]),
+            '*TicketGet*'    => Http::response(['Ticket' => [
+                $this->fakeTicket('1'),
+                $this->fakeTicket('2'),
+                $this->fakeTicket('3'),
+            ]]),
+        ]);
+
+        $tickets = Znuny::tickets()->where('CustomerID', '12345')->get();
+
+        $this->assertCount(3, $tickets);
+        $this->assertSame(['1', '2', '3'], $tickets->pluck('id')->all());
+    }
+
+    public function test_get_chunks_when_result_exceeds_pool_size(): void
+    {
+        config()->set('znuny.http.pool_size', 2);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5']]),
+            '*TicketGet*'    => Http::sequence()
+                ->push(['Ticket' => [$this->fakeTicket('1'), $this->fakeTicket('2')]])
+                ->push(['Ticket' => [$this->fakeTicket('3'), $this->fakeTicket('4')]])
+                ->push(['Ticket' => [$this->fakeTicket('5')]]),
+        ]);
+
+        $tickets = Znuny::tickets()->where('CustomerID', '1')->get();
+
+        $this->assertCount(5, $tickets);
+        $this->assertSame(['1', '2', '3', '4', '5'], $tickets->pluck('id')->all());
+    }
+
+    public function test_get_returns_empty_collection_when_no_ids(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response([]),
+        ]);
+
+        $this->assertTrue(Znuny::tickets()->where('X', 'Y')->get()->isEmpty());
+    }
+
+    private function fakeTicket(string $id): array
+    {
+        return [
+            'TicketID'     => $id,
+            'TicketNumber' => str_pad($id, 10, '0', STR_PAD_LEFT),
+            'Title'        => 'Ticket ' . $id,
+            'QueueID'      => '1',
+            'Queue'        => 'Q',
+            'State'        => 'new',
+            'Priority'     => '3 normal',
+            'Created'      => '2026-04-08 10:00:00',
+        ];
+    }
 }

@@ -114,13 +114,45 @@ class TicketBuilder
         return collect(array_map('strval', (array) $ids))->values();
     }
 
-    /**
-     * Implemented in Task 5.2.
-     * @return Collection<int, Ticket>
-     */
+    /** @return Collection<int, Ticket> */
     public function get(): Collection
     {
-        throw new \BadMethodCallException('get() is implemented in Task 5.2');
+        $ids = $this->ids();
+
+        if ($ids->isEmpty()) {
+            return collect();
+        }
+
+        return $this->fetchByIds($ids->all());
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     * @return Collection<int, Ticket>
+     */
+    protected function fetchByIds(array $ids): Collection
+    {
+        $chunks = array_chunk($ids, $this->poolSize());
+        $results = collect();
+
+        foreach ($chunks as $chunk) {
+            $response = $this->client->request('TicketGet', [
+                'TicketID'      => $chunk,
+                'AllArticles'   => 1,
+                'DynamicFields' => 1,
+            ]);
+
+            foreach (($response['Ticket'] ?? []) as $ticketData) {
+                $results->push(Ticket::fromZnunyResponse($ticketData));
+            }
+        }
+
+        return $results->values();
+    }
+
+    protected function poolSize(): int
+    {
+        return max(1, (int) config('znuny.http.pool_size', 25));
     }
 
     /** Implemented in Task 5.3. */
