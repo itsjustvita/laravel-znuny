@@ -54,4 +54,23 @@ final class ZnunyExceptionTest extends TestCase
         $this->assertSame('[REDACTED]', $payload['Ticket']['Auth']['SessionID']);
         $this->assertSame('[REDACTED]', $payload['TopLevel']['nested']['Token']);
     }
+
+    public function test_it_exposes_context_for_laravel_log_handler(): void
+    {
+        $exception = new class('boom') extends ZnunyException {};
+        $exception
+            ->setOperation('TicketGet')
+            ->setErrorCode('TicketGet.NotFound')
+            ->setConnection('tenant-a')
+            ->setRequestPayload(['TicketID' => '42'])
+            ->setResponseBody(['Error' => ['ErrorCode' => 'TicketGet.NotFound']]);
+
+        $this->assertSame([
+            'znuny_operation'  => 'TicketGet',
+            'znuny_error_code' => 'TicketGet.NotFound',
+            'znuny_connection' => 'tenant-a',
+            'znuny_payload'    => ['TicketID' => '42'],
+            'znuny_response'   => ['Error' => ['ErrorCode' => 'TicketGet.NotFound']],
+        ], $exception->context());
+    }
 }

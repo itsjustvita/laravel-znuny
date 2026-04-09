@@ -67,6 +67,17 @@ abstract class ZnunyException extends RuntimeException
         return $this->responseBody;
     }
 
+    public function context(): array
+    {
+        return [
+            'znuny_operation'  => $this->operation,
+            'znuny_error_code' => $this->errorCode,
+            'znuny_connection' => $this->connection,
+            'znuny_payload'    => $this->requestPayload,
+            'znuny_response'   => $this->responseBody,
+        ];
+    }
+
     private function sanitize(array $payload): array
     {
         $redactKeys = [
