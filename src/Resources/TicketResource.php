@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Resources;
 
 use ItsJustVita\LaravelZnuny\Builders\TicketCreateBuilder;
+use ItsJustVita\LaravelZnuny\Builders\TicketInputMapper;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 
@@ -44,5 +45,16 @@ class TicketResource extends Resource
         }
 
         return Ticket::fromZnunyResponse($response['Ticket'][0]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ticket
+     */
+    public function update(string $ticketId, array $ticket): void
+    {
+        $this->client->request('TicketUpdate/' . rawurlencode($ticketId), [
+            'TicketID' => $ticketId,
+            'Ticket'   => TicketInputMapper::mapTicket($ticket),
+        ]);
     }
 }

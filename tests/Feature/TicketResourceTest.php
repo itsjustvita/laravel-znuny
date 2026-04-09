@@ -86,4 +86,17 @@ final class TicketResourceTest extends TestCase
 
         Http::assertSent(fn ($r) => str_contains($r->url(), 'TicketGet/weird%2Fid'));
     }
+
+    public function test_update_sends_ticket_changes(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '42', 'TicketNumber' => '00042']),
+        ]);
+
+        Znuny::tickets()->update('42', ['state' => 'closed successful']);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'TicketUpdate/42')
+            && ($r['Ticket']['State'] ?? null) === 'closed successful');
+    }
 }
