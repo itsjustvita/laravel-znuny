@@ -144,6 +144,56 @@ final class TicketBuilderTest extends TestCase
         $this->assertTrue(Znuny::tickets()->where('X', 'Y')->get()->isEmpty());
     }
 
+    public function test_paginate_returns_length_aware_paginator(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1','2','3','4','5','6','7','8','9','10']]),
+            '*TicketGet*'    => Http::response(['Ticket' => [
+                $this->fakeTicket('1'), $this->fakeTicket('2'), $this->fakeTicket('3'),
+            ]]),
+        ]);
+
+        $paginator = Znuny::tickets()
+            ->where('CustomerID', '12345')
+            ->paginate(perPage: 3, page: 1);
+
+        $this->assertInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class, $paginator);
+        $this->assertSame(10, $paginator->total());
+        $this->assertSame(3, $paginator->perPage());
+        $this->assertSame(1, $paginator->currentPage());
+        $this->assertCount(3, $paginator->items());
+    }
+
+    public function test_paginate_second_page(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1','2','3','4','5','6','7','8','9','10']]),
+            '*TicketGet*'    => Http::response(['Ticket' => [
+                $this->fakeTicket('4'), $this->fakeTicket('5'), $this->fakeTicket('6'),
+            ]]),
+        ]);
+
+        $paginator = Znuny::tickets()->where('X', 'Y')->paginate(perPage: 3, page: 2);
+
+        $this->assertSame(2, $paginator->currentPage());
+        $this->assertSame(['4', '5', '6'], collect($paginator->items())->pluck('id')->all());
+    }
+
+    public function test_paginate_empty_result(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response([]),
+        ]);
+
+        $paginator = Znuny::tickets()->where('X', 'Y')->paginate(perPage: 10, page: 1);
+
+        $this->assertSame(0, $paginator->total());
+        $this->assertSame([], $paginator->items());
+    }
+
     private function fakeTicket(string $id): array
     {
         return [

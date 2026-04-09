@@ -155,10 +155,24 @@ class TicketBuilder
         return max(1, (int) config('znuny.http.pool_size', 25));
     }
 
-    /** Implemented in Task 5.3. */
     public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
     {
-        throw new \BadMethodCallException('paginate() is implemented in Task 5.3');
+        $ids = $this->ids();
+        $total = $ids->count();
+
+        if ($total === 0) {
+            return new LengthAwarePaginator([], 0, $perPage, $page);
+        }
+
+        $pageIds = $ids->slice(($page - 1) * $perPage, $perPage)->values()->all();
+        $items = $this->fetchByIds($pageIds);
+
+        return new LengthAwarePaginator(
+            items: $items->all(),
+            total: $total,
+            perPage: $perPage,
+            currentPage: $page,
+        );
     }
 
     /** Implemented in Task 5.4. */
