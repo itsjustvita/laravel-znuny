@@ -194,6 +194,26 @@ final class TicketBuilderTest extends TestCase
         $this->assertSame([], $paginator->items());
     }
 
+    public function test_lazy_yields_tickets_in_chunks(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1','2','3','4','5']]),
+            '*TicketGet*'    => Http::sequence()
+                ->push(['Ticket' => [$this->fakeTicket('1'), $this->fakeTicket('2')]])
+                ->push(['Ticket' => [$this->fakeTicket('3'), $this->fakeTicket('4')]])
+                ->push(['Ticket' => [$this->fakeTicket('5')]]),
+        ]);
+
+        $iterator = Znuny::tickets()->where('X', 'Y')->lazy(chunkSize: 2);
+        $collected = [];
+        foreach ($iterator as $ticket) {
+            $collected[] = $ticket->id;
+        }
+
+        $this->assertSame(['1', '2', '3', '4', '5'], $collected);
+    }
+
     private function fakeTicket(string $id): array
     {
         return [

@@ -175,9 +175,14 @@ class TicketBuilder
         );
     }
 
-    /** Implemented in Task 5.4. */
     public function lazy(int $chunkSize = 100): \Generator
     {
-        throw new \BadMethodCallException('lazy() is implemented in Task 5.4');
+        $ids = $this->ids();
+
+        foreach (array_chunk($ids->all(), max(1, $chunkSize)) as $chunk) {
+            foreach ($this->fetchByIds($chunk) as $ticket) {
+                yield $ticket;
+            }
+        }
     }
 }
