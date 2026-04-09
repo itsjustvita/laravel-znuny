@@ -57,4 +57,15 @@ class TicketResource extends Resource
             'Ticket'   => TicketInputMapper::mapTicket($ticket),
         ]);
     }
+
+    /**
+     * @param  array<string, mixed>  $article
+     */
+    public function addArticle(string $ticketId, array $article): void
+    {
+        $this->client->request('TicketUpdate/' . rawurlencode($ticketId), [
+            'TicketID' => $ticketId,
+            'Article'  => TicketInputMapper::mapArticle($article),
+        ]);
+    }
 }
