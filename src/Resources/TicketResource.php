@@ -2,11 +2,24 @@
 
 namespace ItsJustVita\LaravelZnuny\Resources;
 
+use ItsJustVita\LaravelZnuny\Builders\TicketCreateBuilder;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 
 class TicketResource extends Resource
 {
+    /**
+     * @param  array<string, mixed>  $ticket
+     */
+    public function create(array $ticket): TicketCreateBuilder
+    {
+        return new TicketCreateBuilder(
+            client: $this->client,
+            resource: $this,
+            ticket: $ticket,
+        );
+    }
+
     public function find(string $ticketId, bool $withArticles = false, bool $withDynamicFields = false): Ticket
     {
         $payload = ['TicketID' => $ticketId];
