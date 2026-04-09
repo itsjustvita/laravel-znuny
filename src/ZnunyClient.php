@@ -7,6 +7,7 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use Throwable;
 
@@ -26,6 +27,15 @@ class ZnunyClient
 
     public function request(string $operation, array $payload = []): array
     {
+        return $this->requestWithRetry(
+            $operation,
+            $payload,
+            retriesLeft: $this->autoRetryEnabled() ? 1 : 0,
+        );
+    }
+
+    protected function requestWithRetry(string $operation, array $payload, int $retriesLeft): array
+    {
         $sessionId = $this->sessionManager->sessionId(
             $this->connection,
             fn (string $name) => $this->createSession(),
@@ -33,7 +43,22 @@ class ZnunyClient
 
         $body = array_merge(['SessionID' => $sessionId], $payload);
 
-        return $this->dispatch($operation, $body);
+        try {
+            return $this->dispatch($operation, $body);
+        } catch (ZnunySessionExpiredException $e) {
+            if ($retriesLeft <= 0) {
+                throw $e;
+            }
+
+            $this->sessionManager->invalidate($this->connection);
+
+            return $this->requestWithRetry($operation, $payload, $retriesLeft - 1);
+        }
+    }
+
+    protected function autoRetryEnabled(): bool
+    {
+        return (bool) config('znuny.session.auto_retry_on_expired', true);
     }
 
     protected function createSession(): string

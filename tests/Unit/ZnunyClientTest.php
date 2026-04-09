@@ -116,4 +116,53 @@ final class ZnunyClientTest extends TestCase
         $this->assertSame('42', $result['Ticket'][0]['TicketID']);
         Http::assertSentCount(3); // SessionCreate + TicketGet(503) + TicketGet(200)
     }
+
+    public function test_it_retries_once_on_session_expired_and_succeeds(): void
+    {
+        $sequence = Http::sequence()
+            ->push(['SessionID' => 'SESS_OLD'])
+            ->push(['Error' => ['ErrorCode' => 'TicketGet.AuthFail', 'ErrorMessage' => 'SessionID expired']])
+            ->push(['SessionID' => 'SESS_NEW'])
+            ->push(['Ticket' => [['TicketID' => '42']]]);
+
+        Http::fake(['*' => $sequence]);
+
+        $client = $this->makeClient();
+        $result = $client->request('TicketGet', ['TicketID' => '42']);
+
+        $this->assertSame(['TicketID' => '42'], $result['Ticket'][0]);
+        Http::assertSentCount(4);
+    }
+
+    public function test_it_does_not_retry_twice_on_session_expired(): void
+    {
+        $sequence = Http::sequence()
+            ->push(['SessionID' => 'SESS_A'])
+            ->push(['Error' => ['ErrorCode' => 'TicketGet.AuthFail', 'ErrorMessage' => 'SessionID expired']])
+            ->push(['SessionID' => 'SESS_B'])
+            ->push(['Error' => ['ErrorCode' => 'TicketGet.AuthFail', 'ErrorMessage' => 'SessionID expired']]);
+
+        Http::fake(['*' => $sequence]);
+
+        $client = $this->makeClient();
+
+        $this->expectException(\ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException::class);
+        $client->request('TicketGet', ['TicketID' => '42']);
+    }
+
+    public function test_it_honors_disabled_auto_retry(): void
+    {
+        $sequence = Http::sequence()
+            ->push(['SessionID' => 'SESS_A'])
+            ->push(['Error' => ['ErrorCode' => 'TicketGet.AuthFail', 'ErrorMessage' => 'SessionID expired']]);
+
+        Http::fake(['*' => $sequence]);
+
+        config()->set('znuny.session.auto_retry_on_expired', false);
+
+        $client = $this->makeClient();
+
+        $this->expectException(\ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException::class);
+        $client->request('TicketGet', ['TicketID' => '42']);
+    }
 }
