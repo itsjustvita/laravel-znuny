@@ -73,4 +73,29 @@ class TicketResource extends Resource
     {
         $this->update($ticketId, ['state' => $state]);
     }
+
+    public function query(): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    {
+        return new \ItsJustVita\LaravelZnuny\Builders\TicketBuilder($this->client, $this);
+    }
+
+    public function where(string $field, mixed $value): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    {
+        return $this->query()->where($field, $value);
+    }
+
+    public function whereState(string|array $states): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    {
+        return $this->query()->whereState($states);
+    }
+
+    public function whereQueue(string|array $queues): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    {
+        return $this->query()->whereQueue($queues);
+    }
+
+    public function whereCustomerId(string $customerId): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    {
+        return $this->query()->whereCustomerId($customerId);
+    }
 }
