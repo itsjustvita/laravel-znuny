@@ -51,4 +51,15 @@ class QueueResource extends Resource
 
         return $queue;
     }
+
+    public function resolve(string $type, bool $businessCustomer): string
+    {
+        $segment = $businessCustomer ? 'business' : 'private';
+
+        $configured = config("znuny.queues.resolution.{$segment}.{$type}");
+
+        return $configured !== null
+            ? (string) $configured
+            : (string) config('znuny.queues.default');
+    }
 }

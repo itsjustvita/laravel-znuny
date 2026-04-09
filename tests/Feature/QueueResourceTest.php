@@ -79,4 +79,37 @@ final class QueueResourceTest extends TestCase
         $this->expectException(QueueNotFoundException::class);
         Znuny::queues()->findByName('Nonexistent');
     }
+
+    public function test_resolve_returns_business_queue_id(): void
+    {
+        config()->set('znuny.queues.resolution.business.relocation', '901');
+        config()->set('znuny.queues.resolution.private.relocation', '902');
+
+        $this->assertSame('901', Znuny::queues()->resolve('relocation', businessCustomer: true));
+        $this->assertSame('902', Znuny::queues()->resolve('relocation', businessCustomer: false));
+    }
+
+    public function test_resolve_falls_back_to_default_when_not_configured(): void
+    {
+        config()->set('znuny.queues.default', '803');
+
+        $this->assertSame('803', Znuny::queues()->resolve('unknown_type', businessCustomer: true));
+    }
+
+    public function test_resolve_works_for_all_common_ticket_types(): void
+    {
+        config()->set('znuny.queues.resolution.business', [
+            'data_changes'      => '100',
+            'relocation'        => '101',
+            'cancellation'      => '102',
+            'tariff_change'     => '103',
+            'contract_transfer' => '104',
+        ]);
+
+        $this->assertSame('100', Znuny::queues()->resolve('data_changes', businessCustomer: true));
+        $this->assertSame('101', Znuny::queues()->resolve('relocation', businessCustomer: true));
+        $this->assertSame('102', Znuny::queues()->resolve('cancellation', businessCustomer: true));
+        $this->assertSame('103', Znuny::queues()->resolve('tariff_change', businessCustomer: true));
+        $this->assertSame('104', Znuny::queues()->resolve('contract_transfer', businessCustomer: true));
+    }
 }
