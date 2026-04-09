@@ -69,11 +69,19 @@ abstract class ZnunyException extends RuntimeException
 
     private function sanitize(array $payload): array
     {
-        $redactKeys = ['Password', 'SessionID', 'UserPw', 'Secret'];
+        $redactKeys = [
+            'password', 'sessionid', 'userpw', 'pw', 'newpw',
+            'secret', 'token', 'accesstoken', 'apikey', 'authorization', 'otp',
+        ];
 
         foreach ($payload as $key => $value) {
-            if (in_array($key, $redactKeys, true)) {
-                unset($payload[$key]);
+            if (is_array($value)) {
+                $payload[$key] = $this->sanitize($value);
+                continue;
+            }
+
+            if (is_string($key) && in_array(strtolower($key), $redactKeys, true)) {
+                $payload[$key] = '[REDACTED]';
             }
         }
 

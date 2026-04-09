@@ -6,8 +6,9 @@ class ExceptionMapper
 {
     public function fromErrorResponse(array $body, string $operation, string $connection, array $payload): ZnunyException
     {
-        $code = (string) ($body['Error']['ErrorCode'] ?? '');
-        $message = (string) ($body['Error']['ErrorMessage'] ?? 'Unknown Znuny error');
+        $error = is_array($body['Error'] ?? null) ? $body['Error'] : [];
+        $code = (string) ($error['ErrorCode'] ?? '');
+        $message = (string) ($error['ErrorMessage'] ?? 'Unknown Znuny error');
 
         $exception = $this->selectExceptionClass($code, $message, $operation);
         $exception->setErrorCode($code);
@@ -21,7 +22,10 @@ class ExceptionMapper
 
     public function fromHttpStatus(int $status, array $body, string $operation, string $connection, array $payload): ZnunyException
     {
-        $message = sprintf('[HTTP %d] %s', $status, $body['message'] ?? $operation . ' failed');
+        $error = is_array($body['Error'] ?? null) ? $body['Error'] : [];
+        $code = (string) ($error['ErrorCode'] ?? '');
+        $znunyMessage = (string) ($error['ErrorMessage'] ?? $body['message'] ?? "{$operation} failed");
+        $message = sprintf('[HTTP %d] %s', $status, $znunyMessage);
 
         $exception = match (true) {
             $status === 401 || $status === 403 => new ZnunyAuthenticationException($message),
@@ -30,6 +34,7 @@ class ExceptionMapper
             default                             => new ZnunyServerException($message),
         };
 
+        $exception->setErrorCode($code);
         $exception->setOperation($operation);
         $exception->setConnection($connection);
         $exception->setRequestPayload($payload);
@@ -96,8 +101,8 @@ class ExceptionMapper
             return new ZnunyRateLimitException($fullMessage);
         }
 
-        // Fallback: anonymous subclass of ZnunyException to allow throwing
-        return new class($fullMessage) extends ZnunyException {};
+        // Fallback: concrete generic exception (named class for log grouping)
+        return new GenericZnunyException($fullMessage);
     }
 
     private function notFoundForOperation(string $operation, string $message): ZnunyNotFoundException
@@ -106,7 +111,7 @@ class ExceptionMapper
             str_starts_with($operation, 'Ticket')   => new TicketNotFoundException($message),
             str_starts_with($operation, 'Queue')    => new QueueNotFoundException($message),
             str_starts_with($operation, 'Customer') => new CustomerNotFoundException($message),
-            default                                  => new class($message) extends ZnunyNotFoundException {},
+            default                                  => new ZnunyNotFoundException($message),
         };
     }
 }
