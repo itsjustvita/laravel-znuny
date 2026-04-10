@@ -92,6 +92,15 @@ class ZnunyClient
             payload: $this->redact($body),
         ));
 
+        if ((bool) config('znuny.logging.enabled') && (bool) config('znuny.logging.log_requests')) {
+            \Illuminate\Support\Facades\Log::channel((string) config('znuny.logging.channel', 'znuny'))
+                ->info('Znuny request', [
+                    'connection' => $this->connection,
+                    'operation'  => $operation,
+                    'payload'    => $this->redact($body),
+                ]);
+        }
+
         $start = microtime(true);
 
         try {
@@ -104,6 +113,7 @@ class ZnunyClient
                 exception: $ex,
                 payload: $this->redact($body),
             ));
+            $this->logError($operation, $ex);
             throw $ex;
         }
 
@@ -123,6 +133,7 @@ class ZnunyClient
                 exception: $ex,
                 payload: $this->redact($body),
             ));
+            $this->logError($operation, $ex);
             throw $ex;
         }
 
@@ -141,6 +152,7 @@ class ZnunyClient
                 exception: $ex,
                 payload: $this->redact($body),
             ));
+            $this->logError($operation, $ex);
             throw $ex;
         }
 
@@ -162,6 +174,19 @@ class ZnunyClient
         }
 
         return $payload;
+    }
+
+    protected function logError(string $operation, \ItsJustVita\LaravelZnuny\Exceptions\ZnunyException $ex): void
+    {
+        if ((bool) config('znuny.logging.enabled') && (bool) config('znuny.logging.log_errors')) {
+            \Illuminate\Support\Facades\Log::channel((string) config('znuny.logging.channel', 'znuny'))
+                ->error('Znuny error', [
+                    'connection' => $this->connection,
+                    'operation'  => $operation,
+                    'code'       => $ex->getErrorCode(),
+                    'message'    => $ex->getMessage(),
+                ]);
+        }
     }
 
     protected function httpClient(): PendingRequest
