@@ -20,6 +20,12 @@ class ZnunyServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__ . '/../config/znuny.php' => config_path('znuny.php'),
             ], 'znuny-config');
+
+            $this->commands([
+                \ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand::class,
+                \ItsJustVita\LaravelZnuny\Commands\CacheClearCommand::class,
+                \ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand::class,
+            ]);
         }
     }
 }
