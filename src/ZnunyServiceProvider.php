@@ -27,5 +27,19 @@ class ZnunyServiceProvider extends ServiceProvider
                 \ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand::class,
             ]);
         }
+
+        if ((bool) config('znuny.webhooks.enabled', false)) {
+            $this->registerWebhookRoutes();
+        }
+    }
+
+    public function registerWebhookRoutes(): void
+    {
+        $prefix = (string) config('znuny.webhooks.route_prefix', 'znuny/webhooks');
+        $middleware = (array) config('znuny.webhooks.middleware', ['api']);
+
+        \Illuminate\Support\Facades\Route::prefix($prefix)
+            ->middleware($middleware)
+            ->post('/{event}', [\ItsJustVita\LaravelZnuny\Webhooks\WebhookController::class, 'handle']);
     }
 }
