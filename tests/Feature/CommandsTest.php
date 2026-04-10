@@ -58,4 +58,27 @@ final class CommandsTest extends TestCase
 
         $this->artisan('znuny:cache-clear --all')->assertExitCode(0);
     }
+
+    public function test_generate_fields_writes_helper_class(): void
+    {
+        $target = storage_path('app/znuny-test/DynamicFields.php');
+        @unlink($target);
+        @mkdir(dirname($target), 0777, true);
+
+        config()->set('znuny.dynamic_fields', [
+            'CustomerSegment' => ['type' => 'string', 'allowed' => ['business', 'private']],
+            'OrderId'         => ['type' => 'string'],
+            'Priority'        => ['type' => 'integer'],
+        ]);
+
+        $this->artisan('znuny:generate-fields', ['--output' => $target])
+            ->assertExitCode(0);
+
+        $this->assertFileExists($target);
+        $contents = file_get_contents($target);
+        $this->assertStringContainsString('public function customerSegment(', $contents);
+        $this->assertStringContainsString('public function orderId(', $contents);
+        $this->assertStringContainsString('public function priority(', $contents);
+        $this->assertStringContainsString('namespace App\\Znuny;', $contents);
+    }
 }
