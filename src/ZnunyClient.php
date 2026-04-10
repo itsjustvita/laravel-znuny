@@ -84,36 +84,84 @@ class ZnunyClient
 
     protected function dispatch(string $operation, array $body): array
     {
-        $url = rtrim($this->config['base_url'], '/').'/'.ltrim($operation, '/');
+        $url = rtrim($this->config['base_url'], '/') . '/' . ltrim($operation, '/');
+
+        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent(
+            connection: $this->connection,
+            operation: $operation,
+            payload: $this->redact($body),
+        ));
+
+        $start = microtime(true);
 
         try {
             $response = $this->httpClient()->post($url, $body);
         } catch (ConnectionException $e) {
-            throw $this->exceptionMapper->fromTransportError($e, $operation, $this->connection, $body);
+            $ex = $this->exceptionMapper->fromTransportError($e, $operation, $this->connection, $body);
+            event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed(
+                connection: $this->connection,
+                operation: $operation,
+                exception: $ex,
+                payload: $this->redact($body),
+            ));
+            throw $ex;
         }
 
+        $elapsed = (microtime(true) - $start) * 1000.0;
+
         if ($response->serverError()) {
-            throw $this->exceptionMapper->fromHttpStatus(
+            $ex = $this->exceptionMapper->fromHttpStatus(
                 status: $response->status(),
                 body: $response->json() ?? [],
                 operation: $operation,
                 connection: $this->connection,
                 payload: $body,
             );
+            event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed(
+                connection: $this->connection,
+                operation: $operation,
+                exception: $ex,
+                payload: $this->redact($body),
+            ));
+            throw $ex;
         }
 
         $data = $response->json() ?? [];
 
         if (isset($data['Error'])) {
-            throw $this->exceptionMapper->fromErrorResponse(
+            $ex = $this->exceptionMapper->fromErrorResponse(
                 body: $data,
                 operation: $operation,
                 connection: $this->connection,
                 payload: $body,
             );
+            event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed(
+                connection: $this->connection,
+                operation: $operation,
+                exception: $ex,
+                payload: $this->redact($body),
+            ));
+            throw $ex;
         }
 
+        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyResponseReceived(
+            connection: $this->connection,
+            operation: $operation,
+            responseTimeMs: $elapsed,
+            payload: $this->redact($body),
+            response: $data,
+        ));
+
         return $data;
+    }
+
+    protected function redact(array $payload): array
+    {
+        foreach (['SessionID', 'Password', 'UserPw'] as $key) {
+            unset($payload[$key]);
+        }
+
+        return $payload;
     }
 
     protected function httpClient(): PendingRequest

@@ -56,6 +56,12 @@ class TicketResource extends Resource
             'TicketID' => $ticketId,
             'Ticket'   => TicketInputMapper::mapTicket($ticket),
         ]);
+
+        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated(
+            connection: $this->client->connection(),
+            ticketId: $ticketId,
+            changes: $ticket,
+        ));
     }
 
     /**
@@ -67,6 +73,12 @@ class TicketResource extends Resource
             'TicketID' => $ticketId,
             'Article'  => TicketInputMapper::mapArticle($article),
         ]);
+
+        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyArticleAdded(
+            connection: $this->client->connection(),
+            ticketId: $ticketId,
+            article: $article,
+        ));
     }
 
     public function close(string $ticketId, string $state = 'closed successful'): void

@@ -75,6 +75,13 @@ class TicketCreateBuilder
             throw new InvalidArgumentException('TicketCreate succeeded but no TicketID was returned.');
         }
 
-        return $this->resource->find($ticketId, withArticles: true, withDynamicFields: true);
+        $ticket = $this->resource->find($ticketId, withArticles: true, withDynamicFields: true);
+
+        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyTicketCreated(
+            connection: $this->client->connection(),
+            ticket: $ticket,
+        ));
+
+        return $ticket;
     }
 }
