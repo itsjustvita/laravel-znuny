@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny;
 
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
+use ItsJustVita\LaravelZnuny\Caching\CacheManager;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
 use ItsJustVita\LaravelZnuny\Resources\CustomerResource;
 use ItsJustVita\LaravelZnuny\Resources\PriorityResource;
@@ -95,22 +96,22 @@ class ZnunyManager
 
     public function queues(): QueueResource
     {
-        return new QueueResource($this->client());
+        return new QueueResource($this->client(), $this->buildCacheManager());
     }
 
     public function states(): StateResource
     {
-        return new StateResource($this->client());
+        return new StateResource($this->client(), $this->buildCacheManager());
     }
 
     public function priorities(): PriorityResource
     {
-        return new PriorityResource($this->client());
+        return new PriorityResource($this->client(), $this->buildCacheManager());
     }
 
     public function types(): TypeResource
     {
-        return new TypeResource($this->client());
+        return new TypeResource($this->client(), $this->buildCacheManager());
     }
 
     public function customers(): CustomerResource
@@ -120,12 +121,17 @@ class ZnunyManager
 
     public function flush(?string $resource = null): void
     {
-        // Wired in Phase 7
+        $this->buildCacheManager()->flush($this->connectionName(), $resource);
     }
 
     public function flushAll(): void
     {
-        // Wired in Phase 7
+        $connections = array_keys((array) $this->app['config']->get('znuny.connections', []));
+        $manager = $this->buildCacheManager();
+
+        foreach ($connections as $name) {
+            $manager->flush($name);
+        }
     }
 
     protected function defaultConnection(): string
@@ -142,6 +148,19 @@ class ZnunyManager
         }
 
         return $config;
+    }
+
+    protected function buildCacheManager(): CacheManager
+    {
+        $store = $this->app['config']->get('znuny.cache.store');
+        $cache = $store ? Cache::store($store) : Cache::store();
+
+        return new CacheManager(
+            cache: $cache,
+            prefix: (string) $this->app['config']->get('znuny.cache.prefix', 'znuny:lookup:'),
+            ttls: (array) $this->app['config']->get('znuny.cache.ttl', []),
+            enabled: (bool) $this->app['config']->get('znuny.cache.enabled', true),
+        );
     }
 
     protected function buildSessionManager(): SessionManager

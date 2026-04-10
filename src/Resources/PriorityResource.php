@@ -10,10 +10,12 @@ class PriorityResource extends Resource
     /** @return Collection<int, Priority> */
     public function all(): Collection
     {
-        $response = $this->client->request('PriorityList', []);
+        return $this->remember('priorities', function () {
+            $response = $this->client->request('PriorityList', []);
 
-        return collect($response['Priority'] ?? [])
-            ->map(fn (array $row) => Priority::fromZnunyResponse($row))
-            ->values();
+            return collect($response['Priority'] ?? [])
+                ->map(fn (array $row) => Priority::fromZnunyResponse($row))
+                ->values();
+        });
     }
 }
