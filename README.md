@@ -1,5 +1,10 @@
 # laravel-znuny
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
+[![Total Downloads](https://img.shields.io/packagist/dt/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
+[![PHP Version](https://img.shields.io/packagist/php-v/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
+[![License](https://img.shields.io/packagist/l/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
+
 > Modern Laravel SDK for the Znuny / OTRS Community Edition Generic Interface REST API.
 
 Replaces hand-rolled `OTRSService` implementations with a typed, fluent, Laravel-native package: facade-centric API, multi-connection support, cache-backed sessions with auto-retry, typed DTOs, fluent ticket search with pagination, per-resource caching for lookup data, and hybrid dynamic fields.
