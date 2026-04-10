@@ -26,8 +26,8 @@ final readonly class Type
     public function toArray(): array
     {
         return [
-            'TypeID'  => $this->id,
-            'Name'    => $this->name,
+            'TypeID' => $this->id,
+            'Name' => $this->name,
             'ValidID' => $this->validId,
         ];
     }

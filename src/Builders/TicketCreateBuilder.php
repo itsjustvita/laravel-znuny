@@ -4,6 +4,8 @@ namespace ItsJustVita\LaravelZnuny\Builders;
 
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\DynamicFields\DynamicFieldValidator;
+use ItsJustVita\LaravelZnuny\Events\ZnunyTicketCreated;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 
@@ -53,14 +55,14 @@ class TicketCreateBuilder
         }
 
         if ($this->dynamicFields !== []) {
-            $validator = new \ItsJustVita\LaravelZnuny\DynamicFields\DynamicFieldValidator(
+            $validator = new DynamicFieldValidator(
                 (array) config('znuny.dynamic_fields', [])
             );
             $validator->validate($this->dynamicFields);
         }
 
         $payload = [
-            'Ticket'  => TicketInputMapper::mapTicket($this->ticket),
+            'Ticket' => TicketInputMapper::mapTicket($this->ticket),
             'Article' => TicketInputMapper::mapArticle($this->article),
         ];
 
@@ -77,7 +79,7 @@ class TicketCreateBuilder
 
         $ticket = $this->resource->find($ticketId, withArticles: true, withDynamicFields: true);
 
-        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyTicketCreated(
+        event(new ZnunyTicketCreated(
             connection: $this->client->connection(),
             ticket: $ticket,
         ));

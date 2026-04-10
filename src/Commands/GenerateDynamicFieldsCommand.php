@@ -25,7 +25,7 @@ class GenerateDynamicFieldsCommand extends Command
         $target = (string) ($this->option('output') ?? app_path('Znuny/DynamicFields.php'));
         @mkdir(dirname($target), 0777, true);
 
-        $stub = file_get_contents(__DIR__ . '/../../stubs/DynamicFields.stub');
+        $stub = file_get_contents(__DIR__.'/../../stubs/DynamicFields.stub');
         $methods = $this->buildMethods($fields);
 
         $contents = str_replace('{{ methods }}', $methods, $stub);
@@ -62,8 +62,8 @@ PHP;
         return match ($type) {
             'integer' => 'int',
             'boolean' => 'bool',
-            'float'   => 'float',
-            default   => 'string',
+            'float' => 'float',
+            default => 'string',
         };
     }
 }

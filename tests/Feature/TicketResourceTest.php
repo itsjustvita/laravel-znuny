@@ -13,13 +13,13 @@ final class TicketResourceTest extends TestCase
     public function test_find_returns_ticket_dto(): void
     {
         $payload = json_decode(
-            file_get_contents(__DIR__ . '/../fixtures/ticket-with-articles.json'),
+            file_get_contents(__DIR__.'/../fixtures/ticket-with-articles.json'),
             true,
         );
 
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Ticket' => [$payload]]),
+            '*TicketGet*' => Http::response(['Ticket' => [$payload]]),
         ]);
 
         $ticket = Znuny::tickets()->find('42');
@@ -32,16 +32,16 @@ final class TicketResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Ticket' => [[
-                'TicketID'     => '1',
+            '*TicketGet*' => Http::response(['Ticket' => [[
+                'TicketID' => '1',
                 'TicketNumber' => '1',
-                'Title'        => 't',
-                'QueueID'      => '1',
-                'Queue'        => 'Q',
-                'State'        => 'new',
-                'Priority'     => '3 normal',
-                'Created'      => '2026-04-08 10:00:00',
-                'Article'      => [],
+                'Title' => 't',
+                'QueueID' => '1',
+                'Queue' => 'Q',
+                'State' => 'new',
+                'Priority' => '3 normal',
+                'Created' => '2026-04-08 10:00:00',
+                'Article' => [],
             ]]]),
         ]);
 
@@ -56,8 +56,8 @@ final class TicketResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Error' => [
-                'ErrorCode'    => 'TicketGet.NotFound',
+            '*TicketGet*' => Http::response(['Error' => [
+                'ErrorCode' => 'TicketGet.NotFound',
                 'ErrorMessage' => 'No such ticket',
             ]]),
         ]);
@@ -70,15 +70,15 @@ final class TicketResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Ticket' => [[
-                'TicketID'     => 'weird/id',
+            '*TicketGet*' => Http::response(['Ticket' => [[
+                'TicketID' => 'weird/id',
                 'TicketNumber' => '1',
-                'Title'        => 't',
-                'QueueID'      => '1',
-                'Queue'        => 'Q',
-                'State'        => 'new',
-                'Priority'     => '3 normal',
-                'Created'      => '2026-04-08 10:00:00',
+                'Title' => 't',
+                'QueueID' => '1',
+                'Queue' => 'Q',
+                'State' => 'new',
+                'Priority' => '3 normal',
+                'Created' => '2026-04-08 10:00:00',
             ]]]),
         ]);
 
@@ -108,10 +108,10 @@ final class TicketResourceTest extends TestCase
         ]);
 
         Znuny::tickets()->addArticle('42', [
-            'subject'              => 'Internal note',
-            'body'                 => 'Customer called back',
+            'subject' => 'Internal note',
+            'body' => 'Customer called back',
             'communicationChannel' => 'Internal',
-            'senderType'           => 'agent',
+            'senderType' => 'agent',
         ]);
 
         Http::assertSent(fn ($r) => str_contains($r->url(), 'TicketUpdate/42')

@@ -7,14 +7,19 @@ use RuntimeException;
 abstract class ZnunyException extends RuntimeException
 {
     protected string $operation = '';
+
     protected string $errorCode = '';
+
     protected string $connection = '';
+
     protected array $requestPayload = [];
+
     protected array $responseBody = [];
 
     public function setOperation(string $operation): static
     {
         $this->operation = $operation;
+
         return $this;
     }
 
@@ -26,6 +31,7 @@ abstract class ZnunyException extends RuntimeException
     public function setErrorCode(string $code): static
     {
         $this->errorCode = $code;
+
         return $this;
     }
 
@@ -37,6 +43,7 @@ abstract class ZnunyException extends RuntimeException
     public function setConnection(string $connection): static
     {
         $this->connection = $connection;
+
         return $this;
     }
 
@@ -48,6 +55,7 @@ abstract class ZnunyException extends RuntimeException
     public function setRequestPayload(array $payload): static
     {
         $this->requestPayload = $this->sanitize($payload);
+
         return $this;
     }
 
@@ -59,6 +67,7 @@ abstract class ZnunyException extends RuntimeException
     public function setResponseBody(array $body): static
     {
         $this->responseBody = $body;
+
         return $this;
     }
 
@@ -70,11 +79,11 @@ abstract class ZnunyException extends RuntimeException
     public function context(): array
     {
         return [
-            'znuny_operation'  => $this->operation,
+            'znuny_operation' => $this->operation,
             'znuny_error_code' => $this->errorCode,
             'znuny_connection' => $this->connection,
-            'znuny_payload'    => $this->requestPayload,
-            'znuny_response'   => $this->responseBody,
+            'znuny_payload' => $this->requestPayload,
+            'znuny_response' => $this->responseBody,
         ];
     }
 
@@ -88,6 +97,7 @@ abstract class ZnunyException extends RuntimeException
         foreach ($payload as $key => $value) {
             if (is_array($value)) {
                 $payload[$key] = $this->sanitize($value);
+
                 continue;
             }
 

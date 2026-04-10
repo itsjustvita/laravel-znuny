@@ -137,8 +137,8 @@ class TicketBuilder
 
         foreach ($chunks as $chunk) {
             $response = $this->client->request('TicketGet', [
-                'TicketID'      => $chunk,
-                'AllArticles'   => 1,
+                'TicketID' => $chunk,
+                'AllArticles' => 1,
                 'DynamicFields' => 1,
             ]);
 

@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use ItsJustVita\LaravelZnuny\ZnunyServiceProvider;
 
 final class WebhookStubTest extends TestCase
 {
@@ -20,7 +21,7 @@ final class WebhookStubTest extends TestCase
         config()->set('znuny.webhooks.enabled', true);
 
         // Re-register routes for this test scope
-        $this->app->getProvider(\ItsJustVita\LaravelZnuny\ZnunyServiceProvider::class)->registerWebhookRoutes();
+        $this->app->getProvider(ZnunyServiceProvider::class)->registerWebhookRoutes();
 
         $response = $this->postJson('/znuny/webhooks/ticket.created', ['foo' => 'bar']);
 

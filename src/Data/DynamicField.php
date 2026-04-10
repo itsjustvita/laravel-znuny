@@ -20,7 +20,7 @@ final readonly class DynamicField
     public function toArray(): array
     {
         return [
-            'Name'  => $this->name,
+            'Name' => $this->name,
             'Value' => $this->value,
         ];
     }

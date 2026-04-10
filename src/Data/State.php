@@ -28,10 +28,10 @@ final readonly class State
     public function toArray(): array
     {
         return [
-            'StateID'  => $this->id,
-            'Name'     => $this->name,
+            'StateID' => $this->id,
+            'Name' => $this->name,
             'TypeName' => $this->typeName,
-            'ValidID'  => $this->validId,
+            'ValidID' => $this->validId,
         ];
     }
 }

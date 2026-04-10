@@ -14,19 +14,19 @@ final class MultiConnectionTest extends TestCase
         parent::defineEnvironment($app);
 
         $app['config']->set('znuny.connections.tenant-a', [
-            'base_url'   => 'https://tenant-a.test/otrs/nph-genericinterface.pl/Webservice/test',
-            'username'   => 'userA',
-            'password'   => 'passA',
+            'base_url' => 'https://tenant-a.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'userA',
+            'password' => 'passA',
             'verify_ssl' => false,
-            'timeout'    => 5,
+            'timeout' => 5,
         ]);
 
         $app['config']->set('znuny.connections.tenant-b', [
-            'base_url'   => 'https://tenant-b.test/otrs/nph-genericinterface.pl/Webservice/test',
-            'username'   => 'userB',
-            'password'   => 'passB',
+            'base_url' => 'https://tenant-b.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'userB',
+            'password' => 'passB',
             'verify_ssl' => false,
-            'timeout'    => 5,
+            'timeout' => 5,
         ]);
     }
 

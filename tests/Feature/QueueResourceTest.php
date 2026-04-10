@@ -14,7 +14,7 @@ final class QueueResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*'    => Http::response(['Queue' => [
+            '*QueueList*' => Http::response(['Queue' => [
                 ['QueueID' => '1',   'Name' => 'Postmaster', 'GroupID' => '1', 'ValidID' => '1'],
                 ['QueueID' => '803', 'Name' => 'Support',    'GroupID' => '1', 'ValidID' => '1'],
             ]]),
@@ -30,7 +30,7 @@ final class QueueResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueGet*'     => Http::response(['Queue' => [[
+            '*QueueGet*' => Http::response(['Queue' => [[
                 'QueueID' => '803', 'Name' => 'Support', 'GroupID' => '1', 'ValidID' => '1',
             ]]]),
         ]);
@@ -45,7 +45,7 @@ final class QueueResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueGet*'     => Http::response(['Queue' => []]),
+            '*QueueGet*' => Http::response(['Queue' => []]),
         ]);
 
         $this->expectException(QueueNotFoundException::class);
@@ -56,7 +56,7 @@ final class QueueResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*'    => Http::response(['Queue' => [
+            '*QueueList*' => Http::response(['Queue' => [
                 ['QueueID' => '1',   'Name' => 'Postmaster', 'GroupID' => '1', 'ValidID' => '1'],
                 ['QueueID' => '803', 'Name' => 'Support',    'GroupID' => '1', 'ValidID' => '1'],
             ]]),
@@ -71,7 +71,7 @@ final class QueueResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*'    => Http::response(['Queue' => [
+            '*QueueList*' => Http::response(['Queue' => [
                 ['QueueID' => '1', 'Name' => 'Postmaster', 'GroupID' => '1', 'ValidID' => '1'],
             ]]),
         ]);
@@ -99,10 +99,10 @@ final class QueueResourceTest extends TestCase
     public function test_resolve_works_for_all_common_ticket_types(): void
     {
         config()->set('znuny.queues.resolution.business', [
-            'data_changes'      => '100',
-            'relocation'        => '101',
-            'cancellation'      => '102',
-            'tariff_change'     => '103',
+            'data_changes' => '100',
+            'relocation' => '101',
+            'cancellation' => '102',
+            'tariff_change' => '103',
             'contract_transfer' => '104',
         ]);
 

@@ -34,14 +34,14 @@ final readonly class Article
     public function toArray(): array
     {
         return [
-            'ArticleID'            => $this->id,
-            'Subject'              => $this->subject,
-            'Body'                 => $this->body,
-            'ContentType'          => $this->contentType,
+            'ArticleID' => $this->id,
+            'Subject' => $this->subject,
+            'Body' => $this->body,
+            'ContentType' => $this->contentType,
             'CommunicationChannel' => $this->communicationChannel,
-            'SenderType'           => $this->senderType,
-            'From'                 => $this->from,
-            'CreateTime'           => $this->created?->format('Y-m-d H:i:s'),
+            'SenderType' => $this->senderType,
+            'From' => $this->from,
+            'CreateTime' => $this->created?->format('Y-m-d H:i:s'),
         ];
     }
 }

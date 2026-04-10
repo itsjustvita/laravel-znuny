@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Data;
 
+use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Article;
 use ItsJustVita\LaravelZnuny\Data\DynamicField;
@@ -12,7 +13,7 @@ final class TicketTest extends TestCase
 {
     public function test_it_builds_from_fixture(): void
     {
-        $payload = json_decode(file_get_contents(__DIR__ . '/../../fixtures/ticket-with-articles.json'), true);
+        $payload = json_decode(file_get_contents(__DIR__.'/../../fixtures/ticket-with-articles.json'), true);
 
         $ticket = Ticket::fromZnunyResponse($payload);
 
@@ -36,21 +37,21 @@ final class TicketTest extends TestCase
         $this->assertInstanceOf(DynamicField::class, $ticket->dynamicFields->first());
         $this->assertSame('OrderId', $ticket->dynamicFields->first()->name);
 
-        $this->assertInstanceOf(\Carbon\Carbon::class, $ticket->created);
+        $this->assertInstanceOf(Carbon::class, $ticket->created);
         $this->assertSame('2026-04-08 10:00:00', $ticket->created->format('Y-m-d H:i:s'));
     }
 
     public function test_it_handles_minimal_payload(): void
     {
         $ticket = Ticket::fromZnunyResponse([
-            'TicketID'     => '1',
+            'TicketID' => '1',
             'TicketNumber' => '00001',
-            'Title'        => 'minimal',
-            'QueueID'      => '1',
-            'Queue'        => 'Misc',
-            'State'        => 'new',
-            'Priority'     => '3 normal',
-            'Created'      => '2026-04-08 10:00:00',
+            'Title' => 'minimal',
+            'QueueID' => '1',
+            'Queue' => 'Misc',
+            'State' => 'new',
+            'Priority' => '3 normal',
+            'Created' => '2026-04-08 10:00:00',
         ]);
 
         $this->assertCount(0, $ticket->articles);
@@ -61,13 +62,13 @@ final class TicketTest extends TestCase
     public function test_it_handles_missing_created(): void
     {
         $ticket = Ticket::fromZnunyResponse([
-            'TicketID'     => '1',
+            'TicketID' => '1',
             'TicketNumber' => '00001',
-            'Title'        => 'no timestamps',
-            'QueueID'      => '1',
-            'Queue'        => 'Misc',
-            'State'        => 'new',
-            'Priority'     => '3 normal',
+            'Title' => 'no timestamps',
+            'QueueID' => '1',
+            'Queue' => 'Misc',
+            'State' => 'new',
+            'Priority' => '3 normal',
         ]);
 
         $this->assertNull($ticket->created);

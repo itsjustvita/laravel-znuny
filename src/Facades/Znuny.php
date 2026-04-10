@@ -3,10 +3,12 @@
 namespace ItsJustVita\LaravelZnuny\Facades;
 
 use Illuminate\Support\Facades\Facade;
+use ItsJustVita\LaravelZnuny\ZnunyManager;
 
 /**
  * @method static \ItsJustVita\LaravelZnuny\ZnunyManager connection(?string $name = null)
- * @see \ItsJustVita\LaravelZnuny\ZnunyManager
+ *
+ * @see ZnunyManager
  */
 class Znuny extends Facade
 {

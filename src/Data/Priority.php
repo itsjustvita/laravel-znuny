@@ -27,8 +27,8 @@ final readonly class Priority
     {
         return [
             'PriorityID' => $this->id,
-            'Name'       => $this->name,
-            'ValidID'    => $this->validId,
+            'Name' => $this->name,
+            'ValidID' => $this->validId,
         ];
     }
 }

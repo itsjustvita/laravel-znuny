@@ -21,7 +21,7 @@ final class LoggingTest extends TestCase
 
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Ticket' => [[
+            '*TicketGet*' => Http::response(['Ticket' => [[
                 'TicketID' => '1', 'TicketNumber' => '1', 'Title' => 't',
                 'QueueID' => '1', 'Queue' => 'Q', 'State' => 'new',
                 'Priority' => '3 normal', 'Created' => '2026-04-08 10:00:00',
@@ -43,11 +43,12 @@ final class LoggingTest extends TestCase
 
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Error' => ['ErrorCode' => 'TicketGet.NotFound', 'ErrorMessage' => 'gone']]),
+            '*TicketGet*' => Http::response(['Error' => ['ErrorCode' => 'TicketGet.NotFound', 'ErrorMessage' => 'gone']]),
         ]);
 
         try {
             Znuny::tickets()->find('999');
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+        }
     }
 }

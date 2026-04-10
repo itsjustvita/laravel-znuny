@@ -31,7 +31,7 @@ final readonly class Queue
     {
         return [
             'QueueID' => $this->id,
-            'Name'    => $this->name,
+            'Name' => $this->name,
             'GroupID' => $this->groupId,
             'ValidID' => $this->validId,
             'Comment' => $this->comment,

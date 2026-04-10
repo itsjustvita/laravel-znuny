@@ -6,7 +6,12 @@ use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed;
+use ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent;
+use ItsJustVita\LaravelZnuny\Events\ZnunyResponseReceived;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use Throwable;
@@ -65,7 +70,7 @@ class ZnunyClient
     {
         $body = [
             'UserLogin' => $this->config['username'],
-            'Password'  => $this->config['password'],
+            'Password' => $this->config['password'],
         ];
 
         $response = $this->dispatch('SessionCreate', $body);
@@ -84,20 +89,20 @@ class ZnunyClient
 
     protected function dispatch(string $operation, array $body): array
     {
-        $url = rtrim($this->config['base_url'], '/') . '/' . ltrim($operation, '/');
+        $url = rtrim($this->config['base_url'], '/').'/'.ltrim($operation, '/');
 
-        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent(
+        event(new ZnunyRequestSent(
             connection: $this->connection,
             operation: $operation,
             payload: $this->redact($body),
         ));
 
         if ((bool) config('znuny.logging.enabled') && (bool) config('znuny.logging.log_requests')) {
-            \Illuminate\Support\Facades\Log::channel((string) config('znuny.logging.channel', 'znuny'))
+            Log::channel((string) config('znuny.logging.channel', 'znuny'))
                 ->info('Znuny request', [
                     'connection' => $this->connection,
-                    'operation'  => $operation,
-                    'payload'    => $this->redact($body),
+                    'operation' => $operation,
+                    'payload' => $this->redact($body),
                 ]);
         }
 
@@ -107,7 +112,7 @@ class ZnunyClient
             $response = $this->httpClient()->post($url, $body);
         } catch (ConnectionException $e) {
             $ex = $this->exceptionMapper->fromTransportError($e, $operation, $this->connection, $body);
-            event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed(
+            event(new ZnunyRequestFailed(
                 connection: $this->connection,
                 operation: $operation,
                 exception: $ex,
@@ -127,7 +132,7 @@ class ZnunyClient
                 connection: $this->connection,
                 payload: $body,
             );
-            event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed(
+            event(new ZnunyRequestFailed(
                 connection: $this->connection,
                 operation: $operation,
                 exception: $ex,
@@ -146,7 +151,7 @@ class ZnunyClient
                 connection: $this->connection,
                 payload: $body,
             );
-            event(new \ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed(
+            event(new ZnunyRequestFailed(
                 connection: $this->connection,
                 operation: $operation,
                 exception: $ex,
@@ -156,7 +161,7 @@ class ZnunyClient
             throw $ex;
         }
 
-        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyResponseReceived(
+        event(new ZnunyResponseReceived(
             connection: $this->connection,
             operation: $operation,
             responseTimeMs: $elapsed,
@@ -176,15 +181,15 @@ class ZnunyClient
         return $payload;
     }
 
-    protected function logError(string $operation, \ItsJustVita\LaravelZnuny\Exceptions\ZnunyException $ex): void
+    protected function logError(string $operation, ZnunyException $ex): void
     {
         if ((bool) config('znuny.logging.enabled') && (bool) config('znuny.logging.log_errors')) {
-            \Illuminate\Support\Facades\Log::channel((string) config('znuny.logging.channel', 'znuny'))
+            Log::channel((string) config('znuny.logging.channel', 'znuny'))
                 ->error('Znuny error', [
                     'connection' => $this->connection,
-                    'operation'  => $operation,
-                    'code'       => $ex->getErrorCode(),
-                    'message'    => $ex->getMessage(),
+                    'operation' => $operation,
+                    'code' => $ex->getErrorCode(),
+                    'message' => $ex->getMessage(),
                 ]);
         }
     }

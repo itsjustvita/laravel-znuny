@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Tests;
 
 use Illuminate\Support\Facades\Http;
+use ItsJustVita\LaravelZnuny\Facades\Znuny;
 use ItsJustVita\LaravelZnuny\ZnunyServiceProvider;
 use Orchestra\Testbench\TestCase as BaseTestCase;
 
@@ -23,7 +24,7 @@ abstract class TestCase extends BaseTestCase
     protected function getPackageAliases($app): array
     {
         return [
-            'Znuny' => \ItsJustVita\LaravelZnuny\Facades\Znuny::class,
+            'Znuny' => Znuny::class,
         ];
     }
 

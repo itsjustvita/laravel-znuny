@@ -10,8 +10,8 @@ final class TypeTest extends TestCase
     public function test_it_builds_from_znuny_response(): void
     {
         $type = Type::fromZnunyResponse([
-            'TypeID'  => '2',
-            'Name'    => 'Incident',
+            'TypeID' => '2',
+            'Name' => 'Incident',
             'ValidID' => '1',
         ]);
 
@@ -23,14 +23,14 @@ final class TypeTest extends TestCase
     public function test_it_serializes_to_array(): void
     {
         $type = Type::fromZnunyResponse([
-            'TypeID'  => '2',
-            'Name'    => 'Incident',
+            'TypeID' => '2',
+            'Name' => 'Incident',
             'ValidID' => '1',
         ]);
 
         $this->assertSame([
-            'TypeID'  => '2',
-            'Name'    => 'Incident',
+            'TypeID' => '2',
+            'Name' => 'Incident',
             'ValidID' => '1',
         ], $type->toArray());
     }

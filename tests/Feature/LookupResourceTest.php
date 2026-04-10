@@ -15,7 +15,7 @@ final class LookupResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*StateList*'    => Http::response(['State' => [
+            '*StateList*' => Http::response(['State' => [
                 ['StateID' => '1', 'Name' => 'new',  'TypeName' => 'new',  'ValidID' => '1'],
                 ['StateID' => '4', 'Name' => 'open', 'TypeName' => 'open', 'ValidID' => '1'],
             ]]),
@@ -46,7 +46,7 @@ final class LookupResourceTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TypeList*'     => Http::response(['Type' => [
+            '*TypeList*' => Http::response(['Type' => [
                 ['TypeID' => '1', 'Name' => 'Unclassified', 'ValidID' => '1'],
                 ['TypeID' => '2', 'Name' => 'Incident',     'ValidID' => '1'],
             ]]),

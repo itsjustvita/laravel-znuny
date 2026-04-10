@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
+use Carbon\Carbon;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
@@ -46,6 +48,7 @@ final class TicketBuilderTest extends TestCase
             if (! str_contains($r->url(), 'TicketSearch')) {
                 return false;
             }
+
             return ($r['CustomerID'] ?? null) === '12345'
                 && ($r['States'] ?? null) === ['open']
                 && ($r['Queues'] ?? null) === ['Support']
@@ -64,7 +67,7 @@ final class TicketBuilderTest extends TestCase
 
         Znuny::tickets()
             ->query()
-            ->whereCreatedAfter(\Carbon\Carbon::parse('2026-01-01 00:00:00'))
+            ->whereCreatedAfter(Carbon::parse('2026-01-01 00:00:00'))
             ->ids();
 
         Http::assertSent(fn ($r) => str_contains($r->url(), 'TicketSearch')
@@ -102,7 +105,7 @@ final class TicketBuilderTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3']]),
-            '*TicketGet*'    => Http::response(['Ticket' => [
+            '*TicketGet*' => Http::response(['Ticket' => [
                 $this->fakeTicket('1'),
                 $this->fakeTicket('2'),
                 $this->fakeTicket('3'),
@@ -122,7 +125,7 @@ final class TicketBuilderTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5']]),
-            '*TicketGet*'    => Http::sequence()
+            '*TicketGet*' => Http::sequence()
                 ->push(['Ticket' => [$this->fakeTicket('1'), $this->fakeTicket('2')]])
                 ->push(['Ticket' => [$this->fakeTicket('3'), $this->fakeTicket('4')]])
                 ->push(['Ticket' => [$this->fakeTicket('5')]]),
@@ -148,8 +151,8 @@ final class TicketBuilderTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketSearch*' => Http::response(['TicketID' => ['1','2','3','4','5','6','7','8','9','10']]),
-            '*TicketGet*'    => Http::response(['Ticket' => [
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']]),
+            '*TicketGet*' => Http::response(['Ticket' => [
                 $this->fakeTicket('1'), $this->fakeTicket('2'), $this->fakeTicket('3'),
             ]]),
         ]);
@@ -158,7 +161,7 @@ final class TicketBuilderTest extends TestCase
             ->where('CustomerID', '12345')
             ->paginate(perPage: 3, page: 1);
 
-        $this->assertInstanceOf(\Illuminate\Pagination\LengthAwarePaginator::class, $paginator);
+        $this->assertInstanceOf(LengthAwarePaginator::class, $paginator);
         $this->assertSame(10, $paginator->total());
         $this->assertSame(3, $paginator->perPage());
         $this->assertSame(1, $paginator->currentPage());
@@ -169,8 +172,8 @@ final class TicketBuilderTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketSearch*' => Http::response(['TicketID' => ['1','2','3','4','5','6','7','8','9','10']]),
-            '*TicketGet*'    => Http::response(['Ticket' => [
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10']]),
+            '*TicketGet*' => Http::response(['Ticket' => [
                 $this->fakeTicket('4'), $this->fakeTicket('5'), $this->fakeTicket('6'),
             ]]),
         ]);
@@ -198,8 +201,8 @@ final class TicketBuilderTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketSearch*' => Http::response(['TicketID' => ['1','2','3','4','5']]),
-            '*TicketGet*'    => Http::sequence()
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5']]),
+            '*TicketGet*' => Http::sequence()
                 ->push(['Ticket' => [$this->fakeTicket('1'), $this->fakeTicket('2')]])
                 ->push(['Ticket' => [$this->fakeTicket('3'), $this->fakeTicket('4')]])
                 ->push(['Ticket' => [$this->fakeTicket('5')]]),
@@ -217,14 +220,14 @@ final class TicketBuilderTest extends TestCase
     private function fakeTicket(string $id): array
     {
         return [
-            'TicketID'     => $id,
+            'TicketID' => $id,
             'TicketNumber' => str_pad($id, 10, '0', STR_PAD_LEFT),
-            'Title'        => 'Ticket ' . $id,
-            'QueueID'      => '1',
-            'Queue'        => 'Q',
-            'State'        => 'new',
-            'Priority'     => '3 normal',
-            'Created'      => '2026-04-08 10:00:00',
+            'Title' => 'Ticket '.$id,
+            'QueueID' => '1',
+            'Queue' => 'Q',
+            'State' => 'new',
+            'Priority' => '3 normal',
+            'Created' => '2026-04-08 10:00:00',
         ];
     }
 }

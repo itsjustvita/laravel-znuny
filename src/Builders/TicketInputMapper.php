@@ -11,18 +11,18 @@ class TicketInputMapper
     public static function mapTicket(array $input): array
     {
         $map = [
-            'title'        => 'Title',
-            'queueId'      => 'QueueID',
-            'queue'        => 'Queue',
-            'state'        => 'State',
-            'stateId'      => 'StateID',
-            'priority'     => 'Priority',
-            'priorityId'   => 'PriorityID',
-            'type'         => 'Type',
-            'typeId'       => 'TypeID',
+            'title' => 'Title',
+            'queueId' => 'QueueID',
+            'queue' => 'Queue',
+            'state' => 'State',
+            'stateId' => 'StateID',
+            'priority' => 'Priority',
+            'priorityId' => 'PriorityID',
+            'type' => 'Type',
+            'typeId' => 'TypeID',
             'customerUser' => 'CustomerUser',
-            'customerId'   => 'CustomerID',
-            'serviceId'    => 'ServiceID',
+            'customerId' => 'CustomerID',
+            'serviceId' => 'ServiceID',
         ];
 
         $result = [];
@@ -40,13 +40,13 @@ class TicketInputMapper
     public static function mapArticle(array $input): array
     {
         $map = [
-            'subject'              => 'Subject',
-            'body'                 => 'Body',
-            'contentType'          => 'ContentType',
+            'subject' => 'Subject',
+            'body' => 'Body',
+            'contentType' => 'ContentType',
             'communicationChannel' => 'CommunicationChannel',
-            'senderType'           => 'SenderType',
-            'from'                 => 'From',
-            'timeUnit'             => 'TimeUnit',
+            'senderType' => 'SenderType',
+            'from' => 'From',
+            'timeUnit' => 'TimeUnit',
         ];
 
         $result = [];

@@ -11,8 +11,8 @@ final class PriorityTest extends TestCase
     {
         $priority = Priority::fromZnunyResponse([
             'PriorityID' => '3',
-            'Name'       => '3 normal',
-            'ValidID'    => '1',
+            'Name' => '3 normal',
+            'ValidID' => '1',
         ]);
 
         $this->assertSame('3', $priority->id);
@@ -24,14 +24,14 @@ final class PriorityTest extends TestCase
     {
         $priority = Priority::fromZnunyResponse([
             'PriorityID' => '3',
-            'Name'       => '3 normal',
-            'ValidID'    => '1',
+            'Name' => '3 normal',
+            'ValidID' => '1',
         ]);
 
         $this->assertSame([
             'PriorityID' => '3',
-            'Name'       => '3 normal',
-            'ValidID'    => '1',
+            'Name' => '3 normal',
+            'ValidID' => '1',
         ], $priority->toArray());
     }
 }

@@ -13,15 +13,15 @@ final class CustomerResourceTest extends TestCase
     public function test_find_returns_customer_dto(): void
     {
         Http::fake([
-            '*SessionCreate'    => Http::response(['SessionID' => 'S1']),
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*CustomerUserGet*' => Http::response(['CustomerUser' => [[
-                'CustomerID'      => '12345',
+                'CustomerID' => '12345',
                 'CustomerCompany' => 'ACME',
-                'UserFirstname'   => 'Jane',
-                'UserLastname'    => 'Doe',
-                'UserEmail'       => 'jane@acme.test',
-                'UserLogin'       => 'jane@acme.test',
-                'ValidID'         => '1',
+                'UserFirstname' => 'Jane',
+                'UserLastname' => 'Doe',
+                'UserEmail' => 'jane@acme.test',
+                'UserLogin' => 'jane@acme.test',
+                'ValidID' => '1',
             ]]]),
         ]);
 
@@ -34,7 +34,7 @@ final class CustomerResourceTest extends TestCase
     public function test_find_throws_when_not_found(): void
     {
         Http::fake([
-            '*SessionCreate'    => Http::response(['SessionID' => 'S1']),
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*CustomerUserGet*' => Http::response(['CustomerUser' => []]),
         ]);
 
@@ -47,15 +47,15 @@ final class CustomerResourceTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::response(['TicketID' => ['5']]),
-            '*TicketGet*'    => Http::response(['Ticket' => [[
-                'TicketID'     => '5',
+            '*TicketGet*' => Http::response(['Ticket' => [[
+                'TicketID' => '5',
                 'TicketNumber' => '00005',
-                'Title'        => 't',
-                'QueueID'      => '1',
-                'Queue'        => 'Q',
-                'State'        => 'open',
-                'Priority'     => '3 normal',
-                'Created'      => '2026-04-08 10:00:00',
+                'Title' => 't',
+                'QueueID' => '1',
+                'Queue' => 'Q',
+                'State' => 'open',
+                'Priority' => '3 normal',
+                'Created' => '2026-04-08 10:00:00',
             ]]]),
         ]);
 

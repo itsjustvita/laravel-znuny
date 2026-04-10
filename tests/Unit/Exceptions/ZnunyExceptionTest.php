@@ -43,7 +43,7 @@ final class ZnunyExceptionTest extends TestCase
         $exception->setRequestPayload([
             'Ticket' => [
                 'Title' => 'ok',
-                'Auth'  => ['Password' => 'hunter2', 'SessionID' => 'abc'],
+                'Auth' => ['Password' => 'hunter2', 'SessionID' => 'abc'],
             ],
             'TopLevel' => ['nested' => ['Token' => 'xyz']],
         ]);
@@ -66,11 +66,11 @@ final class ZnunyExceptionTest extends TestCase
             ->setResponseBody(['Error' => ['ErrorCode' => 'TicketGet.NotFound']]);
 
         $this->assertSame([
-            'znuny_operation'  => 'TicketGet',
+            'znuny_operation' => 'TicketGet',
             'znuny_error_code' => 'TicketGet.NotFound',
             'znuny_connection' => 'tenant-a',
-            'znuny_payload'    => ['TicketID' => '42'],
-            'znuny_response'   => ['Error' => ['ErrorCode' => 'TicketGet.NotFound']],
+            'znuny_payload' => ['TicketID' => '42'],
+            'znuny_response' => ['Error' => ['ErrorCode' => 'TicketGet.NotFound']],
         ], $exception->context());
     }
 }

@@ -10,13 +10,13 @@ final class CustomerTest extends TestCase
     public function test_it_builds_from_znuny_response(): void
     {
         $customer = Customer::fromZnunyResponse([
-            'CustomerID'      => '12345',
+            'CustomerID' => '12345',
             'CustomerCompany' => 'ACME Corp',
-            'UserFirstname'   => 'Jane',
-            'UserLastname'    => 'Doe',
-            'UserEmail'       => 'jane@acme.test',
-            'UserLogin'       => 'jane@acme.test',
-            'ValidID'         => '1',
+            'UserFirstname' => 'Jane',
+            'UserLastname' => 'Doe',
+            'UserEmail' => 'jane@acme.test',
+            'UserLogin' => 'jane@acme.test',
+            'ValidID' => '1',
         ]);
 
         $this->assertSame('12345', $customer->id);
@@ -31,23 +31,23 @@ final class CustomerTest extends TestCase
     public function test_it_serializes_to_array(): void
     {
         $customer = Customer::fromZnunyResponse([
-            'CustomerID'      => '12345',
+            'CustomerID' => '12345',
             'CustomerCompany' => 'ACME Corp',
-            'UserFirstname'   => 'Jane',
-            'UserLastname'    => 'Doe',
-            'UserEmail'       => 'jane@acme.test',
-            'UserLogin'       => 'jane@acme.test',
-            'ValidID'         => '1',
+            'UserFirstname' => 'Jane',
+            'UserLastname' => 'Doe',
+            'UserEmail' => 'jane@acme.test',
+            'UserLogin' => 'jane@acme.test',
+            'ValidID' => '1',
         ]);
 
         $this->assertSame([
-            'CustomerID'      => '12345',
+            'CustomerID' => '12345',
             'CustomerCompany' => 'ACME Corp',
-            'UserFirstname'   => 'Jane',
-            'UserLastname'    => 'Doe',
-            'UserEmail'       => 'jane@acme.test',
-            'UserLogin'       => 'jane@acme.test',
-            'ValidID'         => '1',
+            'UserFirstname' => 'Jane',
+            'UserLastname' => 'Doe',
+            'UserEmail' => 'jane@acme.test',
+            'UserLogin' => 'jane@acme.test',
+            'ValidID' => '1',
         ], $customer->toArray());
     }
 }

@@ -19,7 +19,7 @@ final class EventDispatchTest extends TestCase
 
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Ticket' => [[
+            '*TicketGet*' => Http::response(['Ticket' => [[
                 'TicketID' => '1', 'TicketNumber' => '1', 'Title' => 't',
                 'QueueID' => '1', 'Queue' => 'Q', 'State' => 'new',
                 'Priority' => '3 normal', 'Created' => '2026-04-08 10:00:00',
@@ -38,12 +38,13 @@ final class EventDispatchTest extends TestCase
 
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketGet*'    => Http::response(['Error' => ['ErrorCode' => 'TicketGet.NotFound', 'ErrorMessage' => 'gone']]),
+            '*TicketGet*' => Http::response(['Error' => ['ErrorCode' => 'TicketGet.NotFound', 'ErrorMessage' => 'gone']]),
         ]);
 
         try {
             Znuny::tickets()->find('999');
-        } catch (\Throwable) {}
+        } catch (\Throwable) {
+        }
 
         Event::assertDispatched(ZnunyRequestFailed::class);
     }
@@ -55,7 +56,7 @@ final class EventDispatchTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketCreate*' => Http::response(['TicketID' => '42', 'TicketNumber' => '00042']),
-            '*TicketGet*'    => Http::response(['Ticket' => [[
+            '*TicketGet*' => Http::response(['Ticket' => [[
                 'TicketID' => '42', 'TicketNumber' => '00042', 'Title' => 't',
                 'QueueID' => '1', 'Queue' => 'Q', 'State' => 'new',
                 'Priority' => '3 normal', 'Created' => '2026-04-08 10:00:00',
@@ -66,8 +67,8 @@ final class EventDispatchTest extends TestCase
             'title' => 't', 'queue' => 'Q', 'state' => 'new',
             'priority' => '3 normal', 'customerUser' => 'c@example.com',
         ])
-        ->withArticle(['subject' => 's', 'body' => 'b', 'contentType' => 'text/plain'])
-        ->save();
+            ->withArticle(['subject' => 's', 'body' => 'b', 'contentType' => 'text/plain'])
+            ->save();
 
         Event::assertDispatched(ZnunyTicketCreated::class);
     }

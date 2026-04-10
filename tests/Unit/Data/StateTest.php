@@ -10,10 +10,10 @@ final class StateTest extends TestCase
     public function test_it_builds_from_znuny_response(): void
     {
         $state = State::fromZnunyResponse([
-            'StateID'  => '4',
-            'Name'     => 'open',
+            'StateID' => '4',
+            'Name' => 'open',
             'TypeName' => 'open',
-            'ValidID'  => '1',
+            'ValidID' => '1',
         ]);
 
         $this->assertSame('4', $state->id);
@@ -25,17 +25,17 @@ final class StateTest extends TestCase
     public function test_it_serializes_to_array(): void
     {
         $state = State::fromZnunyResponse([
-            'StateID'  => '4',
-            'Name'     => 'open',
+            'StateID' => '4',
+            'Name' => 'open',
             'TypeName' => 'open',
-            'ValidID'  => '1',
+            'ValidID' => '1',
         ]);
 
         $this->assertSame([
-            'StateID'  => '4',
-            'Name'     => 'open',
+            'StateID' => '4',
+            'Name' => 'open',
             'TypeName' => 'open',
-            'ValidID'  => '1',
+            'ValidID' => '1',
         ], $state->toArray());
     }
 }

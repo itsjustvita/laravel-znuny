@@ -34,13 +34,13 @@ final readonly class Customer
     public function toArray(): array
     {
         return [
-            'CustomerID'      => $this->id,
+            'CustomerID' => $this->id,
             'CustomerCompany' => $this->company,
-            'UserFirstname'   => $this->firstName,
-            'UserLastname'    => $this->lastName,
-            'UserEmail'       => $this->email,
-            'UserLogin'       => $this->login,
-            'ValidID'         => $this->validId,
+            'UserFirstname' => $this->firstName,
+            'UserLastname' => $this->lastName,
+            'UserEmail' => $this->email,
+            'UserLogin' => $this->login,
+            'ValidID' => $this->validId,
         ];
     }
 }

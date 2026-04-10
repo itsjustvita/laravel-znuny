@@ -12,7 +12,7 @@ final class CommandsTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*'    => Http::response(['Queue' => []]),
+            '*QueueList*' => Http::response(['Queue' => []]),
         ]);
 
         $this->artisan('znuny:test-connection')
@@ -35,7 +35,7 @@ final class CommandsTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*'    => Http::response(['Queue' => [
+            '*QueueList*' => Http::response(['Queue' => [
                 ['QueueID' => '1', 'Name' => 'Support', 'GroupID' => '1', 'ValidID' => '1'],
             ]]),
         ]);
@@ -67,8 +67,8 @@ final class CommandsTest extends TestCase
 
         config()->set('znuny.dynamic_fields', [
             'CustomerSegment' => ['type' => 'string', 'allowed' => ['business', 'private']],
-            'OrderId'         => ['type' => 'string'],
-            'Priority'        => ['type' => 'integer'],
+            'OrderId' => ['type' => 'string'],
+            'Priority' => ['type' => 'integer'],
         ]);
 
         $this->artisan('znuny:generate-fields', ['--output' => $target])

@@ -2,14 +2,22 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
+use ItsJustVita\LaravelZnuny\Exceptions\CustomerNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
+use ItsJustVita\LaravelZnuny\Exceptions\GenericZnunyException;
+use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
+use ItsJustVita\LaravelZnuny\Exceptions\InvalidPriorityException;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidQueueException;
+use ItsJustVita\LaravelZnuny\Exceptions\InvalidStateException;
 use ItsJustVita\LaravelZnuny\Exceptions\QueueNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRateLimitException;
-use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 
 final class ExceptionMapperTest extends TestCase
@@ -19,7 +27,7 @@ final class ExceptionMapperTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->mapper = new ExceptionMapper();
+        $this->mapper = new ExceptionMapper;
     }
 
     public function test_it_maps_session_expired_error_code(): void
@@ -156,7 +164,7 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\InvalidStateException::class, $exception);
+        $this->assertInstanceOf(InvalidStateException::class, $exception);
     }
 
     public function test_it_maps_invalid_priority(): void
@@ -168,7 +176,7 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\InvalidPriorityException::class, $exception);
+        $this->assertInstanceOf(InvalidPriorityException::class, $exception);
     }
 
     public function test_it_maps_invalid_dynamic_field(): void
@@ -180,7 +188,7 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException::class, $exception);
+        $this->assertInstanceOf(InvalidDynamicFieldException::class, $exception);
     }
 
     public function test_it_maps_customer_not_found(): void
@@ -192,7 +200,7 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\CustomerNotFoundException::class, $exception);
+        $this->assertInstanceOf(CustomerNotFoundException::class, $exception);
     }
 
     public function test_unknown_not_found_falls_back_to_base_not_found(): void
@@ -204,8 +212,8 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\ZnunyNotFoundException::class, $exception);
-        $this->assertNotInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException::class, $exception);
+        $this->assertInstanceOf(ZnunyNotFoundException::class, $exception);
+        $this->assertNotInstanceOf(TicketNotFoundException::class, $exception);
     }
 
     public function test_unknown_error_code_falls_back_to_generic(): void
@@ -217,8 +225,8 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\GenericZnunyException::class, $exception);
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\ZnunyException::class, $exception);
+        $this->assertInstanceOf(GenericZnunyException::class, $exception);
+        $this->assertInstanceOf(ZnunyException::class, $exception);
     }
 
     public function test_http_401_maps_to_authentication(): void
@@ -231,7 +239,7 @@ final class ExceptionMapperTest extends TestCase
             payload: ['TicketID' => '1'],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException::class, $exception);
+        $this->assertInstanceOf(ZnunyAuthenticationException::class, $exception);
         $this->assertSame('TicketGet', $exception->getOperation());
     }
 
@@ -245,7 +253,7 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\ZnunyRateLimitException::class, $exception);
+        $this->assertInstanceOf(ZnunyRateLimitException::class, $exception);
     }
 
     public function test_http_status_propagates_znuny_error_message(): void
@@ -258,7 +266,7 @@ final class ExceptionMapperTest extends TestCase
             payload: [],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException::class, $exception);
+        $this->assertInstanceOf(ZnunyServerException::class, $exception);
         $this->assertSame('Backend.Offline', $exception->getErrorCode());
         $this->assertStringContainsString('Database unreachable', $exception->getMessage());
     }
@@ -273,7 +281,7 @@ final class ExceptionMapperTest extends TestCase
             payload: ['TicketID' => '1'],
         );
 
-        $this->assertInstanceOf(\ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException::class, $exception);
+        $this->assertInstanceOf(ZnunyConnectionException::class, $exception);
         $this->assertSame('TicketGet', $exception->getOperation());
         $this->assertSame('tenant-a', $exception->getConnection());
         $this->assertSame(['TicketID' => '1'], $exception->getRequestPayload());

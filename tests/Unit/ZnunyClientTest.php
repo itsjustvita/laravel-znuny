@@ -2,11 +2,14 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
-use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
@@ -34,7 +37,7 @@ final class ZnunyClientTest extends TestCase
                 new SessionStore(Cache::store('array'), 'znuny:session:'),
                 ttl: 60,
             ),
-            exceptionMapper: new ExceptionMapper(),
+            exceptionMapper: new ExceptionMapper,
         );
     }
 
@@ -143,7 +146,7 @@ final class ZnunyClientTest extends TestCase
     public function test_it_maps_transport_errors_to_connection_exception(): void
     {
         Http::fake(function () {
-            throw new \Illuminate\Http\Client\ConnectionException('Connection refused');
+            throw new ConnectionException('Connection refused');
         });
 
         $client = $this->makeClient();
@@ -151,7 +154,7 @@ final class ZnunyClientTest extends TestCase
         try {
             $client->request('TicketGet', ['TicketID' => '1']);
             $this->fail('Expected ZnunyConnectionException');
-        } catch (\ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException $e) {
+        } catch (ZnunyConnectionException $e) {
             $this->assertSame('SessionCreate', $e->getOperation()); // the first call is SessionCreate
             $this->assertSame('default', $e->getConnection());
             $this->assertArrayHasKey('UserLogin', $e->getRequestPayload());
@@ -194,7 +197,7 @@ final class ZnunyClientTest extends TestCase
 
         $client = $this->makeClient();
 
-        $this->expectException(\ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException::class);
+        $this->expectException(ZnunySessionExpiredException::class);
         $client->request('TicketGet', ['TicketID' => '42']);
     }
 
@@ -210,7 +213,7 @@ final class ZnunyClientTest extends TestCase
 
         $client = $this->makeClient();
 
-        $this->expectException(\ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException::class);
+        $this->expectException(ZnunySessionExpiredException::class);
         $client->request('TicketGet', ['TicketID' => '42']);
     }
 }

@@ -11,14 +11,14 @@ final class ArticleTest extends TestCase
     public function test_it_builds_from_znuny_response(): void
     {
         $article = Article::fromZnunyResponse([
-            'ArticleID'             => '500',
-            'Subject'               => 'Initial',
-            'Body'                  => 'Hello',
-            'ContentType'           => 'text/plain; charset=utf8',
-            'CommunicationChannel'  => 'Internal',
-            'SenderType'            => 'agent',
-            'From'                  => 'agent@example.com',
-            'CreateTime'            => '2026-04-08 10:00:00',
+            'ArticleID' => '500',
+            'Subject' => 'Initial',
+            'Body' => 'Hello',
+            'ContentType' => 'text/plain; charset=utf8',
+            'CommunicationChannel' => 'Internal',
+            'SenderType' => 'agent',
+            'From' => 'agent@example.com',
+            'CreateTime' => '2026-04-08 10:00:00',
         ]);
 
         $this->assertSame('500', $article->id);
@@ -44,14 +44,14 @@ final class ArticleTest extends TestCase
         );
 
         $this->assertSame([
-            'ArticleID'            => '500',
-            'Subject'              => 'Initial',
-            'Body'                 => 'Hello',
-            'ContentType'          => 'text/plain; charset=utf8',
+            'ArticleID' => '500',
+            'Subject' => 'Initial',
+            'Body' => 'Hello',
+            'ContentType' => 'text/plain; charset=utf8',
             'CommunicationChannel' => 'Internal',
-            'SenderType'           => 'agent',
-            'From'                 => 'agent@example.com',
-            'CreateTime'           => '2026-04-08 10:00:00',
+            'SenderType' => 'agent',
+            'From' => 'agent@example.com',
+            'CreateTime' => '2026-04-08 10:00:00',
         ], $article->toArray());
     }
 }

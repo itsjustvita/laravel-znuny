@@ -30,8 +30,8 @@ class QueueResource extends Resource
         if (empty($response['Queue'][0])) {
             $ex = new QueueNotFoundException("Queue {$queueId} not found");
             $ex->setOperation('QueueGet')
-               ->setConnection($this->client->connection())
-               ->setRequestPayload(['QueueID' => $queueId]);
+                ->setConnection($this->client->connection())
+                ->setRequestPayload(['QueueID' => $queueId]);
 
             throw $ex;
         }
@@ -46,7 +46,7 @@ class QueueResource extends Resource
         if (! $queue) {
             $ex = new QueueNotFoundException("Queue named '{$name}' not found");
             $ex->setOperation('QueueList')
-               ->setConnection($this->client->connection());
+                ->setConnection($this->client->connection());
 
             throw $ex;
         }

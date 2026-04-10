@@ -57,20 +57,20 @@ final readonly class Ticket
     public function toArray(): array
     {
         return [
-            'TicketID'       => $this->id,
-            'TicketNumber'   => $this->ticketNumber,
-            'Title'          => $this->title,
-            'QueueID'        => $this->queueId,
-            'Queue'          => $this->queue,
-            'State'          => $this->state,
-            'Priority'       => $this->priority,
-            'Type'           => $this->type,
-            'CustomerID'     => $this->customerId,
+            'TicketID' => $this->id,
+            'TicketNumber' => $this->ticketNumber,
+            'Title' => $this->title,
+            'QueueID' => $this->queueId,
+            'Queue' => $this->queue,
+            'State' => $this->state,
+            'Priority' => $this->priority,
+            'Type' => $this->type,
+            'CustomerID' => $this->customerId,
             'CustomerUserID' => $this->customerUser,
-            'Created'        => $this->created?->format('Y-m-d H:i:s'),
-            'Changed'        => $this->changed?->format('Y-m-d H:i:s'),
-            'Article'        => $this->articles->map(fn (Article $a) => $a->toArray())->all(),
-            'DynamicField'   => $this->dynamicFields->map(fn (DynamicField $f) => $f->toArray())->all(),
+            'Created' => $this->created?->format('Y-m-d H:i:s'),
+            'Changed' => $this->changed?->format('Y-m-d H:i:s'),
+            'Article' => $this->articles->map(fn (Article $a) => $a->toArray())->all(),
+            'DynamicField' => $this->dynamicFields->map(fn (DynamicField $f) => $f->toArray())->all(),
         ];
     }
 }

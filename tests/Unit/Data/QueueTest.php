@@ -10,12 +10,12 @@ final class QueueTest extends TestCase
     public function test_it_builds_from_znuny_response(): void
     {
         $queue = Queue::fromZnunyResponse([
-            'QueueID'         => '803',
-            'Name'            => 'Support',
-            'GroupID'         => '1',
-            'ValidID'         => '1',
+            'QueueID' => '803',
+            'Name' => 'Support',
+            'GroupID' => '1',
+            'ValidID' => '1',
             'SystemAddressID' => '1',
-            'Comment'         => 'Primary support queue',
+            'Comment' => 'Primary support queue',
         ]);
 
         $this->assertSame('803', $queue->id);
@@ -29,7 +29,7 @@ final class QueueTest extends TestCase
     {
         $queue = Queue::fromZnunyResponse([
             'QueueID' => '9',
-            'Name'    => 'Old Queue',
+            'Name' => 'Old Queue',
             'GroupID' => '1',
             'ValidID' => '2',
         ]);
@@ -41,7 +41,7 @@ final class QueueTest extends TestCase
     {
         $queue = Queue::fromZnunyResponse([
             'QueueID' => '803',
-            'Name'    => 'Support',
+            'Name' => 'Support',
             'GroupID' => '1',
             'ValidID' => '1',
             'Comment' => 'Primary support queue',
@@ -49,7 +49,7 @@ final class QueueTest extends TestCase
 
         $this->assertSame([
             'QueueID' => '803',
-            'Name'    => 'Support',
+            'Name' => 'Support',
             'GroupID' => '1',
             'ValidID' => '1',
             'Comment' => 'Primary support queue',
@@ -60,7 +60,7 @@ final class QueueTest extends TestCase
     {
         $queue = Queue::fromZnunyResponse([
             'QueueID' => '5',
-            'Name'    => 'Legacy',
+            'Name' => 'Legacy',
             'GroupID' => '1',
             'ValidID' => '3',
         ]);

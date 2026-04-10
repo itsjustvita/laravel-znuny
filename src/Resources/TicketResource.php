@@ -2,9 +2,12 @@
 
 namespace ItsJustVita\LaravelZnuny\Resources;
 
+use ItsJustVita\LaravelZnuny\Builders\TicketBuilder;
 use ItsJustVita\LaravelZnuny\Builders\TicketCreateBuilder;
 use ItsJustVita\LaravelZnuny\Builders\TicketInputMapper;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\Events\ZnunyArticleAdded;
+use ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 
 class TicketResource extends Resource
@@ -33,13 +36,13 @@ class TicketResource extends Resource
             $payload['DynamicFields'] = 1;
         }
 
-        $response = $this->client->request('TicketGet/' . rawurlencode($ticketId), $payload);
+        $response = $this->client->request('TicketGet/'.rawurlencode($ticketId), $payload);
 
         if (! isset($response['Ticket'][0])) {
             $ex = new TicketNotFoundException("Znuny returned no ticket data for TicketID {$ticketId}");
             $ex->setOperation('TicketGet')
-               ->setConnection($this->client->connection())
-               ->setRequestPayload($payload);
+                ->setConnection($this->client->connection())
+                ->setRequestPayload($payload);
 
             throw $ex;
         }
@@ -52,12 +55,12 @@ class TicketResource extends Resource
      */
     public function update(string $ticketId, array $ticket): void
     {
-        $this->client->request('TicketUpdate/' . rawurlencode($ticketId), [
+        $this->client->request('TicketUpdate/'.rawurlencode($ticketId), [
             'TicketID' => $ticketId,
-            'Ticket'   => TicketInputMapper::mapTicket($ticket),
+            'Ticket' => TicketInputMapper::mapTicket($ticket),
         ]);
 
-        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated(
+        event(new ZnunyTicketUpdated(
             connection: $this->client->connection(),
             ticketId: $ticketId,
             changes: $ticket,
@@ -69,12 +72,12 @@ class TicketResource extends Resource
      */
     public function addArticle(string $ticketId, array $article): void
     {
-        $this->client->request('TicketUpdate/' . rawurlencode($ticketId), [
+        $this->client->request('TicketUpdate/'.rawurlencode($ticketId), [
             'TicketID' => $ticketId,
-            'Article'  => TicketInputMapper::mapArticle($article),
+            'Article' => TicketInputMapper::mapArticle($article),
         ]);
 
-        event(new \ItsJustVita\LaravelZnuny\Events\ZnunyArticleAdded(
+        event(new ZnunyArticleAdded(
             connection: $this->client->connection(),
             ticketId: $ticketId,
             article: $article,
@@ -86,27 +89,27 @@ class TicketResource extends Resource
         $this->update($ticketId, ['state' => $state]);
     }
 
-    public function query(): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    public function query(): TicketBuilder
     {
-        return new \ItsJustVita\LaravelZnuny\Builders\TicketBuilder($this->client, $this);
+        return new TicketBuilder($this->client, $this);
     }
 
-    public function where(string $field, mixed $value): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    public function where(string $field, mixed $value): TicketBuilder
     {
         return $this->query()->where($field, $value);
     }
 
-    public function whereState(string|array $states): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    public function whereState(string|array $states): TicketBuilder
     {
         return $this->query()->whereState($states);
     }
 
-    public function whereQueue(string|array $queues): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    public function whereQueue(string|array $queues): TicketBuilder
     {
         return $this->query()->whereQueue($queues);
     }
 
-    public function whereCustomerId(string $customerId): \ItsJustVita\LaravelZnuny\Builders\TicketBuilder
+    public function whereCustomerId(string $customerId): TicketBuilder
     {
         return $this->query()->whereCustomerId($customerId);
     }

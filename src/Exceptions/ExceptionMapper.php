@@ -29,9 +29,9 @@ class ExceptionMapper
 
         $exception = match (true) {
             $status === 401 || $status === 403 => new ZnunyAuthenticationException($message),
-            $status === 429                    => new ZnunyRateLimitException($message),
-            $status >= 500                     => new ZnunyServerException($message),
-            default                             => new ZnunyServerException($message),
+            $status === 429 => new ZnunyRateLimitException($message),
+            $status >= 500 => new ZnunyServerException($message),
+            default => new ZnunyServerException($message),
         };
 
         $exception->setErrorCode($code);
@@ -55,7 +55,7 @@ class ExceptionMapper
 
     private function selectExceptionClass(string $code, string $message, string $operation): ZnunyException
     {
-        $haystack = strtolower($code . ' ' . $message);
+        $haystack = strtolower($code.' '.$message);
         $lowerMessage = strtolower($message);
         $fullMessage = $message !== '' ? "[{$code}] {$message}" : $code;
 
@@ -108,10 +108,10 @@ class ExceptionMapper
     private function notFoundForOperation(string $operation, string $message): ZnunyNotFoundException
     {
         return match (true) {
-            str_starts_with($operation, 'Ticket')   => new TicketNotFoundException($message),
-            str_starts_with($operation, 'Queue')    => new QueueNotFoundException($message),
+            str_starts_with($operation, 'Ticket') => new TicketNotFoundException($message),
+            str_starts_with($operation, 'Queue') => new QueueNotFoundException($message),
             str_starts_with($operation, 'Customer') => new CustomerNotFoundException($message),
-            default                                  => new ZnunyNotFoundException($message),
+            default => new ZnunyNotFoundException($message),
         };
     }
 }

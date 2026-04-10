@@ -59,7 +59,7 @@ final class DynamicFieldValidatorTest extends TestCase
     public function test_valid_values_pass(): void
     {
         $validator = new DynamicFieldValidator(definitions: [
-            'Segment'  => ['type' => 'string', 'allowed' => ['business']],
+            'Segment' => ['type' => 'string', 'allowed' => ['business']],
             'Priority' => ['type' => 'integer', 'min' => 1, 'max' => 5],
         ]);
 

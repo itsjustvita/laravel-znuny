@@ -49,11 +49,11 @@ class ZnunyManager
         $clone = clone $this;
         $clone->boundConnection = 'ephemeral';
         $clone->runtimeConfig = [
-            'base_url'   => $baseUrl,
-            'username'   => $username,
-            'password'   => $password,
+            'base_url' => $baseUrl,
+            'username' => $username,
+            'password' => $password,
             'verify_ssl' => $verifySSL,
-            'timeout'    => $timeout,
+            'timeout' => $timeout,
         ];
         $clone->clients = [];
 
@@ -79,7 +79,7 @@ class ZnunyManager
             connection: $connection,
             config: $config,
             sessionManager: $this->buildSessionManager(),
-            exceptionMapper: new ExceptionMapper(),
+            exceptionMapper: new ExceptionMapper,
         );
 
         if ($this->runtimeConfig === null) {

@@ -20,10 +20,11 @@ final class CacheManagerTest extends TestCase
         $calls = 0;
         $resolver = function () use (&$calls): array {
             $calls++;
+
             return [['QueueID' => '1']];
         };
 
-        $first  = $manager->remember('default', 'queues', $resolver);
+        $first = $manager->remember('default', 'queues', $resolver);
         $second = $manager->remember('default', 'queues', $resolver);
 
         $this->assertSame($first, $second);
@@ -42,6 +43,7 @@ final class CacheManagerTest extends TestCase
         $calls = 0;
         $resolver = function () use (&$calls): array {
             $calls++;
+
             return [];
         };
 
@@ -61,12 +63,20 @@ final class CacheManagerTest extends TestCase
         $manager->flush('default', 'queues');
 
         $calls = 0;
-        $manager->remember('default', 'queues', function () use (&$calls) { $calls++; return ['q']; });
+        $manager->remember('default', 'queues', function () use (&$calls) {
+            $calls++;
+
+            return ['q'];
+        });
         $this->assertSame(1, $calls);
 
         // states still cached
         $calls2 = 0;
-        $manager->remember('default', 'states', function () use (&$calls2) { $calls2++; return ['s']; });
+        $manager->remember('default', 'states', function () use (&$calls2) {
+            $calls2++;
+
+            return ['s'];
+        });
         $this->assertSame(0, $calls2);
     }
 
@@ -80,8 +90,16 @@ final class CacheManagerTest extends TestCase
         $manager->flush('default');
 
         $qCalls = $sCalls = 0;
-        $manager->remember('default', 'queues', function () use (&$qCalls) { $qCalls++; return ['q']; });
-        $manager->remember('default', 'states', function () use (&$sCalls) { $sCalls++; return ['s']; });
+        $manager->remember('default', 'queues', function () use (&$qCalls) {
+            $qCalls++;
+
+            return ['q'];
+        });
+        $manager->remember('default', 'states', function () use (&$sCalls) {
+            $sCalls++;
+
+            return ['s'];
+        });
 
         $this->assertSame(1, $qCalls);
         $this->assertSame(1, $sCalls);

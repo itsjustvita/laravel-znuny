@@ -2,13 +2,18 @@
 
 namespace ItsJustVita\LaravelZnuny;
 
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
+use ItsJustVita\LaravelZnuny\Commands\CacheClearCommand;
+use ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand;
+use ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand;
+use ItsJustVita\LaravelZnuny\Webhooks\WebhookController;
 
 class ZnunyServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../config/znuny.php', 'znuny');
+        $this->mergeConfigFrom(__DIR__.'/../config/znuny.php', 'znuny');
 
         $this->app->singleton(ZnunyManager::class, fn ($app) => new ZnunyManager($app));
         $this->app->alias(ZnunyManager::class, 'znuny');
@@ -18,13 +23,13 @@ class ZnunyServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__ . '/../config/znuny.php' => config_path('znuny.php'),
+                __DIR__.'/../config/znuny.php' => config_path('znuny.php'),
             ], 'znuny-config');
 
             $this->commands([
-                \ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand::class,
-                \ItsJustVita\LaravelZnuny\Commands\CacheClearCommand::class,
-                \ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand::class,
+                TestConnectionCommand::class,
+                CacheClearCommand::class,
+                GenerateDynamicFieldsCommand::class,
             ]);
         }
 
@@ -38,8 +43,8 @@ class ZnunyServiceProvider extends ServiceProvider
         $prefix = (string) config('znuny.webhooks.route_prefix', 'znuny/webhooks');
         $middleware = (array) config('znuny.webhooks.middleware', ['api']);
 
-        \Illuminate\Support\Facades\Route::prefix($prefix)
+        Route::prefix($prefix)
             ->middleware($middleware)
-            ->post('/{event}', [\ItsJustVita\LaravelZnuny\Webhooks\WebhookController::class, 'handle']);
+            ->post('/{event}', [WebhookController::class, 'handle']);
     }
 }
