@@ -52,6 +52,13 @@ class TicketCreateBuilder
             );
         }
 
+        if ($this->dynamicFields !== []) {
+            $validator = new \ItsJustVita\LaravelZnuny\DynamicFields\DynamicFieldValidator(
+                (array) config('znuny.dynamic_fields', [])
+            );
+            $validator->validate($this->dynamicFields);
+        }
+
         $payload = [
             'Ticket'  => TicketInputMapper::mapTicket($this->ticket),
             'Article' => TicketInputMapper::mapArticle($this->article),

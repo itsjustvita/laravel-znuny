@@ -73,6 +73,25 @@ final class TicketCreateBuilderTest extends TestCase
         ])->save();
     }
 
+    public function test_invalid_dynamic_field_throws(): void
+    {
+        config()->set('znuny.dynamic_fields', [
+            'Segment' => ['type' => 'string', 'allowed' => ['business', 'private']],
+        ]);
+
+        Http::fake(['*SessionCreate' => Http::response(['SessionID' => 'S1'])]);
+
+        $this->expectException(\ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException::class);
+
+        Znuny::tickets()->create([
+            'title' => 't', 'queue' => 'Support', 'state' => 'new',
+            'priority' => '3 normal', 'customerUser' => 'c@example.com',
+        ])
+        ->withArticle(['subject' => 's', 'body' => 'b', 'contentType' => 'text/plain'])
+        ->withDynamicFields(['Segment' => 'government'])
+        ->save();
+    }
+
     public function test_queue_id_is_accepted_instead_of_queue_name(): void
     {
         Http::fake([
