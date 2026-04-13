@@ -47,7 +47,7 @@ class ZnunyManager
         int $timeout = 30,
     ): self {
         $clone = clone $this;
-        $clone->boundConnection = 'ephemeral';
+        $clone->boundConnection = 'ephemeral_' . md5($baseUrl . '|' . $username);
         $clone->runtimeConfig = [
             'base_url' => $baseUrl,
             'username' => $username,
@@ -117,6 +117,14 @@ class ZnunyManager
     public function customers(): CustomerResource
     {
         return new CustomerResource($this->client());
+    }
+
+    /**
+     * Test the connection by performing a fresh SessionCreate call.
+     */
+    public function ping(): bool
+    {
+        return $this->client()->ping();
     }
 
     public function flush(?string $resource = null): void

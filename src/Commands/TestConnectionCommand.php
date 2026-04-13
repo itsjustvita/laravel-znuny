@@ -17,7 +17,7 @@ class TestConnectionCommand extends Command
         $connection = (string) ($this->argument('connection') ?? config('znuny.default', 'default'));
 
         try {
-            $manager->connection($connection)->queues()->all();
+            $manager->connection($connection)->ping();
             $this->info("Znuny connection [{$connection}] OK");
 
             return self::SUCCESS;

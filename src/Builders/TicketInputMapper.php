@@ -21,6 +21,7 @@ class TicketInputMapper
             'type' => 'Type',
             'typeId' => 'TypeID',
             'customerUser' => 'CustomerUser',
+            'customerUserID' => 'CustomerUserID',
             'customerId' => 'CustomerID',
             'serviceId' => 'ServiceID',
         ];

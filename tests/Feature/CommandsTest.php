@@ -12,7 +12,6 @@ final class CommandsTest extends TestCase
     {
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*' => Http::response(['Queue' => []]),
         ]);
 
         $this->artisan('znuny:test-connection')

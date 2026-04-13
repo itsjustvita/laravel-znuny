@@ -16,10 +16,38 @@ class TicketBuilder
 
     protected ?int $limit = null;
 
+    protected bool $withArticles = true;
+
+    protected bool $withDynamicFields = true;
+
     public function __construct(
         protected readonly ZnunyClient $client,
         protected readonly TicketResource $resource,
     ) {}
+
+    public function withArticles(bool $value = true): self
+    {
+        $this->withArticles = $value;
+
+        return $this;
+    }
+
+    public function withDynamicFields(bool $value = true): self
+    {
+        $this->withDynamicFields = $value;
+
+        return $this;
+    }
+
+    public function withoutArticles(): self
+    {
+        return $this->withArticles(false);
+    }
+
+    public function withoutDynamicFields(): self
+    {
+        return $this->withDynamicFields(false);
+    }
 
     public function where(string $field, mixed $value): self
     {
@@ -136,11 +164,17 @@ class TicketBuilder
         $results = collect();
 
         foreach ($chunks as $chunk) {
-            $response = $this->client->request('TicketGet', [
-                'TicketID' => $chunk,
-                'AllArticles' => 1,
-                'DynamicFields' => 1,
-            ]);
+            $params = ['TicketID' => $chunk];
+
+            if ($this->withArticles) {
+                $params['AllArticles'] = 1;
+            }
+
+            if ($this->withDynamicFields) {
+                $params['DynamicFields'] = 1;
+            }
+
+            $response = $this->client->request('TicketGet', $params);
 
             foreach (($response['Ticket'] ?? []) as $ticketData) {
                 $results->push(Ticket::fromZnunyResponse($ticketData));

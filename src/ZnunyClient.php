@@ -61,6 +61,16 @@ class ZnunyClient
         }
     }
 
+    /**
+     * Test the connection by performing a fresh SessionCreate call.
+     */
+    public function ping(): bool
+    {
+        $this->createSession();
+
+        return true;
+    }
+
     protected function autoRetryEnabled(): bool
     {
         return (bool) config('znuny.session.auto_retry_on_expired', true);

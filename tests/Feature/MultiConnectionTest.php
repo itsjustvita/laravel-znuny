@@ -55,7 +55,7 @@ final class MultiConnectionTest extends TestCase
             password: 'eph',
         );
 
-        $this->assertSame('ephemeral', $m->connectionName());
+        $this->assertStringStartsWith('ephemeral_', $m->connectionName());
     }
 
     public function test_unknown_connection_throws(): void
