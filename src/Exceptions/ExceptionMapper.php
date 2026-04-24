@@ -59,10 +59,10 @@ class ExceptionMapper
         $lowerMessage = strtolower($message);
         $fullMessage = $message !== '' ? "[{$code}] {$message}" : $code;
 
-        // Session-expired specifically. The "session" hint is checked against the
-        // ErrorMessage only — codes like "SessionCreate.AuthFail" legitimately
-        // contain "session" without meaning the session itself is stale.
-        if (str_contains($haystack, 'authfail') && str_contains($lowerMessage, 'session')) {
+        // AuthFail on any operation other than SessionCreate means the cached session
+        // has expired — the agent already authenticated successfully before this point.
+        // Only SessionCreate.AuthFail indicates genuinely wrong credentials.
+        if (str_contains($haystack, 'authfail') && $operation !== 'SessionCreate') {
             return new ZnunySessionExpiredException($fullMessage);
         }
         if (str_contains($lowerMessage, 'sessionid') && str_contains($lowerMessage, 'invalid')) {

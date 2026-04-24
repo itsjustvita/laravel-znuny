@@ -160,11 +160,10 @@ class TicketBuilder
      */
     protected function fetchByIds(array $ids): Collection
     {
-        $chunks = array_chunk($ids, $this->poolSize());
         $results = collect();
 
-        foreach ($chunks as $chunk) {
-            $params = ['TicketID' => $chunk];
+        foreach ($ids as $id) {
+            $params = ['TicketID' => $id];
 
             if ($this->withArticles) {
                 $params['AllArticles'] = 1;
@@ -174,19 +173,14 @@ class TicketBuilder
                 $params['DynamicFields'] = 1;
             }
 
-            $response = $this->client->request('TicketGet', $params);
+            $response = $this->client->request('TicketGet/'.rawurlencode($id), $params);
 
-            foreach (($response['Ticket'] ?? []) as $ticketData) {
-                $results->push(Ticket::fromZnunyResponse($ticketData));
+            if (isset($response['Ticket'][0])) {
+                $results->push(Ticket::fromZnunyResponse($response['Ticket'][0]));
             }
         }
 
         return $results->values();
-    }
-
-    protected function poolSize(): int
-    {
-        return max(1, (int) config('znuny.http.pool_size', 25));
     }
 
     public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
