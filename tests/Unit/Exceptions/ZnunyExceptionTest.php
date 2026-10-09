@@ -2,7 +2,11 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Exceptions;
 
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRouteNotFoundException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 
 final class ZnunyExceptionTest extends TestCase
@@ -69,8 +73,26 @@ final class ZnunyExceptionTest extends TestCase
             'znuny_operation' => 'TicketGet',
             'znuny_error_code' => 'TicketGet.NotFound',
             'znuny_connection' => 'tenant-a',
+            'znuny_http_status' => null,
             'znuny_payload' => ['TicketID' => '42'],
             'znuny_response' => ['Error' => ['ErrorCode' => 'TicketGet.NotFound']],
         ], $exception->context());
+    }
+
+    public function test_it_carries_the_http_status(): void
+    {
+        $exception = new class('boom') extends ZnunyException {};
+
+        $this->assertNull($exception->getHttpStatus());
+        $this->assertSame(503, $exception->setHttpStatus(503)->getHttpStatus());
+    }
+
+    public function test_new_exception_types_have_the_expected_parents(): void
+    {
+        $this->assertInstanceOf(ZnunyException::class, new ZnunyConfigurationException('x'));
+        $this->assertInstanceOf(\RuntimeException::class, new ZnunyConfigurationException('x'));
+        $this->assertInstanceOf(ZnunyConfigurationException::class, new ZnunyRouteNotFoundException('x'));
+        $this->assertInstanceOf(ZnunyException::class, new ZnunyAccessDeniedException('x'));
+        $this->assertNotInstanceOf(ZnunyAuthenticationException::class, new ZnunyAccessDeniedException('x'));
     }
 }
