@@ -7,6 +7,7 @@ use Illuminate\Support\ServiceProvider;
 use ItsJustVita\LaravelZnuny\Commands\CacheClearCommand;
 use ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand;
 use ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand;
+use ItsJustVita\LaravelZnuny\Webhooks\AuthenticateWebhook;
 use ItsJustVita\LaravelZnuny\Webhooks\WebhookController;
 
 class ZnunyServiceProvider extends ServiceProvider
@@ -33,6 +34,8 @@ class ZnunyServiceProvider extends ServiceProvider
             ]);
         }
 
+        $this->app['router']->aliasMiddleware('znuny.webhook', AuthenticateWebhook::class);
+
         if ((bool) config('znuny.webhooks.enabled', false)) {
             $this->registerWebhookRoutes();
         }
@@ -40,11 +43,11 @@ class ZnunyServiceProvider extends ServiceProvider
 
     public function registerWebhookRoutes(): void
     {
-        $prefix = (string) config('znuny.webhooks.route_prefix', 'znuny/webhooks');
-        $middleware = (array) config('znuny.webhooks.middleware', ['api']);
+        $prefix = trim((string) config('znuny.webhooks.route_prefix', 'znuny/webhooks'), '/');
+        $middleware = array_merge((array) config('znuny.webhooks.middleware', ['api']), ['znuny.webhook']);
 
-        Route::prefix($prefix)
+        Route::post($prefix.'/{event?}', WebhookController::class)
             ->middleware($middleware)
-            ->post('/{event}', [WebhookController::class, 'handle']);
+            ->name('znuny.webhook');
     }
 }

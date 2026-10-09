@@ -1,0 +1,54 @@
+{
+  "Event": {
+    "Event": "TicketCreate",
+    "TicketID": "42"
+  },
+  "Ticket": {
+    "TicketID": "42",
+    "TicketNumber": "2026100910000042",
+    "Title": "Printer on fire",
+    "QueueID": "2",
+    "Queue": "Raw",
+    "StateID": "1",
+    "State": "new",
+    "StateType": "new",
+    "PriorityID": "3",
+    "Priority": "3 normal",
+    "TypeID": "1",
+    "Type": "Unclassified",
+    "Lock": "unlock",
+    "OwnerID": "1",
+    "Owner": "root@localhost",
+    "ResponsibleID": "1",
+    "Responsible": "root@localhost",
+    "CustomerID": "acme",
+    "CustomerUserID": "jane@example.com",
+    "Created": "2026-10-09 10:00:00",
+    "Changed": "2026-10-09 10:00:00",
+    "DynamicField_OrderId": "ORD-1",
+    "CustomerUser": {
+      "UserLogin": "jane@example.com",
+      "UserEmail": "jane@example.com",
+      "UserFirstname": "Jane",
+      "UserLastname": "Doe"
+    },
+    "QueueData": {
+      "QueueID": "2",
+      "Name": "Raw"
+    },
+    "Articles": [
+      {
+        "ArticleID": "7",
+        "Subject": "Printer on fire",
+        "Body": "Please send help.",
+        "ContentType": "text/plain; charset=utf-8",
+        "CommunicationChannel": "Email",
+        "SenderType": "customer",
+        "From": "jane@example.com",
+        "To": "Raw",
+        "IsVisibleForCustomer": "1",
+        "CreateTime": "2026-10-09 10:00:00"
+      }
+    ]
+  }
+}
