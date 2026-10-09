@@ -2,12 +2,12 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
 use Znuny;
-use Illuminate\Http\Client\Request;
-use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 
 final class MultiConnectionTest extends TestCase
 {
@@ -170,5 +170,47 @@ final class MultiConnectionTest extends TestCase
         $this->expectExceptionMessage('Znuny connection [broken] is missing [username].');
 
         Znuny::connection('broken')->client();
+    }
+
+    public function test_a_runtime_connection_never_reuses_the_session_of_a_connection_with_the_same_name(): void
+    {
+        Http::fake([
+            'https://znuny.test/*/SessionCreate' => Http::response(['SessionID' => 'DEFAULT_SESSION']),
+            'https://znuny.test/*/TicketSearch' => Http::response(['TicketID' => []]),
+            'https://elsewhere.test/*/SessionCreate' => Http::response(['SessionID' => 'OTHER_SESSION']),
+            'https://elsewhere.test/*/TicketSearch' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::call('TicketSearch');
+        Znuny::build([
+            'name' => 'default',
+            'base_url' => 'https://elsewhere.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'someone',
+            'password' => 'else',
+            'routes' => 'operation-name',
+        ])->call('TicketSearch');
+
+        Http::assertNotSent(fn (Request $r) => str_starts_with($r->url(), 'https://elsewhere.test')
+            && ($r['SessionID'] ?? null) === 'DEFAULT_SESSION');
+        Http::assertSent(fn (Request $r) => $r->url() === 'https://elsewhere.test/otrs/nph-genericinterface.pl/Webservice/test/SessionCreate');
+    }
+
+    public function test_runtime_connections_with_different_passwords_do_not_share_a_session(): void
+    {
+        Http::fake([
+            '*/SessionCreate' => Http::sequence()->push(['SessionID' => 'FIRST'])->push(['SessionID' => 'SECOND']),
+            '*/TicketSearch' => Http::response(['TicketID' => []]),
+        ]);
+
+        $config = [
+            'base_url' => 'https://shared.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'agent',
+            'routes' => 'operation-name',
+        ];
+
+        Znuny::build($config + ['password' => 'right'])->call('TicketSearch');
+        Znuny::build($config + ['password' => 'wrong'])->call('TicketSearch');
+
+        $this->assertCount(2, collect(Http::recorded())->filter(fn (array $pair) => str_ends_with($pair[0]->url(), '/SessionCreate')));
     }
 }
