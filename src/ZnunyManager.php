@@ -6,6 +6,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Cache;
 use ItsJustVita\LaravelZnuny\Caching\CacheManager;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Resources\CustomerResource;
 use ItsJustVita\LaravelZnuny\Resources\PriorityResource;
 use ItsJustVita\LaravelZnuny\Resources\QueueResource;
@@ -14,7 +15,6 @@ use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\Resources\TypeResource;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
-use RuntimeException;
 
 class ZnunyManager
 {
@@ -23,6 +23,7 @@ class ZnunyManager
 
     protected ?string $boundConnection = null;
 
+    /** @var array<string, mixed>|null */
     protected ?array $runtimeConfig = null;
 
     public function __construct(
@@ -39,54 +40,71 @@ class ZnunyManager
         return $clone;
     }
 
+    /**
+     * Use a connection that only exists at runtime. Accepts the keys of a configured
+     * connection plus an optional "name" (used for logs, events and the session cache).
+     *
+     * @param  array<string, mixed>  $config
+     */
+    public function build(array $config): self
+    {
+        $name = (string) ($config['name'] ?? '');
+        unset($config['name']);
+
+        $clone = clone $this;
+        $clone->boundConnection = $name !== '' ? $name : $this->runtimeName($config);
+        $clone->runtimeConfig = $config;
+        $clone->clients = [];
+
+        return $clone;
+    }
+
+    /**
+     * @param  array<string, mixed>  $options  further connection keys, e.g. ['routes' => 'operation-name']
+     */
     public function usingCredentials(
         string $baseUrl,
         string $username,
         string $password,
         bool $verifySSL = true,
         int $timeout = 30,
+        array $options = [],
     ): self {
-        $clone = clone $this;
-        $clone->boundConnection = 'ephemeral_' . md5($baseUrl . '|' . $username);
-        $clone->runtimeConfig = [
+        return $this->build(array_merge([
             'base_url' => $baseUrl,
             'username' => $username,
             'password' => $password,
             'verify_ssl' => $verifySSL,
             'timeout' => $timeout,
-        ];
-        $clone->clients = [];
-
-        return $clone;
-    }
-
-    public function connectionName(): string
-    {
-        return $this->boundConnection ?? $this->defaultConnection();
+        ], $options));
     }
 
     public function client(): ZnunyClient
     {
         $connection = $this->connectionName();
 
-        if ($this->runtimeConfig === null && isset($this->clients[$connection])) {
-            return $this->clients[$connection];
-        }
-
-        $config = $this->runtimeConfig ?? $this->configFor($connection);
-
-        $client = new ZnunyClient(
+        return $this->clients[$connection] ??= new ZnunyClient(
             connection: $connection,
-            config: $config,
+            config: $this->runtimeConfig ?? $this->configFor($connection),
             sessionManager: $this->buildSessionManager(),
             exceptionMapper: new ExceptionMapper,
         );
+    }
 
-        if ($this->runtimeConfig === null) {
-            $this->clients[$connection] = $client;
-        }
+    /**
+     * Call any Znuny operation on this connection.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public function call(string $operation, array $payload = []): array
+    {
+        return $this->client()->call($operation, $payload);
+    }
 
-        return $client;
+    public function connectionName(): string
+    {
+        return $this->boundConnection ?? $this->defaultConnection();
     }
 
     public function tickets(): TicketResource
@@ -147,12 +165,25 @@ class ZnunyManager
         return (string) $this->app['config']->get('znuny.default', 'default');
     }
 
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    protected function runtimeName(array $config): string
+    {
+        return 'ephemeral_'.md5(implode('|', [
+            (string) ($config['base_url'] ?? ''),
+            strtolower((string) ($config['user_type'] ?? 'agent')),
+            (string) ($config['username'] ?? ''),
+            strtolower((string) ($config['auth'] ?? 'session')),
+        ]));
+    }
+
     protected function configFor(string $name): array
     {
         $config = $this->app['config']->get("znuny.connections.{$name}");
 
         if (! is_array($config)) {
-            throw new RuntimeException("Znuny connection [{$name}] is not configured.");
+            throw new ZnunyConfigurationException("Znuny connection [{$name}] is not configured.");
         }
 
         return $config;
