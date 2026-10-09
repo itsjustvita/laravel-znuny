@@ -6,6 +6,7 @@ use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class RequestBuilderTest extends TestCase
 {
@@ -99,5 +100,30 @@ final class RequestBuilderTest extends TestCase
         $this->expectException(ZnunyConfigurationException::class);
 
         $this->builder()->build('TicketSearch', ['DynamicField_Order' => ['Equals' => 'X']], ['SessionID' => 'S1']);
+    }
+
+    #[DataProvider('dotSegments')]
+    public function test_dot_segment_placeholder_values_are_rejected(mixed $value): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('must not be "." or ".."');
+
+        $this->builder()->build('TicketGet', ['TicketID' => $value], ['SessionID' => 'S1']);
+    }
+
+    public static function dotSegments(): array
+    {
+        return [
+            'parent directory' => ['..'],
+            'current directory' => ['.'],
+            'inside a batch' => [['1', '..']],
+        ];
+    }
+
+    public function test_values_that_only_contain_dots_are_not_dot_segments(): void
+    {
+        $request = $this->builder()->build('TicketGet', ['TicketID' => '...'], ['SessionID' => 'S1']);
+
+        $this->assertSame(self::BASE.'/Ticket/...', $request->url);
     }
 }

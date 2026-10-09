@@ -85,6 +85,18 @@ final class RequestBuilder
                 ));
             }
 
+            // "." and ".." would become dot segments that HTTP servers normalise away,
+            // sending the request to another route or web service.
+            foreach ($values as $item) {
+                if (in_array(QueryString::scalar($item), ['.', '..'], true)) {
+                    throw new ZnunyConfigurationException(sprintf(
+                        'Parameter [%s] for operation [%s] must not be "." or "..".',
+                        $name,
+                        $operation,
+                    ));
+                }
+            }
+
             $used[] = $name;
 
             return implode(',', array_map(fn (mixed $item): string => rawurlencode(QueryString::scalar($item)), $values));
