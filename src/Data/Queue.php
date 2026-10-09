@@ -2,8 +2,12 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
+use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
+
 final readonly class Queue
 {
+    use HasAttributes;
+
     public function __construct(
         public string $id,
         public string $name,
@@ -11,6 +15,7 @@ final readonly class Queue
         public string $validId,
         public bool $valid,
         public ?string $comment,
+        public array $attributes = [],
     ) {}
 
     public static function fromZnunyResponse(array $data): self
@@ -24,6 +29,7 @@ final readonly class Queue
             validId: $validId,
             valid: $validId === '1',
             comment: $data['Comment'] ?? null,
+            attributes: $data,
         );
     }
 

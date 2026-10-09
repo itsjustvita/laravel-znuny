@@ -2,8 +2,12 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
+use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
+
 final readonly class Customer
 {
+    use HasAttributes;
+
     public function __construct(
         public string $id,
         public ?string $company,
@@ -13,6 +17,7 @@ final readonly class Customer
         public ?string $login,
         public string $validId,
         public bool $valid,
+        public array $attributes = [],
     ) {}
 
     public static function fromZnunyResponse(array $data): self
@@ -28,6 +33,7 @@ final readonly class Customer
             login: $data['UserLogin'] ?? null,
             validId: $validId,
             valid: $validId === '1',
+            attributes: $data,
         );
     }
 
