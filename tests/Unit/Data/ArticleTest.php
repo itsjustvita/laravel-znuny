@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny\Tests\Unit\Data;
 
 use Carbon\Carbon;
 use ItsJustVita\LaravelZnuny\Data\Article;
+use ItsJustVita\LaravelZnuny\Data\Attachment;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 
 final class ArticleTest extends TestCase
@@ -51,7 +52,34 @@ final class ArticleTest extends TestCase
             'CommunicationChannel' => 'Internal',
             'SenderType' => 'agent',
             'From' => 'agent@example.com',
+            'To' => null,
+            'Cc' => null,
+            'Bcc' => null,
+            'IsVisibleForCustomer' => null,
             'CreateTime' => '2026-04-08 10:00:00',
+            'Attachment' => [],
         ], $article->toArray());
+    }
+
+    public function test_it_reads_recipients_visibility_and_attachments(): void
+    {
+        $article = Article::fromZnunyResponse([
+            'ArticleID' => '7',
+            'To' => 'support@example.com',
+            'Cc' => '',
+            'IsVisibleForCustomer' => '1',
+            'Attachment' => [
+                ['Filename' => 'a.txt', 'ContentType' => 'text/plain', 'Content' => base64_encode('A'), 'FilesizeRaw' => '1'],
+            ],
+            'MessageID' => '<id@example.com>',
+        ]);
+
+        $this->assertSame('support@example.com', $article->to);
+        $this->assertNull($article->cc);
+        $this->assertTrue($article->isVisibleForCustomer);
+        $this->assertInstanceOf(Attachment::class, $article->attachments->first());
+        $this->assertSame('A', $article->attachments->first()->content);
+        $this->assertSame('<id@example.com>', $article->attribute('MessageID'));
+        $this->assertArrayNotHasKey('Attachment', $article->attributes);
     }
 }

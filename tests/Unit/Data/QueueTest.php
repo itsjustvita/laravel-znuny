@@ -69,4 +69,11 @@ final class QueueTest extends TestCase
         $this->assertFalse($queue->valid);
         $this->assertSame('3', $queue->toArray()['ValidID']);
     }
+
+    public function test_it_keeps_raw_attributes(): void
+    {
+        $queue = Queue::fromZnunyResponse(['QueueID' => '1', 'Name' => 'Raw', 'ValidID' => '1', 'UnlockTimeout' => '0']);
+
+        $this->assertSame('0', $queue->attribute('UnlockTimeout'));
+    }
 }
