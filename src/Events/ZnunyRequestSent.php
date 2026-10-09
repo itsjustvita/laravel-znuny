@@ -8,5 +8,7 @@ final readonly class ZnunyRequestSent
         public string $connection,
         public string $operation,
         public array $payload,
+        public string $method = '',
+        public string $path = '',
     ) {}
 }
