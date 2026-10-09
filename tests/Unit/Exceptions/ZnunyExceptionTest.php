@@ -95,4 +95,12 @@ final class ZnunyExceptionTest extends TestCase
         $this->assertInstanceOf(ZnunyException::class, new ZnunyAccessDeniedException('x'));
         $this->assertNotInstanceOf(ZnunyAuthenticationException::class, new ZnunyAccessDeniedException('x'));
     }
+
+    public function test_it_redacts_the_response_body(): void
+    {
+        $exception = new class('boom') extends ZnunyException {};
+        $exception->setResponseBody(['SessionID' => 'abc', 'Error' => ['ErrorCode' => 'X']]);
+
+        $this->assertSame(['SessionID' => '[REDACTED]', 'Error' => ['ErrorCode' => 'X']], $exception->getResponseBody());
+    }
 }

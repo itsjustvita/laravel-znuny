@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
@@ -12,6 +13,7 @@ use ItsJustVita\LaravelZnuny\Events\ZnunyResponseReceived;
 use ItsJustVita\LaravelZnuny\Events\ZnunySessionRefreshed;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRouteNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
@@ -238,5 +240,50 @@ final class ZnunyClientTransportTest extends TestCase
         Http::fake(['*' => Http::response(['TicketID' => ['1']])]);
 
         $this->assertSame(['TicketID' => ['1']], $this->client(['auth' => 'credentials'])->request('TicketSearch'));
+    }
+
+    public function test_session_ids_are_redacted_in_response_events(): void
+    {
+        Event::fake([ZnunyResponseReceived::class]);
+        Http::fake([
+            self::BASE.'/Session' => Http::response(['SessionID' => 'S1']),
+            '*' => Http::response(['TicketID' => []]),
+        ]);
+
+        $this->client()->call('TicketSearch');
+
+        Event::assertDispatched(ZnunyResponseReceived::class, fn (ZnunyResponseReceived $e) => $e->operation === 'SessionCreate'
+            && $e->response === ['SessionID' => '[REDACTED]']);
+    }
+
+    public function test_transport_errors_do_not_leak_credentials_from_the_url(): void
+    {
+        Http::fake(function (Request $request) {
+            throw new ConnectionException('cURL error 7: Failed to connect for '.$request->url());
+        });
+
+        try {
+            $this->client(['auth' => 'credentials', 'auth_transport' => 'payload'])->call('TicketSearch', ['Limit' => 1]);
+            $this->fail('Expected ZnunyConnectionException');
+        } catch (ZnunyConnectionException $e) {
+            $this->assertSame('cURL error 7: Failed to connect for '.self::BASE.'/Ticket', $e->getMessage());
+            $this->assertStringNotContainsString('secret', $e->getMessage());
+            $this->assertStringNotContainsString('secret', (string) $e->getPrevious()?->getMessage());
+        }
+    }
+
+    public function test_transport_errors_do_not_leak_session_ids_from_the_path(): void
+    {
+        Http::fake(function (Request $request) {
+            throw new ConnectionException('cURL error 28: Operation timed out for '.$request->url());
+        });
+
+        try {
+            $this->client(['auth' => 'credentials'])->call('SessionGet', ['SessionID' => 'topsecret']);
+            $this->fail('Expected ZnunyConnectionException');
+        } catch (ZnunyConnectionException $e) {
+            $this->assertStringContainsString('/Session/[REDACTED]', $e->getMessage());
+            $this->assertStringNotContainsString('topsecret', $e->getMessage());
+        }
     }
 }

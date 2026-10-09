@@ -47,4 +47,12 @@ final class RedactorTest extends TestCase
     {
         $this->assertSame(['Content' => 'short'], Redactor::forLog(['Content' => 'short']));
     }
+
+    public function test_scrub_redacts_credentials_in_urls_and_messages(): void
+    {
+        $this->assertSame(
+            'Failed for https://znuny.test/Ticket?UserLogin=agent&Password=[REDACTED]&SessionID=[REDACTED]&Limit=1',
+            Redactor::scrub('Failed for https://znuny.test/Ticket?UserLogin=agent&Password=s3cr%26t&SessionID=abc&Limit=1'),
+        );
+    }
 }

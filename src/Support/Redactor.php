@@ -22,7 +22,7 @@ final class Redactor
     public static function redact(array $data): array
     {
         foreach ($data as $key => $value) {
-            if (is_string($key) && in_array(strtolower($key), self::SENSITIVE_KEYS, true)) {
+            if (is_string($key) && self::isSensitive($key)) {
                 $data[$key] = self::REDACTED;
 
                 continue;
@@ -34,6 +34,24 @@ final class Redactor
         }
 
         return $data;
+    }
+
+    public static function isSensitive(string $key): bool
+    {
+        return in_array(strtolower($key), self::SENSITIVE_KEYS, true);
+    }
+
+    /**
+     * Mask credentials that appear as key=value pairs in free text, e.g. the URL that
+     * transport error messages contain.
+     */
+    public static function scrub(string $text): string
+    {
+        return (string) preg_replace_callback(
+            '/\b([A-Za-z][\w-]*)=([^&\s"\']*)/',
+            fn (array $match): string => self::isSensitive($match[1]) ? $match[1].'='.self::REDACTED : $match[0],
+            $text,
+        );
     }
 
     /**

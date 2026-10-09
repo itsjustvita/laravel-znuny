@@ -69,7 +69,7 @@ abstract class ZnunyException extends RuntimeException
 
     public function setResponseBody(array $body): static
     {
-        $this->responseBody = $body;
+        $this->responseBody = Redactor::redact($body);
 
         return $this;
     }
