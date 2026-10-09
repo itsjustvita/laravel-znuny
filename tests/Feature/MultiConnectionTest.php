@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
 use Znuny;
+use Illuminate\Http\Client\Request;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 
 final class MultiConnectionTest extends TestCase
 {
@@ -90,5 +92,83 @@ final class MultiConnectionTest extends TestCase
 
         Http::assertSent(fn ($r) => str_contains($r->url(), 'tenant-a.test') && ($r['UserLogin'] ?? null) === 'userA');
         Http::assertSent(fn ($r) => str_contains($r->url(), 'tenant-b.test') && ($r['UserLogin'] ?? null) === 'userB');
+    }
+
+    public function test_build_creates_a_runtime_connection_with_its_own_routes(): void
+    {
+        Http::fake([
+            'https://runtime.test/*/SessionCreate' => Http::response(['SessionID' => 'R1']),
+            'https://runtime.test/*/TicketSearch' => Http::response(['TicketID' => ['1']]),
+        ]);
+
+        $result = Znuny::build([
+            'base_url' => 'https://runtime.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'rt',
+            'password' => 'pw',
+            'routes' => 'operation-name',
+        ])->call('TicketSearch', ['Limit' => 1]);
+
+        $this->assertSame(['TicketID' => ['1']], $result);
+    }
+
+    public function test_build_uses_the_given_name(): void
+    {
+        $manager = Znuny::build(['name' => 'tenant-42', 'base_url' => 'https://x.test', 'username' => 'u', 'password' => 'p']);
+
+        $this->assertSame('tenant-42', $manager->connectionName());
+        $this->assertSame('tenant-42', $manager->client()->connection());
+    }
+
+    public function test_runtime_connection_names_differ_per_user_type(): void
+    {
+        $base = ['base_url' => 'https://x.test', 'username' => 'u', 'password' => 'p'];
+
+        $this->assertNotSame(
+            Znuny::build($base)->connectionName(),
+            Znuny::build($base + ['user_type' => 'customer'])->connectionName(),
+        );
+    }
+
+    public function test_using_credentials_accepts_options(): void
+    {
+        Http::fake([
+            '*/SessionCreate' => Http::response(['SessionID' => 'E1']),
+            '*/TicketGet/5' => Http::response(['Ticket' => [[
+                'TicketID' => '5', 'TicketNumber' => '5', 'Title' => 't',
+                'QueueID' => '1', 'Queue' => 'Q', 'State' => 'new',
+                'Priority' => '3 normal', 'Created' => '2026-04-08 10:00:00',
+            ]]]),
+        ]);
+
+        Znuny::usingCredentials(
+            baseUrl: 'https://eph.test/otrs/nph-genericinterface.pl/Webservice/test',
+            username: 'eph',
+            password: 'pw',
+            options: ['routes' => 'operation-name'],
+        )->tickets()->find('5');
+
+        Http::assertSent(fn (Request $r) => $r->url() === 'https://eph.test/otrs/nph-genericinterface.pl/Webservice/test/TicketGet/5');
+    }
+
+    public function test_call_on_the_facade_uses_the_default_connection(): void
+    {
+        Http::fake([
+            '*/SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*/FAQSearch' => Http::response(['ID' => ['3']]),
+        ]);
+
+        $this->assertSame(['ID' => ['3']], Znuny::call('FAQSearch', ['Title' => 'VPN*']));
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'znuny.test') && ($r['Title'] ?? null) === 'VPN*');
+    }
+
+    public function test_incomplete_connection_config_throws_configuration_exception(): void
+    {
+        config()->set('znuny.connections.broken', ['base_url' => 'https://x.test']);
+
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [broken] is missing [username].');
+
+        Znuny::connection('broken')->client();
     }
 }
