@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use ItsJustVita\LaravelZnuny\Commands\CacheClearCommand;
 use ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand;
+use ItsJustVita\LaravelZnuny\Commands\RoutesCommand;
 use ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand;
 use ItsJustVita\LaravelZnuny\Webhooks\AuthenticateWebhook;
 use ItsJustVita\LaravelZnuny\Webhooks\WebhookController;
@@ -29,6 +30,7 @@ class ZnunyServiceProvider extends ServiceProvider
 
             $this->commands([
                 TestConnectionCommand::class,
+                RoutesCommand::class,
                 CacheClearCommand::class,
                 GenerateDynamicFieldsCommand::class,
             ]);
