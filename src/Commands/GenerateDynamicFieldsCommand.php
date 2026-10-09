@@ -63,6 +63,7 @@ PHP;
             'integer' => 'int',
             'boolean' => 'bool',
             'float' => 'float',
+            'array' => 'array',
             default => 'string',
         };
     }
