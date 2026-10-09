@@ -80,6 +80,18 @@ final readonly class ConnectionConfig
     }
 
     /**
+     * Cache key for this connection's session. It covers the target and the credentials,
+     * so connections that share a name (or a login with another password) never share a
+     * session. $secret (the app key) keeps the credentials from being guessed from the key.
+     */
+    public function sessionKey(string $secret = ''): string
+    {
+        $identity = implode("\0", [$this->baseUrl, $this->userType, $this->username, $this->password]);
+
+        return $this->name.':'.substr(hash_hmac('sha256', $identity, $secret), 0, 32);
+    }
+
+    /**
      * The request field Znuny expects for the login of this user type.
      */
     public function loginKey(): string
