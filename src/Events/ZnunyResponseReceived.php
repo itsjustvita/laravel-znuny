@@ -10,5 +10,6 @@ final readonly class ZnunyResponseReceived
         public float $responseTimeMs,
         public array $payload,
         public array $response,
+        public int $status = 200,
     ) {}
 }

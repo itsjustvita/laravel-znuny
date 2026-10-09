@@ -19,20 +19,19 @@ final class ZnunyClientTest extends TestCase
 {
     private function makeClient(array $config = []): ZnunyClient
     {
-        // Default: no HTTP-layer retry in tests unless explicitly enabled.
-        config()->set('znuny.http.retries', 0);
-
-        $config = array_merge([
-            'base_url' => 'https://znuny.test/otrs/nph-genericinterface.pl/Webservice/test',
-            'username' => 'testuser',
-            'password' => 'testpass',
-            'verify_ssl' => false,
-            'timeout' => 5,
-        ], $config);
-
         return new ZnunyClient(
             connection: 'default',
-            config: $config,
+            config: array_merge([
+                'base_url' => 'https://znuny.test/otrs/nph-genericinterface.pl/Webservice/test',
+                'username' => 'testuser',
+                'password' => 'testpass',
+                'verify_ssl' => false,
+                'timeout' => 5,
+                // These tests describe operation-name routes (POST /<Operation>).
+                'routes' => 'operation-name',
+                // No HTTP-layer retry unless a test enables it explicitly.
+                'retries' => 0,
+            ], $config),
             sessionManager: new SessionManager(
                 new SessionStore(Cache::store('array'), 'znuny:session:'),
                 ttl: 60,
@@ -108,11 +107,7 @@ final class ZnunyClientTest extends TestCase
 
         Http::fake(['*' => $sequence]);
 
-        $client = $this->makeClient();
-
-        // makeClient() defaults retries to 0; enable for this test only.
-        config()->set('znuny.http.retries', 2);
-        config()->set('znuny.http.retry_delay', 10); // keep test fast
+        $client = $this->makeClient(['retries' => 2, 'retry_delay' => 10]);
 
         $result = $client->request('TicketGet', ['TicketID' => '42']);
 

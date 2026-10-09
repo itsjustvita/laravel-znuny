@@ -31,10 +31,15 @@ abstract class TestCase extends BaseTestCase
     protected function defineEnvironment($app): void
     {
         $app['config']->set('cache.default', 'array');
+
+        // Most feature tests describe v0.1-style operation-name routes (POST /<Operation>).
+        // The stock GenericTicketConnectorREST routes are covered by GenericTicketConnectorTest
+        // and ZnunyClientTransportTest.
         $app['config']->set('znuny.connections.default', [
             'base_url' => 'https://znuny.test/otrs/nph-genericinterface.pl/Webservice/test',
             'username' => 'testuser',
             'password' => 'testpass',
+            'routes' => 'operation-name',
             'verify_ssl' => false,
             'timeout' => 5,
         ]);
