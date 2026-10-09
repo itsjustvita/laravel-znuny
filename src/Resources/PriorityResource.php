@@ -5,13 +5,16 @@ namespace ItsJustVita\LaravelZnuny\Resources;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Priority;
 
+/**
+ * Needs the custom operation PriorityList in the web service.
+ */
 class PriorityResource extends Resource
 {
     /** @return Collection<int, Priority> */
     public function all(): Collection
     {
         return $this->remember('priorities', function () {
-            $response = $this->client->request('PriorityList', []);
+            $response = $this->client->call('PriorityList');
 
             return collect($response['Priority'] ?? [])
                 ->map(fn (array $row) => Priority::fromZnunyResponse($row))
