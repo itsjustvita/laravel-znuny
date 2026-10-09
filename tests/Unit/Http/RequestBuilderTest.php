@@ -126,4 +126,12 @@ final class RequestBuilderTest extends TestCase
 
         $this->assertSame(self::BASE.'/Ticket/...', $request->url);
     }
+
+    public function test_sensitive_placeholders_are_redacted_in_the_logged_path(): void
+    {
+        $request = $this->builder()->build('SessionGet', ['SessionID' => 'abc123'], ['SessionID' => 'S1']);
+
+        $this->assertSame(self::BASE.'/Session/abc123', $request->url);
+        $this->assertSame('/Session/[REDACTED]', $request->path);
+    }
 }

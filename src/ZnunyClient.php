@@ -182,8 +182,12 @@ class ZnunyClient
         try {
             $response = $this->dispatch($request);
         } catch (ConnectionException $e) {
+            // Transport messages contain the request URL, which can carry credentials in the
+            // query string (payload transport on GET routes) or a session ID in the path.
+            $message = Redactor::scrub(str_replace($request->url, $this->settings->baseUrl.$request->path, $e->getMessage()));
+
             throw $this->failed($operation, $request, $redacted, $this->exceptionMapper->fromTransportError(
-                $e,
+                new ConnectionException($message, (int) $e->getCode()),
                 $operation,
                 $this->connection,
                 $data,
@@ -212,7 +216,7 @@ class ZnunyClient
             operation: $operation,
             responseTimeMs: $elapsed,
             payload: $redacted,
-            response: $json,
+            response: Redactor::redact($json),
             status: $response->status(),
         ));
 

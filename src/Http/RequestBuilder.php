@@ -5,6 +5,7 @@ namespace ItsJustVita\LaravelZnuny\Http;
 use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\Route;
+use ItsJustVita\LaravelZnuny\Support\Redactor;
 
 final class RequestBuilder
 {
@@ -27,7 +28,7 @@ final class RequestBuilder
     public function build(string $operation, array $payload, array $auth = []): PreparedRequest
     {
         $route = $this->config->routes->route($operation);
-        [$path, $used] = $this->expandPath($route, $operation, $payload);
+        [$path, $loggedPath, $used] = $this->expandPath($route, $operation, $payload);
         $url = $this->config->baseUrl.$path;
         $headers = [];
 
@@ -42,10 +43,10 @@ final class RequestBuilder
         if (! $route->sendsBody()) {
             $query = QueryString::build(array_merge($auth, array_diff_key($payload, array_flip($used))), $operation);
 
-            return new PreparedRequest('GET', $query === '' ? $url : $url.'?'.$query, $path, null, $headers);
+            return new PreparedRequest('GET', $query === '' ? $url : $url.'?'.$query, $loggedPath, null, $headers);
         }
 
-        return new PreparedRequest($route->method, $url, $path, array_merge($auth, $payload), $headers);
+        return new PreparedRequest($route->method, $url, $loggedPath, array_merge($auth, $payload), $headers);
     }
 
     private function authInHeaders(Route $route): bool
@@ -61,14 +62,18 @@ final class RequestBuilder
      * Fill ":Param" placeholders from the payload. Lists are joined with commas,
      * which Znuny accepts for TicketGet/TicketHistoryGet batches.
      *
+     * Also returns the path for logs, events and errors, in which sensitive placeholders
+     * (e.g. ":SessionID") are redacted.
+     *
      * @param  array<string, mixed>  $payload
-     * @return array{0: string, 1: list<string>}
+     * @return array{0: string, 1: string, 2: list<string>}
      */
     private function expandPath(Route $route, string $operation, array $payload): array
     {
         $used = [];
+        $logged = [];
 
-        $path = preg_replace_callback('#:([^/]+)#', function (array $match) use ($route, $operation, $payload, &$used): string {
+        $path = preg_replace_callback('#:([^/]+)#', function (array $match) use ($route, $operation, $payload, &$used, &$logged): string {
             $name = $match[1];
             $value = $payload[$name] ?? null;
             $values = array_filter(
@@ -98,10 +103,14 @@ final class RequestBuilder
             }
 
             $used[] = $name;
+            $encoded = implode(',', array_map(fn (mixed $item): string => rawurlencode(QueryString::scalar($item)), $values));
+            $logged[$name] = Redactor::isSensitive($name) ? Redactor::REDACTED : $encoded;
 
-            return implode(',', array_map(fn (mixed $item): string => rawurlencode(QueryString::scalar($item)), $values));
+            return $encoded;
         }, $route->path);
 
-        return [(string) $path, $used];
+        $loggedPath = preg_replace_callback('#:([^/]+)#', fn (array $match): string => $logged[$match[1]], $route->path);
+
+        return [(string) $path, (string) $loggedPath, $used];
     }
 }
