@@ -8,8 +8,8 @@ final readonly class FieldDefinition
         public string $name,
         public string $type,
         public ?array $allowed = null,
-        public ?int $min = null,
-        public ?int $max = null,
+        public int|float|null $min = null,
+        public int|float|null $max = null,
     ) {}
 
     public static function fromArray(string $name, array $data): self
@@ -18,8 +18,8 @@ final readonly class FieldDefinition
             name: $name,
             type: (string) ($data['type'] ?? 'string'),
             allowed: isset($data['allowed']) ? array_values((array) $data['allowed']) : null,
-            min: isset($data['min']) ? (int) $data['min'] : null,
-            max: isset($data['max']) ? (int) $data['max'] : null,
+            min: isset($data['min']) && is_numeric($data['min']) ? $data['min'] + 0 : null,
+            max: isset($data['max']) && is_numeric($data['max']) ? $data['max'] + 0 : null,
         );
     }
 }

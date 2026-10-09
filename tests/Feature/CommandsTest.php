@@ -80,4 +80,21 @@ final class CommandsTest extends TestCase
         $this->assertStringContainsString('public function priority(', $contents);
         $this->assertStringContainsString('namespace App\\Znuny;', $contents);
     }
+
+    public function test_generate_fields_supports_float_and_array_types(): void
+    {
+        $target = storage_path('app/znuny-test/DynamicFieldsTyped.php');
+        @unlink($target);
+
+        config()->set('znuny.dynamic_fields', [
+            'Amount' => ['type' => 'float'],
+            'Tags' => ['type' => 'array'],
+        ]);
+
+        $this->artisan('znuny:generate-fields', ['--output' => $target])->assertExitCode(0);
+
+        $contents = file_get_contents($target);
+        $this->assertStringContainsString('public function amount(float $value)', $contents);
+        $this->assertStringContainsString('public function tags(array $value)', $contents);
+    }
 }
