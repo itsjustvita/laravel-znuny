@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny;
 
+use Closure;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
@@ -186,7 +187,7 @@ class ZnunyClient
             path: $request->path,
         ));
 
-        $this->log('info', 'log_requests', 'Znuny request', [
+        $this->log('info', 'log_requests', 'Znuny request', fn (): array => [
             'connection' => $this->connection,
             'operation' => $operation,
             'method' => $request->method,
@@ -241,7 +242,7 @@ class ZnunyClient
             status: $response->status(),
         ));
 
-        $this->log('debug', 'log_responses', 'Znuny response', [
+        $this->log('debug', 'log_responses', 'Znuny response', fn (): array => [
             'connection' => $this->connection,
             'operation' => $operation,
             'status' => $response->status(),
@@ -302,13 +303,17 @@ class ZnunyClient
         return $exception;
     }
 
-    protected function log(string $level, string $toggle, string $message, array $context): void
+    /**
+     * @param  array<string, mixed>|Closure(): array<string, mixed>  $context  a closure is only evaluated when the entry is written
+     */
+    protected function log(string $level, string $toggle, string $message, array|Closure $context): void
     {
         if (! config('znuny.logging.enabled') || ! config("znuny.logging.{$toggle}")) {
             return;
         }
 
-        Log::channel((string) config('znuny.logging.channel', 'znuny'))->{$level}($message, $context);
+        Log::channel((string) config('znuny.logging.channel', 'znuny'))
+            ->{$level}($message, $context instanceof Closure ? $context() : $context);
     }
 
     /**
