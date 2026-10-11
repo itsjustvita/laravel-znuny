@@ -59,7 +59,7 @@ final class RequestBuilderTest extends TestCase
 
     public function test_payload_transport_puts_auth_into_the_query_string(): void
     {
-        $request = $this->builder(['auth_transport' => 'payload'])
+        $request = $this->builder(['routes' => 'generic-ticket-connector-classic', 'auth_transport' => 'payload'])
             ->build('TicketSearch', ['States' => ['new', 'open']], ['SessionID' => 'S1']);
 
         $this->assertSame(self::BASE.'/Ticket?SessionID=S1&States=new&States=open', $request->url);
@@ -99,7 +99,7 @@ final class RequestBuilderTest extends TestCase
     {
         $this->expectException(ZnunyConfigurationException::class);
 
-        $this->builder()->build('TicketSearch', ['DynamicField_Order' => ['Equals' => 'X']], ['SessionID' => 'S1']);
+        $this->builder(['routes' => 'generic-ticket-connector-classic'])->build('TicketSearch', ['DynamicField_Order' => ['Equals' => 'X']], ['SessionID' => 'S1']);
     }
 
     #[DataProvider('dotSegments')]

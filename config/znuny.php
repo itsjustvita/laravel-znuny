@@ -16,8 +16,9 @@ return [
     |--------------------------------------------------------------------------
     |
     | base_url        https://<host>/otrs/nph-genericinterface.pl/Webservice/<Name>
-    | routes          A preset ("generic-ticket-connector" = Znuny's stock web service,
-    |                 "operation-name" = POST /<Operation>) or an array of
+    | routes          A preset ("generic-ticket-connector" = the GenericTicketConnectorREST
+    |                 example Znuny ships, "generic-ticket-connector-classic" = the older
+    |                 development example, "operation-name" = POST /<Operation>) or an array of
     |                 "Operation" => "METHOD /Path/:Param" with an optional "extends" preset.
     |                 Unmapped operations are sent to "POST /<Operation>".
     | auth            "session" (SessionCreate + cached SessionID) or "credentials"

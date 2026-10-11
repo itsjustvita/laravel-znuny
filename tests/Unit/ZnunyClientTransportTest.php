@@ -65,7 +65,7 @@ final class ZnunyClientTransportTest extends TestCase
     {
         Http::fake([self::BASE.'/Ticket*' => Http::response(['TicketID' => ['1']])]);
 
-        $this->client(['auth' => 'credentials'])->call('TicketSearch', ['Limit' => 1]);
+        $this->client(['auth' => 'credentials', 'routes' => 'generic-ticket-connector-classic'])->call('TicketSearch', ['Limit' => 1]);
 
         Http::assertSentCount(1);
         Http::assertSent(fn (Request $r) => $r->url() === self::BASE.'/Ticket?Limit=1'
@@ -94,7 +94,7 @@ final class ZnunyClientTransportTest extends TestCase
             self::BASE.'/Ticket*' => Http::response(['TicketID' => []]),
         ]);
 
-        $this->client(['auth_transport' => 'payload'])->call('TicketSearch', ['States' => ['new', 'open']]);
+        $this->client(['auth_transport' => 'payload', 'routes' => 'generic-ticket-connector-classic'])->call('TicketSearch', ['States' => ['new', 'open']]);
 
         Http::assertSent(fn (Request $r) => $r->url() === self::BASE.'/Ticket?SessionID=S1&States=new&States=open');
     }
@@ -199,7 +199,7 @@ final class ZnunyClientTransportTest extends TestCase
         Event::fake([ZnunyRequestSent::class, ZnunyResponseReceived::class]);
         Http::fake(['*' => Http::response(['TicketID' => []])]);
 
-        $this->client(['auth' => 'credentials'])->call('TicketSearch', ['Title' => 'x']);
+        $this->client(['auth' => 'credentials', 'routes' => 'generic-ticket-connector-classic'])->call('TicketSearch', ['Title' => 'x']);
 
         Event::assertDispatched(ZnunyRequestSent::class, fn (ZnunyRequestSent $e) => $e->method === 'GET'
             && $e->path === '/Ticket'
@@ -232,7 +232,10 @@ final class ZnunyClientTransportTest extends TestCase
 
         $this->assertTrue($this->client(['auth' => 'credentials'])->ping());
 
-        Http::assertSent(fn (Request $r) => $r->url() === self::BASE.'/Ticket?Limit=1');
+        Http::assertSent(fn (Request $r) => $r->method() === 'POST'
+            && $r->url() === self::BASE.'/Ticket/Search'
+            && $r['Limit'] === 1
+            && $r['UserLogin'] === 'agent');
     }
 
     public function test_request_is_a_deprecated_alias_of_call(): void
@@ -263,7 +266,7 @@ final class ZnunyClientTransportTest extends TestCase
         });
 
         try {
-            $this->client(['auth' => 'credentials', 'auth_transport' => 'payload'])->call('TicketSearch', ['Limit' => 1]);
+            $this->client(['auth' => 'credentials', 'auth_transport' => 'payload', 'routes' => 'generic-ticket-connector-classic'])->call('TicketSearch', ['Limit' => 1]);
             $this->fail('Expected ZnunyConnectionException');
         } catch (ZnunyConnectionException $e) {
             $this->assertSame('cURL error 7: Failed to connect for '.self::BASE.'/Ticket', $e->getMessage());

@@ -155,11 +155,12 @@ final class CommandsTest extends TestCase
             ->expectsTable(['Operation', 'Method', 'Path'], [
                 ['SessionCreate', 'POST', '/Session'],
                 ['SessionGet', 'GET', '/Session/:SessionID'],
+                ['SessionDelete', 'DELETE', '/Session/:SessionID'],
                 ['TicketCreate', 'POST', '/Ticket'],
                 ['TicketGet', 'GET', '/Ticket/:TicketID'],
-                ['TicketSearch', 'GET', '/Ticket'],
+                ['TicketSearch', 'POST', '/Ticket/Search'],
                 ['TicketUpdate', 'PATCH', '/Ticket/:TicketID'],
-                ['TicketHistoryGet', 'GET', '/TicketHistory/:TicketID'],
+                ['TicketHistoryGet', 'GET', '/Ticket/History/:TicketID'],
             ])
             ->assertExitCode(0);
     }

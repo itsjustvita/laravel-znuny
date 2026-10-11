@@ -12,11 +12,28 @@ final class RouteMapTest extends TestCase
     {
         $map = RouteMap::fromConfig(null);
 
+        // Routes of var/webservices/examples/GenericTicketConnectorREST.yml shipped with Znuny.
         $this->assertSame('generic-ticket-connector', $map->preset());
+        $this->assertSame('POST /Session', (string) $map->route('SessionCreate'));
+        $this->assertSame('GET /Session/:SessionID', (string) $map->route('SessionGet'));
+        $this->assertSame('DELETE /Session/:SessionID', (string) $map->route('SessionDelete'));
+        $this->assertSame('POST /Ticket', (string) $map->route('TicketCreate'));
+        $this->assertSame('GET /Ticket/:TicketID', (string) $map->route('TicketGet'));
+        $this->assertSame('POST /Ticket/Search', (string) $map->route('TicketSearch'));
+        $this->assertSame('PATCH /Ticket/:TicketID', (string) $map->route('TicketUpdate'));
+        $this->assertSame('GET /Ticket/History/:TicketID', (string) $map->route('TicketHistoryGet'));
+    }
+
+    public function test_classic_preset_matches_the_development_example_web_service(): void
+    {
+        $map = RouteMap::fromConfig('generic-ticket-connector-classic');
+
+        // Routes of development/webservices/GenericTicketConnectorREST.yml (also used by OTRS 5/6).
         $this->assertSame('POST /Session', (string) $map->route('SessionCreate'));
         $this->assertSame('GET /Session/:SessionID', (string) $map->route('SessionGet'));
         $this->assertSame('POST /Ticket', (string) $map->route('TicketCreate'));
         $this->assertSame('GET /Ticket/:TicketID', (string) $map->route('TicketGet'));
+        $this->assertSame('GET /TicketList', (string) $map->route('TicketGetList'));
         $this->assertSame('GET /Ticket', (string) $map->route('TicketSearch'));
         $this->assertSame('PATCH /Ticket/:TicketID', (string) $map->route('TicketUpdate'));
         $this->assertSame('GET /TicketHistory/:TicketID', (string) $map->route('TicketHistoryGet'));
@@ -69,7 +86,7 @@ final class RouteMapTest extends TestCase
     public function test_unknown_preset_throws_with_available_presets(): void
     {
         $this->expectException(ZnunyConfigurationException::class);
-        $this->expectExceptionMessage('Unknown Znuny route preset [does-not-exist]. Available presets: generic-ticket-connector, operation-name.');
+        $this->expectExceptionMessage('Unknown Znuny route preset [does-not-exist]. Available presets: generic-ticket-connector, generic-ticket-connector-classic, operation-name.');
 
         RouteMap::fromConfig('does-not-exist');
     }

@@ -6,7 +6,7 @@
 
 ### Default routes (high impact)
 
-0.1 sent every request as `POST <base_url>/<Operation>`, with the ID appended for `TicketGet`, `TicketUpdate` and `QueueGet`. 0.2 uses the routes of Znuny's stock `GenericTicketConnectorREST` web service by default.
+0.1 sent every request as `POST <base_url>/<Operation>`, with the ID appended for `TicketGet`, `TicketUpdate` and `QueueGet`. 0.2 uses the routes of the `GenericTicketConnectorREST` example web service that Znuny ships (`var/webservices/examples/`) by default. Web services set up from the older example in `development/webservices/` (search via `GET /Ticket`) need `'routes' => 'generic-ticket-connector-classic'`.
 
 If your web service uses routes named after the operations, keep the old behaviour per connection:
 
