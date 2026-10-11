@@ -17,7 +17,7 @@ final class QueueResourceTest extends TestCase
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*QueueList*' => Http::response(['Queue' => [
                 ['QueueID' => '1',   'Name' => 'Postmaster', 'GroupID' => '1', 'ValidID' => '1'],
-                ['QueueID' => '803', 'Name' => 'Support',    'GroupID' => '1', 'ValidID' => '1'],
+                ['QueueID' => '5', 'Name' => 'Support',    'GroupID' => '1', 'ValidID' => '1'],
             ]]),
         ]);
 
@@ -32,11 +32,11 @@ final class QueueResourceTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*QueueGet*' => Http::response(['Queue' => [[
-                'QueueID' => '803', 'Name' => 'Support', 'GroupID' => '1', 'ValidID' => '1',
+                'QueueID' => '5', 'Name' => 'Support', 'GroupID' => '1', 'ValidID' => '1',
             ]]]),
         ]);
 
-        $queue = Znuny::queues()->find('803');
+        $queue = Znuny::queues()->find('5');
 
         $this->assertInstanceOf(Queue::class, $queue);
         $this->assertSame('Support', $queue->name);
@@ -59,13 +59,13 @@ final class QueueResourceTest extends TestCase
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*QueueList*' => Http::response(['Queue' => [
                 ['QueueID' => '1',   'Name' => 'Postmaster', 'GroupID' => '1', 'ValidID' => '1'],
-                ['QueueID' => '803', 'Name' => 'Support',    'GroupID' => '1', 'ValidID' => '1'],
+                ['QueueID' => '5', 'Name' => 'Support',    'GroupID' => '1', 'ValidID' => '1'],
             ]]),
         ]);
 
         $queue = Znuny::queues()->findByName('Support');
 
-        $this->assertSame('803', $queue->id);
+        $this->assertSame('5', $queue->id);
     }
 
     public function test_find_by_name_throws_when_missing(): void
