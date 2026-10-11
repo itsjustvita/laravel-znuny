@@ -347,6 +347,8 @@ Passwords, session IDs and tokens are replaced with `[REDACTED]` in event payloa
 
 ## Logging
 
+The package logs to the channel named in `znuny.logging.channel` (`ZNUNY_LOG_CHANNEL`, default `znuny`). If your application does not define that channel, the package registers it as a daily file, `storage/logs/znuny.log`. To log elsewhere, define the channel yourself or point `ZNUNY_LOG_CHANNEL` at an existing one, e.g. `stack`:
+
 ```php
 // config/logging.php
 'channels' => [

@@ -42,6 +42,7 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 ### Fixed
 
+- Without a `znuny` log channel, Laravel wrote an emergency log entry on every request; the package now registers the channel as a daily `storage/logs/znuny.log` file unless the application defines it.
 - HTTP retries repeated writes after timeouts and server errors, which could create duplicate tickets when Znuny answered slowly; writes are now only repeated when no connection could be established.
 - `get()`, `paginate()` and `lazy()` sent one `TicketGet` per ticket; they use batches again.
 - The dynamic field validator rejected the `float` type that the generator supports.
