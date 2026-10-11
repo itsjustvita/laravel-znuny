@@ -17,6 +17,18 @@ class ZnunyServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/znuny.php', 'znuny');
 
+        // Without a channel definition Laravel would write an emergency entry on every request.
+        $channel = (string) $this->app['config']->get('znuny.logging.channel', 'znuny');
+
+        if ($this->app['config']->get("logging.channels.{$channel}") === null) {
+            $this->app['config']->set("logging.channels.{$channel}", [
+                'driver' => 'daily',
+                'path' => $this->app->storagePath('logs/znuny.log'),
+                'level' => 'debug',
+                'days' => 14,
+            ]);
+        }
+
         $this->app->singleton(ZnunyManager::class, fn ($app) => new ZnunyManager($app));
         $this->app->alias(ZnunyManager::class, 'znuny');
     }
