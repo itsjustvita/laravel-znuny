@@ -6,11 +6,11 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [0.2.0]
 
-Works out of the box with Znuny's stock `GenericTicketConnectorREST` web service. See [UPGRADE.md](UPGRADE.md).
+Works out of the box with the `GenericTicketConnectorREST` example web service that Znuny ships. See [UPGRADE.md](UPGRADE.md).
 
 ### Added
 
-- Configurable REST routes per connection: presets `generic-ticket-connector` (default) and `operation-name` (0.1 behaviour), `extends` overrides and a `POST /<Operation>` fallback.
+- Configurable REST routes per connection: presets `generic-ticket-connector` (default, the example web service Znuny ships), `generic-ticket-connector-classic` (the older development example) and `operation-name` (0.1 behaviour), `extends` overrides and a `POST /<Operation>` fallback.
 - `Znuny::call()` for any operation, `Znuny::build()` for runtime connections, `$options` for `usingCredentials()`.
 - Authentication modes `session` and `credentials`, agent or customer users, credentials via `X-OTRS-Header-*` headers.
 - `tickets()->findMany()` with batched `TicketGet`, `tickets()->history()`, attachments for new tickets, articles and reads, dynamic fields in `update()`, `addArticle()` returns the article ID.
@@ -24,7 +24,7 @@ Works out of the box with Znuny's stock `GenericTicketConnectorREST` web service
 
 ### Changed
 
-- **Breaking:** the default routes follow Znuny's `GenericTicketConnectorREST` web service.
+- **Breaking:** the default routes follow the `GenericTicketConnectorREST` example web service that Znuny ships.
 - Errors are mapped from Znuny's error codes; HTTP errors without a Znuny error body throw instead of returning an empty array.
 - Secrets are redacted the same way in events, logs and exceptions; `logging.log_responses` is implemented.
 - `ZnunySessionRefreshed` is dispatched and carries only the connection name.

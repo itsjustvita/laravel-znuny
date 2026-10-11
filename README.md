@@ -8,7 +8,7 @@
 
 > Laravel SDK for the Znuny / OTRS Community Edition Generic Interface REST API.
 
-Works out of the box with Znuny's stock **GenericTicketConnectorREST** web service and with any custom web service through configurable routes. You get typed DTOs, a fluent ticket search with batching and pagination, attachments, ticket history, session handling with automatic re-login, inbound webhooks, events, logging, and a generic `call()` for every other operation.
+Works out of the box with the **GenericTicketConnectorREST** example web service that Znuny ships, and with any custom web service through configurable routes. You get typed DTOs, a fluent ticket search with batching and pagination, attachments, ticket history, session handling with automatic re-login, inbound webhooks, events, logging, and a generic `call()` for every other operation.
 
 ## Contents
 
@@ -55,11 +55,11 @@ php artisan znuny:test-connection
 
 ## Setting up the web service in Znuny
 
-1. In Znuny open **Admin → Web Services → Add Web Service → Import web service** and import `GenericTicketConnectorREST.yml`. Znuny ships it in `var/webservices/examples/`; it is also [on GitHub](https://github.com/znuny/Znuny/blob/dev/development/webservices/GenericTicketConnectorREST.yml).
+1. In Znuny open **Admin → Web Services → Add Web Service** and import the example web service `GenericTicketConnectorREST` (Znuny ships it in `var/webservices/examples/`).
 2. Keep the name `GenericTicketConnectorREST` or choose your own. The base URL is `https://<host>/otrs/nph-genericinterface.pl/Webservice/<name>`; use your installation's script alias if it is not `/otrs/`.
 3. Create an agent for the API and give it permissions on the queues it needs.
 
-The default route preset matches this web service, so nothing else needs to be configured.
+The default route preset matches this web service, so nothing else needs to be configured. If your web service was set up from the older example in `development/webservices/` (it searches with `GET /Ticket`), set `'routes' => 'generic-ticket-connector-classic'`. `php artisan znuny:test-connection` tells you whether the routes match.
 
 ## Configuration
 
@@ -91,21 +91,22 @@ Znuny maps REST routes to operations per web service. Tell the package which rou
 
 | `routes` | Meaning |
 |---|---|
-| `generic-ticket-connector` (default) | Znuny's stock web service: `POST /Session`, `GET /Session/:SessionID`, `POST /Ticket`, `GET /Ticket/:TicketID`, `GET /Ticket` (search), `PATCH /Ticket/:TicketID`, `GET /TicketHistory/:TicketID` |
+| `generic-ticket-connector` (default) | The example web service Znuny ships (`var/webservices/examples/`): `POST /Session`, `GET`/`DELETE /Session/:SessionID`, `POST /Ticket`, `GET /Ticket/:TicketID`, `POST /Ticket/Search`, `PATCH /Ticket/:TicketID`, `GET /Ticket/History/:TicketID` |
+| `generic-ticket-connector-classic` | The older example (`development/webservices/`) that many OTRS and Znuny installations were set up from: like the default, but `GET /Ticket` (search), `GET /TicketHistory/:TicketID` and `GET /TicketList` |
 | `operation-name` | Routes named after the operations: `POST /<Operation>`, plus `POST /TicketGet/:TicketID`, `POST /TicketUpdate/:TicketID` and `POST /QueueGet/:QueueID` |
 | array | Your own mapping in Znuny's notation `"METHOD /Path/:Param"`, optionally starting from a preset with `extends` |
 
 ```php
 'routes' => [
-    'extends'      => 'generic-ticket-connector',
-    'TicketSearch' => 'POST /TicketSearch',   // e.g. to search by dynamic fields
-    'QueueList'    => 'GET /Queue',
+    'extends'   => 'generic-ticket-connector',
+    'QueueList' => 'GET /Queue',          // custom operations of your web service
+    'FAQSearch' => 'POST /FAQ/Search',
 ],
 ```
 
 Operations without a mapping are sent to `POST /<Operation>`. `php artisan znuny:routes` prints the effective routes of a connection.
 
-For `GET` routes the parameters go into the query string the way Znuny parses it (`States=new&States=open`). Nested parameters such as dynamic field search conditions cannot be expressed in a query string; map that operation to a route with a request body (`POST`), as in the example above.
+For `GET` routes the parameters go into the query string the way Znuny parses it (`States=new&States=open`). Nested parameters such as dynamic field search conditions cannot be expressed in a query string. This affects `TicketSearch` with the classic preset; to search by dynamic fields there, add a `POST` route for `TicketSearch` to the web service and map it, e.g. `'TicketSearch' => 'POST /Ticket/Search'`.
 
 ### Authentication
 
@@ -213,7 +214,7 @@ foreach (Znuny::tickets()->whereQueue('Support')->lazy(chunkSize: 100) as $ticke
 // Any TicketSearch parameter:
 Znuny::tickets()->where('OwnerIDs', [3, 4])->ids();
 
-// Dynamic field conditions (needs a POST route for TicketSearch, see Routes):
+// Dynamic field conditions (the default preset searches via POST; for the classic preset see Routes):
 Znuny::tickets()->query()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids();
 ```
 

@@ -10,7 +10,8 @@ use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use Znuny;
 
 /**
- * End-to-end behaviour against the routes of Znuny's stock GenericTicketConnectorREST web service.
+ * End-to-end behaviour against the routes of the GenericTicketConnectorREST example web service
+ * that Znuny ships (default preset); the classic preset is covered where its routes differ.
  */
 final class GenericTicketConnectorTest extends TestCase
 {
@@ -64,10 +65,10 @@ final class GenericTicketConnectorTest extends TestCase
             && $r->header('X-OTRS-Header-SessionID') === ['S1']);
     }
 
-    public function test_search_and_get_use_repeated_query_keys_and_one_batched_ticket_get(): void
+    public function test_search_posts_to_ticket_search_and_get_uses_one_batched_ticket_get(): void
     {
         $this->fakeZnuny([
-            'GET /Ticket' => ['TicketID' => ['3', '1']],
+            'POST /Ticket/Search' => ['TicketID' => ['3', '1']],
             'GET /Ticket/3,1' => ['Ticket' => [$this->ticket('1'), $this->ticket('3')]],
         ]);
 
@@ -79,8 +80,27 @@ final class GenericTicketConnectorTest extends TestCase
             ->get();
 
         $this->assertSame(['3', '1'], $tickets->pluck('id')->all());
-        Http::assertSent(fn (Request $r) => $r->url() === self::BASE.'/Ticket?States=new&States=open&Limit=10');
+        Http::assertSent(fn (Request $r) => $r->method() === 'POST'
+            && $r->url() === self::BASE.'/Ticket/Search'
+            && $r['States'] === ['new', 'open']
+            && $r['Limit'] === 10
+            && $r['SessionID'] === 'S1');
         Http::assertSent(fn (Request $r) => $r->url() === self::BASE.'/Ticket/3,1');
+    }
+
+    public function test_classic_routes_search_with_repeated_query_keys(): void
+    {
+        config()->set('znuny.connections.default.routes', 'generic-ticket-connector-classic');
+
+        $this->fakeZnuny([
+            'GET /Ticket' => ['TicketID' => ['3', '1']],
+            'GET /Ticket/3,1' => ['Ticket' => [$this->ticket('1'), $this->ticket('3')]],
+        ]);
+
+        $tickets = Znuny::tickets()->whereState(['new', 'open'])->limit(10)->withoutArticles()->withoutDynamicFields()->get();
+
+        $this->assertSame(['3', '1'], $tickets->pluck('id')->all());
+        Http::assertSent(fn (Request $r) => $r->url() === self::BASE.'/Ticket?States=new&States=open&Limit=10');
     }
 
     public function test_create_posts_to_ticket_and_refetches_the_ticket(): void
@@ -118,7 +138,7 @@ final class GenericTicketConnectorTest extends TestCase
 
     public function test_history_uses_the_ticket_history_route(): void
     {
-        $this->fakeZnuny(['GET /TicketHistory/42' => ['TicketHistory' => [['TicketID' => '42', 'History' => [
+        $this->fakeZnuny(['GET /Ticket/History/42' => ['TicketHistory' => [['TicketID' => '42', 'History' => [
             ['HistoryType' => 'NewTicket', 'Name' => 'New ticket', 'CreateTime' => '2026-10-09 10:00:00', 'CreateBy' => '1', 'ArticleID' => '0'],
         ]]]]]);
 
@@ -128,8 +148,9 @@ final class GenericTicketConnectorTest extends TestCase
         $this->assertNull($history->first()->articleId);
     }
 
-    public function test_dynamic_field_search_on_get_route_fails_before_sending(): void
+    public function test_dynamic_field_search_on_the_classic_get_route_fails_before_sending(): void
     {
+        config()->set('znuny.connections.default.routes', 'generic-ticket-connector-classic');
         $this->fakeZnuny([]);
 
         try {
@@ -142,14 +163,9 @@ final class GenericTicketConnectorTest extends TestCase
         Http::assertNotSent(fn (Request $r) => str_starts_with($r->url(), self::BASE.'/Ticket'));
     }
 
-    public function test_dynamic_field_search_works_with_a_post_search_route(): void
+    public function test_dynamic_field_search_works_with_the_default_routes(): void
     {
-        config()->set('znuny.connections.default.routes', [
-            'extends' => 'generic-ticket-connector',
-            'TicketSearch' => 'POST /TicketSearch',
-        ]);
-
-        $this->fakeZnuny(['POST /TicketSearch' => ['TicketID' => ['5']]]);
+        $this->fakeZnuny(['POST /Ticket/Search' => ['TicketID' => ['5']]]);
 
         $ids = Znuny::tickets()->query()->whereDynamicField('OrderId', 'ORD-1')->ids();
 
