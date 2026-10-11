@@ -81,7 +81,7 @@ Znuny::call('TicketGet', ['TicketID' => '123']);
 
 - `*.AccessDenied` errors throw `ZnunyAccessDeniedException` (before: `GenericZnunyException`). Znuny usually reports tickets that do not exist this way.
 - HTTP errors without a Znuny error body now throw (`ZnunyRouteNotFoundException`, `ZnunyAuthenticationException`, `ZnunyServerException`, …) instead of returning an empty array. A `2xx` response that is not JSON throws `ZnunyServerException`.
-- HTTP 4xx responses other than 401, 403, 404 and 429 throw `GenericZnunyException` (before: `ZnunyServerException`).
+- HTTP 4xx responses other than 401, 403, 404 and 429 throw `GenericZnunyException` (before: the response body was returned, or an empty array).
 - `TicketCreate` without a `TicketID` in the response throws `ZnunyServerException` (before: `InvalidArgumentException`).
 - Configuration problems throw `ZnunyConfigurationException`, which still extends `RuntimeException`.
 
