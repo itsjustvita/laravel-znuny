@@ -191,6 +191,10 @@ class ZnunyClient
             // query string (payload transport on GET routes) or a session ID in the path.
             $message = Redactor::scrub(str_replace($request->url, $this->settings->baseUrl.$request->path, $e->getMessage()));
 
+            if (str_contains($message, 'Empty reply from server')) {
+                $message .= ' Znuny answers this way when the web service named in base_url does not exist.';
+            }
+
             throw $this->failed($operation, $request, $redacted, $this->exceptionMapper->fromTransportError(
                 new ConnectionException($message, (int) $e->getCode()),
                 $operation,
