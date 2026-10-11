@@ -378,4 +378,18 @@ final class ZnunyClientTransportTest extends TestCase
         $this->assertSame(['1'], $result['TicketID']);
         $this->assertSame(3, $attempts);
     }
+
+    public function test_a_session_create_answer_without_session_id_is_a_server_error(): void
+    {
+        Http::fake([self::BASE.'/Session' => Http::response(['Unexpected' => 'proxy answer'])]);
+
+        try {
+            $this->client()->call('TicketSearch');
+            $this->fail('Expected ZnunyServerException');
+        } catch (ZnunyServerException $e) {
+            $this->assertSame('SessionCreate', $e->getOperation());
+            $this->assertStringContainsString('without a SessionID', $e->getMessage());
+            $this->assertSame(['Unexpected' => 'proxy answer'], $e->getResponseBody());
+        }
+    }
 }

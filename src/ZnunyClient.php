@@ -16,6 +16,7 @@ use ItsJustVita\LaravelZnuny\Events\ZnunySessionRefreshed;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Http\PreparedRequest;
 use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
@@ -142,13 +143,11 @@ class ZnunyClient
         $sessionId = (string) ($response['SessionID'] ?? '');
 
         if ($sessionId === '') {
-            throw $this->exceptionMapper->fromErrorResponse(
-                body: $response,
-                operation: 'SessionCreate',
-                connection: $this->connection,
-                payload: $this->credentials(),
-                sessionAuth: false,
-            );
+            throw (new ZnunyServerException('Znuny answered SessionCreate without a SessionID.'))
+                ->setOperation('SessionCreate')
+                ->setConnection($this->connection)
+                ->setRequestPayload($this->credentials())
+                ->setResponseBody($response);
         }
 
         return $sessionId;
