@@ -1,0 +1,32 @@
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: znuny
+      MARIADB_USER: znuny
+      MARIADB_PASSWORD: znuny
+    command:
+      - --max-allowed-packet=128M
+      - --innodb-log-file-size=256M
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  znuny:
+    image: ${ZNUNY_IMAGE:-cygnusnetworks/znuny:7.3.7}
+    # The community image is only published for amd64; Apple Silicon runs it emulated.
+    platform: ${ZNUNY_PLATFORM:-linux/amd64}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # Kernel/Config.pm is copied in by setup.sh: the entrypoint changes its permissions,
+    # which fails on a read-only bind mount.
