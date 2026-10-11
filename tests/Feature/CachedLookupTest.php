@@ -40,4 +40,39 @@ final class CachedLookupTest extends TestCase
 
         $this->assertSame(2, $queueListCalls);
     }
+
+    public function test_lookups_are_not_shared_between_targets_with_the_same_name(): void
+    {
+        Http::fake([
+            'https://znuny.test/*/SessionCreate' => Http::response(['SessionID' => 'A']),
+            'https://znuny.test/*/QueueList' => Http::response(['Queue' => [['QueueID' => '1', 'Name' => 'Default queue']]]),
+            'https://other.test/*/SessionCreate' => Http::response(['SessionID' => 'B']),
+            'https://other.test/*/QueueList' => Http::response(['Queue' => [['QueueID' => '7', 'Name' => 'Other queue']]]),
+        ]);
+
+        Znuny::queues()->all();
+        $queues = Znuny::build([
+            'name' => 'default',
+            'base_url' => 'https://other.test/otrs/nph-genericinterface.pl/Webservice/test',
+            'username' => 'someone',
+            'password' => 'else',
+            'routes' => 'operation-name',
+        ])->queues()->all();
+
+        $this->assertSame(['Other queue'], $queues->pluck('name')->all());
+    }
+
+    public function test_flush_all_clears_the_lookups_of_every_configured_connection(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*QueueList*' => Http::response(['Queue' => []]),
+        ]);
+
+        Znuny::queues()->all();
+        Znuny::flushAll();
+        Znuny::queues()->all();
+
+        $this->assertCount(2, collect(Http::recorded())->filter(fn (array $pair) => str_contains($pair[0]->url(), 'QueueList')));
+    }
 }

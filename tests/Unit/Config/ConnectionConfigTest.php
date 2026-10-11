@@ -97,17 +97,17 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame('token', $config['webhooks']['auth']['type']);
     }
 
-    public function test_session_keys_depend_on_target_and_credentials(): void
+    public function test_identity_keys_depend_on_target_and_credentials(): void
     {
-        $key = $this->make()->sessionKey('app-key');
+        $key = $this->make()->identityKey('app-key');
 
-        $this->assertSame($key, $this->make()->sessionKey('app-key'));
+        $this->assertSame($key, $this->make()->identityKey('app-key'));
         $this->assertStringStartsWith('default:', $key);
         $this->assertStringNotContainsString('secret', $key);
-        $this->assertNotSame($key, $this->make(['base_url' => 'https://other.test/Webservice/Test'])->sessionKey('app-key'));
-        $this->assertNotSame($key, $this->make(['username' => 'someone'])->sessionKey('app-key'));
-        $this->assertNotSame($key, $this->make(['password' => 'other'])->sessionKey('app-key'));
-        $this->assertNotSame($key, $this->make(['user_type' => 'customer'])->sessionKey('app-key'));
-        $this->assertNotSame($key, $this->make()->sessionKey('another-app-key'));
+        $this->assertNotSame($key, $this->make(['base_url' => 'https://other.test/Webservice/Test'])->identityKey('app-key'));
+        $this->assertNotSame($key, $this->make(['username' => 'someone'])->identityKey('app-key'));
+        $this->assertNotSame($key, $this->make(['password' => 'other'])->identityKey('app-key'));
+        $this->assertNotSame($key, $this->make(['user_type' => 'customer'])->identityKey('app-key'));
+        $this->assertNotSame($key, $this->make()->identityKey('another-app-key'));
     }
 }

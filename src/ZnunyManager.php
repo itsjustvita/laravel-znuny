@@ -147,7 +147,7 @@ class ZnunyManager
 
     public function flush(?string $resource = null): void
     {
-        $this->buildCacheManager()->flush($this->connectionName(), $resource);
+        $this->buildCacheManager()->flush($this->client()->identityKey(), $resource);
     }
 
     public function flushAll(): void
@@ -156,7 +156,11 @@ class ZnunyManager
         $manager = $this->buildCacheManager();
 
         foreach ($connections as $name) {
-            $manager->flush($name);
+            try {
+                $manager->flush($this->connection($name)->client()->identityKey());
+            } catch (ZnunyConfigurationException) {
+                // An incomplete connection cannot have cached anything.
+            }
         }
     }
 
