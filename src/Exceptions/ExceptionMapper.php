@@ -153,14 +153,20 @@ class ExceptionMapper
             return new ZnunyAccessDeniedException($fullMessage);
         }
 
-        if (in_array($suffix, self::NOT_FOUND_SUFFIXES, true)
-            || str_contains($haystack, 'notfound')
-            || str_contains($haystack, 'not found')) {
+        if (in_array($suffix, self::NOT_FOUND_SUFFIXES, true)) {
             return $this->notFoundForOperation($operation, $fullMessage);
         }
 
-        if (in_array($suffix, self::VALIDATION_SUFFIXES, true)
-            || preg_match('/invalid ?(queue|state|priority|dynamicfield)/', $haystack) === 1) {
+        if (in_array($suffix, self::VALIDATION_SUFFIXES, true)) {
+            return $this->validation($haystack, $fullMessage);
+        }
+
+        // Heuristics from 0.1 for codes that Znuny core does not use (custom operations).
+        if (str_contains($haystack, 'notfound') || str_contains($haystack, 'not found')) {
+            return $this->notFoundForOperation($operation, $fullMessage);
+        }
+
+        if (preg_match('/invalid ?(queue|state|priority|dynamicfield)/', $haystack) === 1) {
             return $this->validation($haystack, $fullMessage);
         }
 

@@ -465,4 +465,17 @@ final class ExceptionMapperTest extends TestCase
         $this->assertSame(200, $exception->getHttpStatus());
         $this->assertSame(['TicketID' => '1'], $exception->getRequestPayload());
     }
+
+    public function test_exact_validation_codes_win_over_message_heuristics(): void
+    {
+        // A custom operation may say "not found" in the message of a validation error.
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TicketCreate.InvalidParameter', 'ErrorMessage' => 'TicketCreate: Ticket->Owner parameter is invalid, user not found!']],
+            operation: 'TicketCreate',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertSame(ZnunyValidationException::class, $exception::class);
+    }
 }
