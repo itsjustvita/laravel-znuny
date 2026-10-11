@@ -88,7 +88,7 @@ class ZnunyClient
                 throw $e;
             }
 
-            $this->sessionManager->invalidate($this->sessionKey());
+            $this->sessionManager->invalidate($this->identityKey());
             $sessionId = $this->sessionId();
 
             event(new ZnunySessionRefreshed(connection: $this->connection));
@@ -125,12 +125,15 @@ class ZnunyClient
 
     protected function sessionId(): string
     {
-        return $this->sessionManager->sessionId($this->sessionKey(), fn (): string => $this->createSession());
+        return $this->sessionManager->sessionId($this->identityKey(), fn (): string => $this->createSession());
     }
 
-    protected function sessionKey(): string
+    /**
+     * Key under which the session and cached lookups of this connection are stored.
+     */
+    public function identityKey(): string
     {
-        return $this->settings->sessionKey((string) config('app.key', ''));
+        return $this->settings->identityKey((string) config('app.key', ''));
     }
 
     protected function createSession(): string

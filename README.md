@@ -127,7 +127,7 @@ Znuny::connection('tenant-a')->tickets()->find('12345');
 
 // Connections that only exist at runtime, e.g. stored per tenant:
 Znuny::build([
-    'name'     => 'tenant-42',            // optional; used for logs, events and the session cache
+    'name'     => 'tenant-42',            // optional; shown in logs and events
     'base_url' => $tenant->znuny_url,
     'username' => $tenant->znuny_user,
     'password' => $tenant->znuny_password,

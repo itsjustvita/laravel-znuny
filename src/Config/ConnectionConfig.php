@@ -80,11 +80,12 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * Cache key for this connection's session. It covers the target and the credentials,
-     * so connections that share a name (or a login with another password) never share a
-     * session. $secret (the app key) keeps the credentials from being guessed from the key.
+     * Cache key for this connection's session and lookups. It covers the target and the
+     * credentials, so connections that share a name (or a login with another password)
+     * never share cached data. $secret (the app key) keeps the credentials from being
+     * guessed from the key.
      */
-    public function sessionKey(string $secret = ''): string
+    public function identityKey(string $secret = ''): string
     {
         $identity = implode("\0", [$this->baseUrl, $this->userType, $this->username, $this->password]);
 

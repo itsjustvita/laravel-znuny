@@ -36,7 +36,7 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 ### Security
 
-- Cached sessions are keyed by target and credentials, so a runtime connection that reuses a connection name can no longer pick up (and send elsewhere) another connection's session ID.
+- Cached sessions and lookups are keyed by target and credentials, so a runtime connection that reuses a connection name can no longer pick up (and send elsewhere) another connection's session ID or serve another system's queues.
 - Route placeholders reject `.` and `..`, which servers would normalise into another route.
 - Session IDs and credentials are kept out of `ZnunyResponseReceived`, exception response bodies, transport error messages and logged paths.
 

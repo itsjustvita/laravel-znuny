@@ -2,7 +2,6 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 
@@ -41,13 +40,13 @@ final class CommandsTest extends TestCase
             ]]),
         ]);
 
-        // Populate cache
         \Znuny::queues()->all();
-        $this->assertNotNull(Cache::get('znuny:lookup:default:queues'));
-
+        \Znuny::queues()->all();
         $this->artisan('znuny:cache-clear')->assertExitCode(0);
+        \Znuny::queues()->all();
 
-        $this->assertNull(Cache::get('znuny:lookup:default:queues'));
+        // The second call is served from the cache, the third one after clearing it is not.
+        $this->assertCount(2, collect(Http::recorded())->filter(fn (array $pair) => str_contains($pair[0]->url(), 'QueueList')));
     }
 
     public function test_cache_clear_all_flag_flushes_every_connection(): void

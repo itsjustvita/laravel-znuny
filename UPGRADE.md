@@ -91,9 +91,9 @@ Znuny::call('TicketGet', ['TicketID' => '123']);
 - Event payloads contain `[REDACTED]` for passwords and session IDs instead of omitting the keys. `ZnunyResponseReceived::$response` is redacted too, so the `SessionCreate` response no longer exposes the session ID.
 - New optional properties: `ZnunyRequestSent::$method` and `$path`, `ZnunyResponseReceived::$status`, `ZnunyTicketUpdated::$dynamicFields`, `ZnunyArticleAdded::$articleId`.
 
-### Session cache
+### Session and lookup cache
 
-Cached sessions are keyed by the connection name plus a hash of base URL, user type, login and password. Sessions cached by 0.1 are therefore not reused; every connection logs in once more after the upgrade.
+Cached sessions and lookups (queues, states, …) are keyed by the connection name plus a hash of base URL, user type, login and password. Data cached by 0.1 is therefore not reused; every connection logs in once more after the upgrade and reloads its lookups.
 
 ### DTO serialization
 
