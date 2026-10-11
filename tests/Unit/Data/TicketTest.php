@@ -20,7 +20,7 @@ final class TicketTest extends TestCase
         $this->assertSame('42', $ticket->id);
         $this->assertSame('202604080001', $ticket->ticketNumber);
         $this->assertSame('Connection issue', $ticket->title);
-        $this->assertSame('803', $ticket->queueId);
+        $this->assertSame('5', $ticket->queueId);
         $this->assertSame('Support', $ticket->queue);
         $this->assertSame('open', $ticket->state);
         $this->assertSame('3 normal', $ticket->priority);

@@ -21,7 +21,7 @@ final class TicketCreateBuilderTest extends TestCase
                 'TicketID' => '99',
                 'TicketNumber' => '202604080099',
                 'Title' => 'Connection issue',
-                'QueueID' => '803',
+                'QueueID' => '5',
                 'Queue' => 'Support',
                 'State' => 'new',
                 'Priority' => '3 normal',
@@ -105,7 +105,7 @@ final class TicketCreateBuilderTest extends TestCase
                 'TicketID' => '1',
                 'TicketNumber' => '1',
                 'Title' => 't',
-                'QueueID' => '803',
+                'QueueID' => '5',
                 'Queue' => 'Support',
                 'State' => 'new',
                 'Priority' => '3 normal',
@@ -115,7 +115,7 @@ final class TicketCreateBuilderTest extends TestCase
 
         Znuny::tickets()->create([
             'title' => 't',
-            'queueId' => '803',
+            'queueId' => '5',
             'state' => 'new',
             'priority' => '3 normal',
             'customerUser' => 'c@example.com',
@@ -128,7 +128,7 @@ final class TicketCreateBuilderTest extends TestCase
                 return false;
             }
 
-            return ($request['Ticket']['QueueID'] ?? null) === '803'
+            return ($request['Ticket']['QueueID'] ?? null) === '5'
                 && ! isset($request['Ticket']['Queue']);
         });
     }
