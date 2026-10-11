@@ -303,4 +303,79 @@ final class ZnunyClientTransportTest extends TestCase
             $this->assertStringContainsString('the web service named in base_url does not exist', $e->getMessage());
         }
     }
+
+    public function test_writes_are_not_repeated_after_a_timeout(): void
+    {
+        $attempts = 0;
+        Http::fake(function () use (&$attempts) {
+            $attempts++;
+
+            throw new ConnectionException('cURL error 28: Operation timed out after 30001 milliseconds');
+        });
+
+        try {
+            $this->client(['auth' => 'credentials', 'retries' => 2, 'retry_delay' => 10])
+                ->call('TicketCreate', ['Ticket' => ['Title' => 'x']]);
+            $this->fail('Expected ZnunyConnectionException');
+        } catch (ZnunyConnectionException) {
+        }
+
+        // Znuny may already have created the ticket; repeating would create a duplicate.
+        $this->assertSame(1, $attempts);
+    }
+
+    public function test_writes_are_repeated_when_no_connection_could_be_established(): void
+    {
+        $attempts = 0;
+        Http::fake(function () use (&$attempts) {
+            if (++$attempts === 1) {
+                throw new ConnectionException('cURL error 7: Failed to connect to znuny.test port 443');
+            }
+
+            return Http::response(['TicketID' => '9', 'TicketNumber' => '1']);
+        });
+
+        $result = $this->client(['auth' => 'credentials', 'retries' => 2, 'retry_delay' => 10])
+            ->call('TicketCreate', ['Ticket' => ['Title' => 'x']]);
+
+        $this->assertSame('9', $result['TicketID']);
+        $this->assertSame(2, $attempts);
+    }
+
+    public function test_writes_are_not_repeated_after_a_server_error(): void
+    {
+        $attempts = 0;
+        Http::fake(function () use (&$attempts) {
+            $attempts++;
+
+            return Http::response('{"faultcode":"Server","faultstring":"Operation failed!"}', 500);
+        });
+
+        try {
+            $this->client(['auth' => 'credentials', 'retries' => 2, 'retry_delay' => 10])
+                ->call('TicketUpdate', ['TicketID' => '1', 'Ticket' => ['State' => 'open']]);
+            $this->fail('Expected ZnunyServerException');
+        } catch (ZnunyServerException) {
+        }
+
+        $this->assertSame(1, $attempts);
+    }
+
+    public function test_reads_are_repeated_after_a_timeout(): void
+    {
+        $attempts = 0;
+        Http::fake(function () use (&$attempts) {
+            if (++$attempts < 3) {
+                throw new ConnectionException('cURL error 28: Operation timed out');
+            }
+
+            return Http::response(['TicketID' => ['1']]);
+        });
+
+        $result = $this->client(['auth' => 'credentials', 'retries' => 2, 'retry_delay' => 10])
+            ->call('TicketSearch', ['Limit' => 1]);
+
+        $this->assertSame(['1'], $result['TicketID']);
+        $this->assertSame(3, $attempts);
+    }
 }

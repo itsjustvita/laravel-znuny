@@ -83,7 +83,7 @@ The default route preset matches this web service, so nothing else needs to be c
 ],
 ```
 
-A connection can also set `retries`, `retry_delay` (milliseconds) and `batch_size`; they default to the values under `http`.
+A connection can also set `retries`, `retry_delay` (milliseconds) and `batch_size`; they default to the values under `http`. Retries repeat reads after timeouts and server errors. Writes such as `TicketCreate` and `TicketUpdate` are only repeated when no connection could be established, so a slow Znuny never receives the same ticket twice.
 
 ### Routes
 

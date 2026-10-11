@@ -86,6 +86,7 @@ return [
 
     'dynamic_fields' => [],
 
+    // Reads are retried after timeouts and 5xx; writes only when no connection could be established.
     'http' => [
         'retries' => 3,
         'retry_delay' => 100,
