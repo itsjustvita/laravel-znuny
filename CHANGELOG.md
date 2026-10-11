@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
-## [0.2.0]
+## [0.2.0] - 2026-10-11
 
 Works out of the box with the `GenericTicketConnectorREST` example web service that Znuny ships. See [UPGRADE.md](UPGRADE.md).
 
