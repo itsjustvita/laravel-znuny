@@ -27,6 +27,16 @@ use Throwable;
 
 class ZnunyClient
 {
+    /**
+     * Operations that only read data. They are repeated after timeouts and server errors.
+     * Everything else is repeated only when no connection could be established, because
+     * Znuny may already have processed it (a slow TicketCreate would create duplicates).
+     */
+    protected const READ_OPERATIONS = [
+        'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet',
+        'QueueList', 'QueueGet', 'StateList', 'PriorityList', 'TypeList', 'CustomerUserGet',
+    ];
+
     protected readonly ConnectionConfig $settings;
 
     protected readonly RequestBuilder $requests;
@@ -185,7 +195,7 @@ class ZnunyClient
         $start = microtime(true);
 
         try {
-            $response = $this->dispatch($request);
+            $response = $this->dispatch($request, $operation);
         } catch (ConnectionException $e) {
             // Transport messages contain the request URL, which can carry credentials in the
             // query string (payload transport on GET routes) or a session ID in the path.
@@ -240,9 +250,10 @@ class ZnunyClient
         return $json;
     }
 
-    protected function dispatch(PreparedRequest $request): Response
+    protected function dispatch(PreparedRequest $request, string $operation): Response
     {
-        $client = $this->httpClient()->withHeaders($request->headers);
+        $repeatable = $request->method === 'GET' || in_array($operation, self::READ_OPERATIONS, true);
+        $client = $this->httpClient($repeatable)->withHeaders($request->headers);
 
         if ($request->body === null) {
             return $client->send('GET', $request->url);
@@ -298,7 +309,10 @@ class ZnunyClient
         Log::channel((string) config('znuny.logging.channel', 'znuny'))->{$level}($message, $context);
     }
 
-    protected function httpClient(): PendingRequest
+    /**
+     * @param  bool  $repeatable  whether the request may be repeated after it possibly reached Znuny
+     */
+    protected function httpClient(bool $repeatable = true): PendingRequest
     {
         $client = Http::timeout($this->settings->timeout)
             ->connectTimeout($this->settings->connectTimeout);
@@ -309,13 +323,15 @@ class ZnunyClient
                 range(0, $this->settings->retries - 1),
             );
 
-            $client = $client->retry($delays, throw: false, when: function (Throwable $exception): bool {
+            $client = $client->retry($delays, throw: false, when: function (Throwable $exception) use ($repeatable): bool {
                 if ($exception instanceof ConnectionException) {
-                    return true;
+                    // cURL 6/7: the request never reached Znuny, so repeating it is always safe.
+                    return $repeatable || preg_match('/cURL error (6|7):/', $exception->getMessage()) === 1;
                 }
 
                 // A missing route is a configuration problem that no retry can fix.
-                return $exception instanceof RequestException
+                return $repeatable
+                    && $exception instanceof RequestException
                     && $exception->response->serverError()
                     && ! str_contains($exception->response->body(), 'determine Operation');
             });
