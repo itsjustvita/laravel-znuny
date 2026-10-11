@@ -11,14 +11,18 @@ use ItsJustVita\LaravelZnuny\Exceptions\InvalidQueueException;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidStateException;
 use ItsJustVita\LaravelZnuny\Exceptions\QueueNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConnectionException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRateLimitException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRouteNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyValidationException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class ExceptionMapperTest extends TestCase
 {
@@ -286,5 +290,192 @@ final class ExceptionMapperTest extends TestCase
         $this->assertSame('tenant-a', $exception->getConnection());
         $this->assertSame(['TicketID' => '1'], $exception->getRequestPayload());
         $this->assertSame($previous, $exception->getPrevious());
+    }
+
+    public function test_access_denied_maps_to_access_denied_exception(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TicketGet.AccessDenied', 'ErrorMessage' => 'TicketGet: User does not have access to the ticket!']],
+            operation: 'TicketGet',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertInstanceOf(ZnunyAccessDeniedException::class, $exception);
+        $this->assertSame('TicketGet.AccessDenied', $exception->getErrorCode());
+    }
+
+    public function test_not_valid_ticket_id_maps_to_ticket_not_found(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TicketGet.NotValidTicketID', 'ErrorMessage' => 'TicketGet: Could not get Ticket data']],
+            operation: 'TicketGet',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertInstanceOf(TicketNotFoundException::class, $exception);
+    }
+
+    public function test_not_ticket_data_maps_to_ticket_not_found_for_history(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TicketHistoryGet.NotTicketData', 'ErrorMessage' => 'TicketHistoryGet: no data']],
+            operation: 'TicketHistoryGet',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertInstanceOf(TicketNotFoundException::class, $exception);
+    }
+
+    #[DataProvider('validationErrors')]
+    public function test_validation_codes_map_to_specific_exceptions(string $code, string $message, string $class): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => $code, 'ErrorMessage' => $message]],
+            operation: 'TicketCreate',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertSame($class, $exception::class);
+    }
+
+    public static function validationErrors(): array
+    {
+        return [
+            'queue' => ['TicketCreate.InvalidParameter', 'TicketCreate: Ticket->QueueID or Ticket->Queue parameter is invalid!', InvalidQueueException::class],
+            'state' => ['TicketUpdate.InvalidParameter', 'TicketUpdate: Ticket->StateID or Ticket->State parameter is invalid!', InvalidStateException::class],
+            'priority' => ['TicketCreate.InvalidParameter', 'TicketCreate: Ticket->PriorityID or Ticket->Priority parameter is invalid!', InvalidPriorityException::class],
+            'dynamic field' => ['TicketCreate.InvalidParameter', 'TicketCreate: DynamicField->Value parameter is invalid!', InvalidDynamicFieldException::class],
+            'missing parameter' => ['TicketCreate.MissingParameter', 'TicketCreate: Ticket->Title parameter is missing!', ZnunyValidationException::class],
+            'wrong structure' => ['TicketGet.WrongStructure', 'TicketGet: Structure for Ticket is not correct!', ZnunyValidationException::class],
+            'empty request' => ['TicketUpdate.EmptyRequest', 'TicketUpdate: The request data is invalid!', ZnunyValidationException::class],
+        ];
+    }
+
+    public function test_auth_fail_in_credentials_mode_is_an_authentication_error(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TicketGet.AuthFail', 'ErrorMessage' => 'TicketGet: Authorization failing!']],
+            operation: 'TicketGet',
+            connection: 'default',
+            payload: [],
+            sessionAuth: false,
+        );
+
+        $this->assertInstanceOf(ZnunyAuthenticationException::class, $exception);
+        $this->assertNotInstanceOf(ZnunySessionExpiredException::class, $exception);
+    }
+
+    public function test_webservice_invalid_configuration_is_a_server_error(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'Webservice.InvalidConfiguration', 'ErrorMessage' => 'Broken']],
+            operation: 'TicketGet',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertInstanceOf(ZnunyServerException::class, $exception);
+    }
+
+    public function test_unknown_error_code_on_a_5xx_falls_back_to_the_status(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'Backend.Offline', 'ErrorMessage' => 'down']],
+            operation: 'TicketGet',
+            connection: 'default',
+            payload: [],
+            httpStatus: 503,
+        );
+
+        $this->assertInstanceOf(ZnunyServerException::class, $exception);
+        $this->assertSame(503, $exception->getHttpStatus());
+    }
+
+    public function test_from_response_detects_missing_routes(): void
+    {
+        $body = "HTTP::REST Error while determine Operation for request URI '/QueueList'.";
+
+        $exception = $this->mapper->fromResponse(500, null, $body, 'QueueList', 'default', [], true, 'POST', '/QueueList');
+
+        $this->assertInstanceOf(ZnunyRouteNotFoundException::class, $exception);
+        $this->assertStringContainsString('POST /QueueList', $exception->getMessage());
+        $this->assertStringContainsString('php artisan znuny:routes default', $exception->getMessage());
+        $this->assertSame(500, $exception->getHttpStatus());
+        $this->assertSame(['raw' => $body], $exception->getResponseBody());
+    }
+
+    public function test_from_response_maps_404_to_route_not_found(): void
+    {
+        $exception = $this->mapper->fromResponse(404, null, 'Not Found', 'TicketGet', 'default', [], true, 'GET', '/Ticket/1');
+
+        $this->assertInstanceOf(ZnunyRouteNotFoundException::class, $exception);
+    }
+
+    public function test_from_response_reads_the_faultstring(): void
+    {
+        $exception = $this->mapper->fromResponse(
+            500,
+            ['faultcode' => 'Server', 'faultstring' => 'Operation failed!'],
+            '{"faultcode":"Server","faultstring":"Operation failed!"}',
+            'TicketCreate', 'default', [], true, 'POST', '/Ticket',
+        );
+
+        $this->assertInstanceOf(ZnunyServerException::class, $exception);
+        $this->assertSame('[HTTP 500] Operation failed!', $exception->getMessage());
+    }
+
+    public function test_from_response_maps_401_without_body_to_authentication(): void
+    {
+        $exception = $this->mapper->fromResponse(401, null, '', 'TicketSearch', 'default', [], true, 'GET', '/Ticket');
+
+        $this->assertInstanceOf(ZnunyAuthenticationException::class, $exception);
+        $this->assertSame('[HTTP 401] TicketSearch failed', $exception->getMessage());
+    }
+
+    public function test_from_response_maps_other_4xx_to_generic(): void
+    {
+        $exception = $this->mapper->fromResponse(400, null, 'Bad Request', 'TicketSearch', 'default', [], true, 'GET', '/Ticket');
+
+        $this->assertSame(GenericZnunyException::class, $exception::class);
+        $this->assertSame(['raw' => 'Bad Request'], $exception->getResponseBody());
+    }
+
+    public function test_from_response_rejects_non_json_success_bodies(): void
+    {
+        $exception = $this->mapper->fromResponse(200, null, '<html>proxy</html>', 'TicketSearch', 'default', [], true, 'GET', '/Ticket');
+
+        $this->assertInstanceOf(ZnunyServerException::class, $exception);
+        $this->assertStringContainsString('unexpected non-JSON response', $exception->getMessage());
+    }
+
+    public function test_from_response_maps_error_bodies_with_a_success_status(): void
+    {
+        $exception = $this->mapper->fromResponse(
+            200,
+            ['Error' => ['ErrorCode' => 'TicketGet.AccessDenied', 'ErrorMessage' => 'denied']],
+            '{}',
+            'TicketGet', 'default', ['TicketID' => '1'], true, 'GET', '/Ticket/1',
+        );
+
+        $this->assertInstanceOf(ZnunyAccessDeniedException::class, $exception);
+        $this->assertSame(200, $exception->getHttpStatus());
+        $this->assertSame(['TicketID' => '1'], $exception->getRequestPayload());
+    }
+
+    public function test_exact_validation_codes_win_over_message_heuristics(): void
+    {
+        // A custom operation may say "not found" in the message of a validation error.
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TicketCreate.InvalidParameter', 'ErrorMessage' => 'TicketCreate: Ticket->Owner parameter is invalid, user not found!']],
+            operation: 'TicketCreate',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertSame(ZnunyValidationException::class, $exception::class);
     }
 }

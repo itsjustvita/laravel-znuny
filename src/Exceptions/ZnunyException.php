@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Exceptions;
 
+use ItsJustVita\LaravelZnuny\Support\Redactor;
 use RuntimeException;
 
 abstract class ZnunyException extends RuntimeException
@@ -15,6 +16,8 @@ abstract class ZnunyException extends RuntimeException
     protected array $requestPayload = [];
 
     protected array $responseBody = [];
+
+    protected ?int $httpStatus = null;
 
     public function setOperation(string $operation): static
     {
@@ -54,7 +57,7 @@ abstract class ZnunyException extends RuntimeException
 
     public function setRequestPayload(array $payload): static
     {
-        $this->requestPayload = $this->sanitize($payload);
+        $this->requestPayload = Redactor::redact($payload);
 
         return $this;
     }
@@ -66,7 +69,7 @@ abstract class ZnunyException extends RuntimeException
 
     public function setResponseBody(array $body): static
     {
-        $this->responseBody = $body;
+        $this->responseBody = Redactor::redact($body);
 
         return $this;
     }
@@ -76,36 +79,27 @@ abstract class ZnunyException extends RuntimeException
         return $this->responseBody;
     }
 
+    public function setHttpStatus(?int $status): static
+    {
+        $this->httpStatus = $status;
+
+        return $this;
+    }
+
+    public function getHttpStatus(): ?int
+    {
+        return $this->httpStatus;
+    }
+
     public function context(): array
     {
         return [
             'znuny_operation' => $this->operation,
             'znuny_error_code' => $this->errorCode,
             'znuny_connection' => $this->connection,
+            'znuny_http_status' => $this->httpStatus,
             'znuny_payload' => $this->requestPayload,
             'znuny_response' => $this->responseBody,
         ];
-    }
-
-    private function sanitize(array $payload): array
-    {
-        $redactKeys = [
-            'password', 'sessionid', 'userpw', 'pw', 'newpw',
-            'secret', 'token', 'accesstoken', 'apikey', 'authorization', 'otp',
-        ];
-
-        foreach ($payload as $key => $value) {
-            if (is_array($value)) {
-                $payload[$key] = $this->sanitize($value);
-
-                continue;
-            }
-
-            if (is_string($key) && in_array(strtolower($key), $redactKeys, true)) {
-                $payload[$key] = '[REDACTED]';
-            }
-        }
-
-        return $payload;
     }
 }

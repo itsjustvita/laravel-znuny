@@ -15,10 +15,17 @@ class DynamicFieldValidator
     public function __construct(array $definitions)
     {
         $parsed = [];
+
         foreach ($definitions as $name => $spec) {
             $parsed[$name] = FieldDefinition::fromArray($name, (array) $spec);
         }
+
         $this->definitions = $parsed;
+    }
+
+    public static function fromConfig(): self
+    {
+        return new self((array) config('znuny.dynamic_fields', []));
     }
 
     /**
@@ -28,11 +35,10 @@ class DynamicFieldValidator
     {
         foreach ($fields as $name => $value) {
             $definition = $this->definitions[$name] ?? null;
-            if ($definition === null) {
-                continue;
-            }
 
-            $this->validateOne($definition, $value);
+            if ($definition !== null) {
+                $this->validateOne($definition, $value);
+            }
         }
     }
 
@@ -43,9 +49,7 @@ class DynamicFieldValidator
                 if (! is_string($value)) {
                     throw $this->invalid($def, 'expected string, got '.gettype($value));
                 }
-                if ($def->allowed !== null && ! in_array($value, $def->allowed, true)) {
-                    throw $this->invalid($def, "value '{$value}' not in allowed set [".implode(', ', $def->allowed).']');
-                }
+                $this->assertAllowed($def, [$value]);
 
                 return;
 
@@ -53,12 +57,15 @@ class DynamicFieldValidator
                 if (! is_int($value)) {
                     throw $this->invalid($def, 'expected integer, got '.gettype($value));
                 }
-                if ($def->min !== null && $value < $def->min) {
-                    throw $this->invalid($def, "value {$value} is below minimum {$def->min}");
+                $this->assertRange($def, $value);
+
+                return;
+
+            case 'float':
+                if (! is_int($value) && ! is_float($value)) {
+                    throw $this->invalid($def, 'expected float, got '.gettype($value));
                 }
-                if ($def->max !== null && $value > $def->max) {
-                    throw $this->invalid($def, "value {$value} is above maximum {$def->max}");
-                }
+                $this->assertRange($def, $value);
 
                 return;
 
@@ -69,8 +76,45 @@ class DynamicFieldValidator
 
                 return;
 
+            case 'array':
+                if (! is_array($value) || ! array_is_list($value)) {
+                    throw $this->invalid($def, 'expected list, got '.gettype($value));
+                }
+                $this->assertAllowed($def, $value);
+
+                return;
+
             default:
                 throw $this->invalid($def, "unsupported field type '{$def->type}'");
+        }
+    }
+
+    /**
+     * @param  array<int, mixed>  $values
+     */
+    private function assertAllowed(FieldDefinition $def, array $values): void
+    {
+        if ($def->allowed === null) {
+            return;
+        }
+
+        foreach ($values as $value) {
+            if (! in_array($value, $def->allowed, true)) {
+                $shown = is_scalar($value) ? (string) $value : gettype($value);
+
+                throw $this->invalid($def, "value '{$shown}' not in allowed set [".implode(', ', $def->allowed).']');
+            }
+        }
+    }
+
+    private function assertRange(FieldDefinition $def, int|float $value): void
+    {
+        if ($def->min !== null && $value < $def->min) {
+            throw $this->invalid($def, "value {$value} is below minimum {$def->min}");
+        }
+
+        if ($def->max !== null && $value > $def->max) {
+            throw $this->invalid($def, "value {$value} is above maximum {$def->max}");
         }
     }
 

@@ -8,5 +8,6 @@ final readonly class ZnunyArticleAdded
         public string $connection,
         public string $ticketId,
         public array $article,
+        public ?string $articleId = null,
     ) {}
 }

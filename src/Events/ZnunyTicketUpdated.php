@@ -8,5 +8,6 @@ final readonly class ZnunyTicketUpdated
         public string $connection,
         public string $ticketId,
         public array $changes,
+        public array $dynamicFields = [],
     ) {}
 }

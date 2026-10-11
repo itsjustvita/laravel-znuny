@@ -2,14 +2,19 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
+use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
+
 final readonly class State
 {
+    use HasAttributes;
+
     public function __construct(
         public string $id,
         public string $name,
         public ?string $typeName,
         public string $validId,
         public bool $valid,
+        public array $attributes = [],
     ) {}
 
     public static function fromZnunyResponse(array $data): self
@@ -22,6 +27,7 @@ final readonly class State
             typeName: $data['TypeName'] ?? null,
             validId: $validId,
             valid: $validId === '1',
+            attributes: $data,
         );
     }
 

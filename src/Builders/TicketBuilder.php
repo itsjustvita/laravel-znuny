@@ -2,7 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Builders;
 
-use Carbon\Carbon;
+use DateTimeInterface;
+use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
@@ -19,6 +20,8 @@ class TicketBuilder
     protected bool $withArticles = true;
 
     protected bool $withDynamicFields = true;
+
+    protected bool $withAttachments = false;
 
     public function __construct(
         protected readonly ZnunyClient $client,
@@ -39,6 +42,13 @@ class TicketBuilder
         return $this;
     }
 
+    public function withAttachments(bool $value = true): self
+    {
+        $this->withAttachments = $value;
+
+        return $this;
+    }
+
     public function withoutArticles(): self
     {
         return $this->withArticles(false);
@@ -49,6 +59,9 @@ class TicketBuilder
         return $this->withDynamicFields(false);
     }
 
+    /**
+     * Any TicketSearch parameter, e.g. where('OwnerIDs', [3, 4]).
+     */
     public function where(string $field, mixed $value): self
     {
         $this->params[$field] = $value;
@@ -58,64 +71,71 @@ class TicketBuilder
 
     public function whereState(string|array $states): self
     {
-        $this->params['States'] = (array) $states;
-
-        return $this;
+        return $this->where('States', (array) $states);
     }
 
     public function whereStateType(string|array $types): self
     {
-        $this->params['StateType'] = (array) $types;
-
-        return $this;
+        return $this->where('StateType', (array) $types);
     }
 
     public function whereQueue(string|array $queues): self
     {
-        $this->params['Queues'] = (array) $queues;
-
-        return $this;
+        return $this->where('Queues', (array) $queues);
     }
 
     public function whereQueueId(string|int|array $ids): self
     {
-        $this->params['QueueIDs'] = array_map('strval', (array) $ids);
-
-        return $this;
+        return $this->where('QueueIDs', array_map('strval', (array) $ids));
     }
 
     public function wherePriority(string|array $priorities): self
     {
-        $this->params['Priorities'] = (array) $priorities;
-
-        return $this;
+        return $this->where('Priorities', (array) $priorities);
     }
 
     public function whereCustomerId(string $customerId): self
     {
-        $this->params['CustomerID'] = $customerId;
-
-        return $this;
+        return $this->where('CustomerID', $customerId);
     }
 
-    public function whereCreatedAfter(Carbon $date): self
+    public function whereCreatedAfter(DateTimeInterface $date): self
     {
-        $this->params['TicketCreateTimeNewerDate'] = $date->format('Y-m-d H:i:s');
-
-        return $this;
+        return $this->where('TicketCreateTimeNewerDate', $date->format('Y-m-d H:i:s'));
     }
 
-    public function whereCreatedBefore(Carbon $date): self
+    public function whereCreatedBefore(DateTimeInterface $date): self
     {
-        $this->params['TicketCreateTimeOlderDate'] = $date->format('Y-m-d H:i:s');
-
-        return $this;
+        return $this->where('TicketCreateTimeOlderDate', $date->format('Y-m-d H:i:s'));
     }
 
+    public function whereChangedAfter(DateTimeInterface $date): self
+    {
+        return $this->where('TicketChangeTimeNewerDate', $date->format('Y-m-d H:i:s'));
+    }
+
+    public function whereChangedBefore(DateTimeInterface $date): self
+    {
+        return $this->where('TicketChangeTimeOlderDate', $date->format('Y-m-d H:i:s'));
+    }
+
+    /**
+     * A dynamic field condition, e.g. whereDynamicField('OrderId', 'ORD-*', 'Like').
+     * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals.
+     * Needs a TicketSearch route with a request body, e.g. 'POST /TicketSearch'.
+     */
+    public function whereDynamicField(string $name, mixed $value, string $operator = 'Equals'): self
+    {
+        return $this->where('DynamicField_'.$name, [$operator => $value]);
+    }
+
+    /**
+     * @param  string  $direction  "Up"/"asc" or "Down"/"desc"
+     */
     public function orderBy(string $field, string $direction = 'Up'): self
     {
         $this->params['SortBy'] = $field;
-        $this->params['OrderBy'] = strtolower($direction) === 'down' ? 'Down' : 'Up';
+        $this->params['OrderBy'] = in_array(strtolower($direction), ['down', 'desc'], true) ? 'Down' : 'Up';
 
         return $this;
     }
@@ -136,8 +156,7 @@ class TicketBuilder
     /** @return Collection<int, string> */
     public function ids(): Collection
     {
-        $response = $this->client->request('TicketSearch', $this->params);
-        $ids = $response['TicketID'] ?? [];
+        $ids = $this->client->call('TicketSearch', $this->params)['TicketID'] ?? [];
 
         return collect(array_map('strval', (array) $ids))->values();
     }
@@ -147,42 +166,12 @@ class TicketBuilder
     {
         $ids = $this->ids();
 
-        if ($ids->isEmpty()) {
-            return collect();
-        }
-
-        return $this->fetchByIds($ids->all());
+        return $ids->isEmpty() ? collect() : $this->fetch($ids->all());
     }
 
     /**
-     * @param  array<int, string>  $ids
-     * @return Collection<int, Ticket>
+     * Fetches all matching IDs, then loads only the tickets of the requested page.
      */
-    protected function fetchByIds(array $ids): Collection
-    {
-        $results = collect();
-
-        foreach ($ids as $id) {
-            $params = ['TicketID' => $id];
-
-            if ($this->withArticles) {
-                $params['AllArticles'] = 1;
-            }
-
-            if ($this->withDynamicFields) {
-                $params['DynamicFields'] = 1;
-            }
-
-            $response = $this->client->request('TicketGet/'.rawurlencode($id), $params);
-
-            if (isset($response['Ticket'][0])) {
-                $results->push(Ticket::fromZnunyResponse($response['Ticket'][0]));
-            }
-        }
-
-        return $results->values();
-    }
-
     public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
     {
         $ids = $this->ids();
@@ -193,24 +182,31 @@ class TicketBuilder
         }
 
         $pageIds = $ids->slice(($page - 1) * $perPage, $perPage)->values()->all();
-        $items = $this->fetchByIds($pageIds);
 
         return new LengthAwarePaginator(
-            items: $items->all(),
+            items: $this->fetch($pageIds)->all(),
             total: $total,
             perPage: $perPage,
             currentPage: $page,
         );
     }
 
-    public function lazy(int $chunkSize = 100): \Generator
+    /** @return Generator<int, Ticket> */
+    public function lazy(int $chunkSize = 100): Generator
     {
-        $ids = $this->ids();
-
-        foreach (array_chunk($ids->all(), max(1, $chunkSize)) as $chunk) {
-            foreach ($this->fetchByIds($chunk) as $ticket) {
+        foreach (array_chunk($this->ids()->all(), max(1, $chunkSize)) as $chunk) {
+            foreach ($this->fetch($chunk) as $ticket) {
                 yield $ticket;
             }
         }
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     * @return Collection<int, Ticket>
+     */
+    protected function fetch(array $ids): Collection
+    {
+        return $this->resource->findMany($ids, $this->withArticles, $this->withDynamicFields, $this->withAttachments);
     }
 }

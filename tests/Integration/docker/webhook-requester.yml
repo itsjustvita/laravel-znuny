@@ -1,0 +1,32 @@
+---
+Debugger:
+  DebugThreshold: debug
+  TestMode: '0'
+Description: Sends TicketCreate events to the laravel-znuny webhook endpoint (integration suite)
+FrameworkVersion: 7.3.7
+Provider:
+  Transport:
+    Type: ''
+RemoteSystem: ''
+Requester:
+  Invoker:
+    TicketEvents:
+      Description: ''
+      Events:
+      - Asynchronous: '0'
+        Event: TicketCreate
+      Type: Ticket::Generic
+  Transport:
+    Config:
+      AdditionalHeaders:
+        X-Znuny-Token: integration-token
+      ContentType: JSON
+      DefaultCommand: POST
+      Host: http://host.docker.internal:8099
+      InvokerControllerMapping:
+        TicketEvents:
+          Command: POST
+          Controller: /znuny/webhooks/TicketCreate
+      SSLNoHostnameVerification: '0'
+      Timeout: '30'
+    Type: HTTP::REST

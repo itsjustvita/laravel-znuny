@@ -6,13 +6,16 @@ use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Queue;
 use ItsJustVita\LaravelZnuny\Exceptions\QueueNotFoundException;
 
+/**
+ * Needs the custom operations QueueList and QueueGet in the web service.
+ */
 class QueueResource extends Resource
 {
     /** @return Collection<int, Queue> */
     public function all(): Collection
     {
         return $this->remember('queues', function () {
-            $response = $this->client->request('QueueList', []);
+            $response = $this->client->call('QueueList');
 
             return collect($response['Queue'] ?? [])
                 ->map(fn (array $row) => Queue::fromZnunyResponse($row))
@@ -22,18 +25,14 @@ class QueueResource extends Resource
 
     public function find(string $queueId): Queue
     {
-        $response = $this->client->request(
-            'QueueGet/'.rawurlencode($queueId),
-            ['QueueID' => $queueId],
-        );
+        $payload = ['QueueID' => $queueId];
+        $response = $this->client->call('QueueGet', $payload);
 
         if (empty($response['Queue'][0])) {
-            $ex = new QueueNotFoundException("Queue {$queueId} not found");
-            $ex->setOperation('QueueGet')
+            throw (new QueueNotFoundException("Queue {$queueId} not found"))
+                ->setOperation('QueueGet')
                 ->setConnection($this->client->connection())
-                ->setRequestPayload(['QueueID' => $queueId]);
-
-            throw $ex;
+                ->setRequestPayload($payload);
         }
 
         return Queue::fromZnunyResponse($response['Queue'][0]);
@@ -44,24 +43,11 @@ class QueueResource extends Resource
         $queue = $this->all()->first(fn (Queue $q) => $q->name === $name);
 
         if (! $queue) {
-            $ex = new QueueNotFoundException("Queue named '{$name}' not found");
-            $ex->setOperation('QueueList')
+            throw (new QueueNotFoundException("Queue named '{$name}' not found"))
+                ->setOperation('QueueList')
                 ->setConnection($this->client->connection());
-
-            throw $ex;
         }
 
         return $queue;
-    }
-
-    public function resolve(string $type, bool $businessCustomer): string
-    {
-        $segment = $businessCustomer ? 'business' : 'private';
-
-        $configured = config("znuny.queues.resolution.{$segment}.{$type}");
-
-        return $configured !== null
-            ? (string) $configured
-            : (string) config('znuny.queues.default');
     }
 }

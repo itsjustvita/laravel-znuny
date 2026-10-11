@@ -10,7 +10,7 @@ final class QueueTest extends TestCase
     public function test_it_builds_from_znuny_response(): void
     {
         $queue = Queue::fromZnunyResponse([
-            'QueueID' => '803',
+            'QueueID' => '5',
             'Name' => 'Support',
             'GroupID' => '1',
             'ValidID' => '1',
@@ -18,7 +18,7 @@ final class QueueTest extends TestCase
             'Comment' => 'Primary support queue',
         ]);
 
-        $this->assertSame('803', $queue->id);
+        $this->assertSame('5', $queue->id);
         $this->assertSame('Support', $queue->name);
         $this->assertSame('1', $queue->groupId);
         $this->assertTrue($queue->valid);
@@ -40,7 +40,7 @@ final class QueueTest extends TestCase
     public function test_it_serializes_to_array(): void
     {
         $queue = Queue::fromZnunyResponse([
-            'QueueID' => '803',
+            'QueueID' => '5',
             'Name' => 'Support',
             'GroupID' => '1',
             'ValidID' => '1',
@@ -48,7 +48,7 @@ final class QueueTest extends TestCase
         ]);
 
         $this->assertSame([
-            'QueueID' => '803',
+            'QueueID' => '5',
             'Name' => 'Support',
             'GroupID' => '1',
             'ValidID' => '1',
@@ -68,5 +68,12 @@ final class QueueTest extends TestCase
         $this->assertSame('3', $queue->validId);
         $this->assertFalse($queue->valid);
         $this->assertSame('3', $queue->toArray()['ValidID']);
+    }
+
+    public function test_it_keeps_raw_attributes(): void
+    {
+        $queue = Queue::fromZnunyResponse(['QueueID' => '1', 'Name' => 'Raw', 'ValidID' => '1', 'UnlockTimeout' => '0']);
+
+        $this->assertSame('0', $queue->attribute('UnlockTimeout'));
     }
 }

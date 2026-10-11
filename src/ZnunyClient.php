@@ -2,242 +2,348 @@
 
 namespace ItsJustVita\LaravelZnuny;
 
+use Closure;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent;
 use ItsJustVita\LaravelZnuny\Events\ZnunyResponseReceived;
+use ItsJustVita\LaravelZnuny\Events\ZnunySessionRefreshed;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
+use ItsJustVita\LaravelZnuny\Http\PreparedRequest;
+use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
+use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
+use ItsJustVita\LaravelZnuny\Support\Redactor;
+use stdClass;
 use Throwable;
 
 class ZnunyClient
 {
+    /**
+     * Operations that only read data. They are repeated after timeouts and server errors.
+     * Everything else is repeated only when no connection could be established, because
+     * Znuny may already have processed it (a slow TicketCreate would create duplicates).
+     */
+    protected const READ_OPERATIONS = [
+        'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet',
+        'QueueList', 'QueueGet', 'StateList', 'PriorityList', 'TypeList', 'CustomerUserGet',
+    ];
+
+    protected readonly ConnectionConfig $settings;
+
+    protected readonly RequestBuilder $requests;
+
+    /**
+     * @param  array<string, mixed>  $config  connection config, see config/znuny.php
+     */
     public function __construct(
         protected readonly string $connection,
-        protected readonly array $config,
+        array $config,
         protected readonly SessionManager $sessionManager,
-        protected readonly ExceptionMapper $exceptionMapper,
-    ) {}
+        protected readonly ExceptionMapper $exceptionMapper = new ExceptionMapper,
+    ) {
+        $this->settings = ConnectionConfig::fromArray($connection, $config, (array) config('znuny.http', []));
+        $this->requests = new RequestBuilder($this->settings);
+    }
 
     public function connection(): string
     {
         return $this->connection;
     }
 
-    public function request(string $operation, array $payload = []): array
+    public function settings(): ConnectionConfig
     {
-        return $this->requestWithRetry(
-            $operation,
-            $payload,
-            retriesLeft: $this->autoRetryEnabled() ? 1 : 0,
-        );
+        return $this->settings;
     }
 
-    protected function requestWithRetry(string $operation, array $payload, int $retriesLeft): array
+    public function routes(): RouteMap
     {
-        $sessionId = $this->sessionManager->sessionId(
-            $this->connection,
-            fn (string $name) => $this->createSession(),
-        );
+        return $this->settings->routes;
+    }
 
-        $body = array_merge(['SessionID' => $sessionId], $payload);
+    /**
+     * Call any Znuny operation with routing, authentication, error mapping, events and logging.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public function call(string $operation, array $payload = []): array
+    {
+        if (! $this->settings->usesSession()) {
+            return $this->send($operation, $payload, $this->credentials());
+        }
 
         try {
-            return $this->dispatch($operation, $body);
+            return $this->send($operation, $payload, ['SessionID' => $this->sessionId()]);
         } catch (ZnunySessionExpiredException $e) {
-            if ($retriesLeft <= 0) {
+            if (! config('znuny.session.auto_retry_on_expired', true)) {
                 throw $e;
             }
 
-            $this->sessionManager->invalidate($this->connection);
+            $this->sessionManager->invalidate($this->identityKey());
+            $sessionId = $this->sessionId();
 
-            return $this->requestWithRetry($operation, $payload, $retriesLeft - 1);
+            event(new ZnunySessionRefreshed(connection: $this->connection));
+
+            return $this->send($operation, $payload, ['SessionID' => $sessionId]);
         }
     }
 
     /**
-     * Test the connection by performing a fresh SessionCreate call.
+     * @deprecated since 0.2.0, use call()
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<array-key, mixed>
+     */
+    public function request(string $operation, array $payload = []): array
+    {
+        return $this->call($operation, $payload);
+    }
+
+    /**
+     * Check the credentials: a fresh SessionCreate in session mode, a minimal
+     * TicketSearch in credentials mode.
      */
     public function ping(): bool
     {
-        $this->createSession();
+        if ($this->settings->usesSession()) {
+            $this->createSession();
+        } else {
+            $this->call('TicketSearch', ['Limit' => 1]);
+        }
 
         return true;
     }
 
-    protected function autoRetryEnabled(): bool
+    protected function sessionId(): string
     {
-        return (bool) config('znuny.session.auto_retry_on_expired', true);
+        return $this->sessionManager->sessionId($this->identityKey(), fn (): string => $this->createSession());
+    }
+
+    /**
+     * Key under which the session and cached lookups of this connection are stored.
+     */
+    public function identityKey(): string
+    {
+        return $this->settings->identityKey((string) config('app.key', ''));
     }
 
     protected function createSession(): string
     {
-        $body = [
-            'UserLogin' => $this->config['username'],
-            'Password' => $this->config['password'],
-        ];
+        $response = $this->send('SessionCreate', [], $this->credentials());
+        $sessionId = (string) ($response['SessionID'] ?? '');
 
-        $response = $this->dispatch('SessionCreate', $body);
-
-        if (! isset($response['SessionID'])) {
-            throw $this->exceptionMapper->fromErrorResponse(
-                body: $response,
-                operation: 'SessionCreate',
-                connection: $this->connection,
-                payload: $body,
-            );
+        if ($sessionId === '') {
+            throw (new ZnunyServerException('Znuny answered SessionCreate without a SessionID.'))
+                ->setOperation('SessionCreate')
+                ->setConnection($this->connection)
+                ->setRequestPayload($this->credentials())
+                ->setResponseBody($response);
         }
 
-        return (string) $response['SessionID'];
+        return $sessionId;
     }
 
-    protected function dispatch(string $operation, array $body): array
+    /** @return array<string, string> */
+    protected function credentials(): array
     {
-        $url = rtrim($this->config['base_url'], '/').'/'.ltrim($operation, '/');
+        return [
+            $this->settings->loginKey() => $this->settings->username,
+            'Password' => $this->settings->password,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, string>  $auth
+     * @return array<array-key, mixed>
+     */
+    protected function send(string $operation, array $payload, array $auth): array
+    {
+        try {
+            $request = $this->requests->build($operation, $payload, $auth);
+        } catch (ZnunyConfigurationException $e) {
+            throw $e->setOperation($operation)->setConnection($this->connection);
+        }
+
+        $data = array_merge($auth, $payload);
+        $redacted = Redactor::redact($data);
 
         event(new ZnunyRequestSent(
             connection: $this->connection,
             operation: $operation,
-            payload: $this->redact($body),
+            payload: $redacted,
+            method: $request->method,
+            path: $request->path,
         ));
 
-        if ((bool) config('znuny.logging.enabled') && (bool) config('znuny.logging.log_requests')) {
-            Log::channel((string) config('znuny.logging.channel', 'znuny'))
-                ->info('Znuny request', [
-                    'connection' => $this->connection,
-                    'operation' => $operation,
-                    'payload' => $this->redact($body),
-                ]);
-        }
+        $this->log('info', 'log_requests', 'Znuny request', fn (): array => [
+            'connection' => $this->connection,
+            'operation' => $operation,
+            'method' => $request->method,
+            'path' => $request->path,
+            'payload' => Redactor::forLog($data),
+        ]);
 
         $start = microtime(true);
 
         try {
-            $response = $this->httpClient()->post($url, $body);
+            $response = $this->dispatch($request, $operation);
         } catch (ConnectionException $e) {
-            $ex = $this->exceptionMapper->fromTransportError($e, $operation, $this->connection, $body);
-            event(new ZnunyRequestFailed(
-                connection: $this->connection,
-                operation: $operation,
-                exception: $ex,
-                payload: $this->redact($body),
+            // Transport messages contain the request URL, which can carry credentials in the
+            // query string (payload transport on GET routes) or a session ID in the path.
+            $message = Redactor::scrub(str_replace($request->url, $this->settings->baseUrl.$request->path, $e->getMessage()));
+
+            if (str_contains($message, 'Empty reply from server')) {
+                $message .= ' Znuny answers this way when the web service named in base_url does not exist.';
+            }
+
+            throw $this->failed($operation, $request, $redacted, $this->exceptionMapper->fromTransportError(
+                new ConnectionException($message, (int) $e->getCode()),
+                $operation,
+                $this->connection,
+                $data,
             ));
-            $this->logError($operation, $ex);
-            throw $ex;
         }
 
         $elapsed = (microtime(true) - $start) * 1000.0;
+        $json = $this->decode($response);
 
-        if ($response->serverError()) {
-            $ex = $this->exceptionMapper->fromHttpStatus(
+        if ($json === null || $response->failed() || isset($json['Error'])) {
+            throw $this->failed($operation, $request, $redacted, $this->exceptionMapper->fromResponse(
                 status: $response->status(),
-                body: $response->json() ?? [],
+                json: $json,
+                rawBody: $response->body(),
                 operation: $operation,
                 connection: $this->connection,
-                payload: $body,
-            );
-            event(new ZnunyRequestFailed(
-                connection: $this->connection,
-                operation: $operation,
-                exception: $ex,
-                payload: $this->redact($body),
+                payload: $data,
+                sessionAuth: $this->settings->usesSession(),
+                method: $request->method,
+                path: $request->path,
             ));
-            $this->logError($operation, $ex);
-            throw $ex;
-        }
-
-        $data = $response->json() ?? [];
-
-        if (isset($data['Error'])) {
-            $ex = $this->exceptionMapper->fromErrorResponse(
-                body: $data,
-                operation: $operation,
-                connection: $this->connection,
-                payload: $body,
-            );
-            event(new ZnunyRequestFailed(
-                connection: $this->connection,
-                operation: $operation,
-                exception: $ex,
-                payload: $this->redact($body),
-            ));
-            $this->logError($operation, $ex);
-            throw $ex;
         }
 
         event(new ZnunyResponseReceived(
             connection: $this->connection,
             operation: $operation,
             responseTimeMs: $elapsed,
-            payload: $this->redact($body),
-            response: $data,
+            payload: $redacted,
+            response: Redactor::redact($json),
+            status: $response->status(),
         ));
 
-        return $data;
+        $this->log('debug', 'log_responses', 'Znuny response', fn (): array => [
+            'connection' => $this->connection,
+            'operation' => $operation,
+            'status' => $response->status(),
+            'duration_ms' => round($elapsed, 1),
+            'response' => Redactor::forLog($json),
+        ]);
+
+        return $json;
     }
 
-    protected function redact(array $payload): array
+    protected function dispatch(PreparedRequest $request, string $operation): Response
     {
-        foreach (['SessionID', 'Password', 'UserPw'] as $key) {
-            unset($payload[$key]);
+        $repeatable = $request->method === 'GET' || in_array($operation, self::READ_OPERATIONS, true);
+        $client = $this->httpClient($repeatable)->withHeaders($request->headers);
+
+        if ($request->body === null) {
+            return $client->send('GET', $request->url);
         }
 
-        return $payload;
+        $body = json_encode(
+            $request->body === [] ? new stdClass : $request->body,
+            JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        );
+
+        return $client->withBody($body, 'application/json')->send($request->method, $request->url);
     }
 
-    protected function logError(string $operation, ZnunyException $ex): void
+    /** @return array<array-key, mixed>|null */
+    protected function decode(Response $response): ?array
     {
-        if ((bool) config('znuny.logging.enabled') && (bool) config('znuny.logging.log_errors')) {
-            Log::channel((string) config('znuny.logging.channel', 'znuny'))
-                ->error('Znuny error', [
-                    'connection' => $this->connection,
-                    'operation' => $operation,
-                    'code' => $ex->getErrorCode(),
-                    'message' => $ex->getMessage(),
-                ]);
+        $decoded = json_decode($response->body(), true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Dispatch the failure event, write the error log and hand the exception back for throwing.
+     */
+    protected function failed(string $operation, PreparedRequest $request, array $redacted, ZnunyException $exception): ZnunyException
+    {
+        event(new ZnunyRequestFailed(
+            connection: $this->connection,
+            operation: $operation,
+            exception: $exception,
+            payload: $redacted,
+        ));
+
+        $this->log('error', 'log_errors', 'Znuny error', [
+            'connection' => $this->connection,
+            'operation' => $operation,
+            'method' => $request->method,
+            'path' => $request->path,
+            'http_status' => $exception->getHttpStatus(),
+            'code' => $exception->getErrorCode(),
+            'message' => $exception->getMessage(),
+        ]);
+
+        return $exception;
+    }
+
+    /**
+     * @param  array<string, mixed>|Closure(): array<string, mixed>  $context  a closure is only evaluated when the entry is written
+     */
+    protected function log(string $level, string $toggle, string $message, array|Closure $context): void
+    {
+        if (! config('znuny.logging.enabled') || ! config("znuny.logging.{$toggle}")) {
+            return;
         }
+
+        Log::channel((string) config('znuny.logging.channel', 'znuny'))
+            ->{$level}($message, $context instanceof Closure ? $context() : $context);
     }
 
-    protected function httpClient(): PendingRequest
+    /**
+     * @param  bool  $repeatable  whether the request may be repeated after it possibly reached Znuny
+     */
+    protected function httpClient(bool $repeatable = true): PendingRequest
     {
-        $retries = max(0, (int) ($this->config['retries'] ?? config('znuny.http.retries', 3)));
-        $baseDelay = max(10, (int) ($this->config['retry_delay'] ?? config('znuny.http.retry_delay', 100)));
-        $delays = $retries > 0
-            ? array_map(fn (int $i) => $baseDelay * (2 ** $i), range(0, $retries - 1))
-            : [0];
+        $client = Http::timeout($this->settings->timeout)
+            ->connectTimeout($this->settings->connectTimeout);
 
-        $client = Http::asJson()
-            ->timeout((int) ($this->config['timeout'] ?? 30))
-            ->connectTimeout((int) ($this->config['connect_timeout'] ?? 3));
-
-        if ($retries > 0) {
-            $client = $client->retry(
-                $delays,
-                throw: false,
-                when: function (Throwable $exception): bool {
-                    if ($exception instanceof ConnectionException) {
-                        return true;
-                    }
-
-                    if ($exception instanceof RequestException) {
-                        return $exception->response->serverError();
-                    }
-
-                    return false;
-                },
+        if ($this->settings->retries > 0) {
+            $delays = array_map(
+                fn (int $attempt): int => $this->settings->retryDelay * (2 ** $attempt),
+                range(0, $this->settings->retries - 1),
             );
+
+            $client = $client->retry($delays, throw: false, when: function (Throwable $exception) use ($repeatable): bool {
+                if ($exception instanceof ConnectionException) {
+                    // cURL 6/7: the request never reached Znuny, so repeating it is always safe.
+                    return $repeatable || preg_match('/cURL error (6|7):/', $exception->getMessage()) === 1;
+                }
+
+                // A missing route is a configuration problem that no retry can fix.
+                return $repeatable
+                    && $exception instanceof RequestException
+                    && $exception->response->serverError()
+                    && ! str_contains($exception->response->body(), 'determine Operation');
+            });
         }
 
-        if (! ($this->config['verify_ssl'] ?? true)) {
-            $client = $client->withOptions(['verify' => false]);
-        }
-
-        return $client;
+        return $this->settings->verifySsl ? $client : $client->withOptions(['verify' => false]);
     }
 }

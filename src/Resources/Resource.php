@@ -18,6 +18,6 @@ abstract class Resource
             return $resolver();
         }
 
-        return $this->cache->remember($this->client->connection(), $resource, $resolver);
+        return $this->cache->remember($this->client->identityKey(), $resource, $resolver);
     }
 }
