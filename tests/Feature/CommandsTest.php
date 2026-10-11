@@ -163,4 +163,20 @@ final class CommandsTest extends TestCase
             ])
             ->assertExitCode(0);
     }
+
+    public function test_routes_command_does_not_need_credentials(): void
+    {
+        config()->set('znuny.connections.partial', ['routes' => 'generic-ticket-connector-classic']);
+
+        $this->artisan('znuny:routes', ['connection' => 'partial'])
+            ->expectsOutputToContain('generic-ticket-connector-classic')
+            ->assertExitCode(0);
+    }
+
+    public function test_routes_command_reports_unknown_connections(): void
+    {
+        $this->artisan('znuny:routes', ['connection' => 'nope'])
+            ->expectsOutputToContain('Znuny connection [nope] is not configured')
+            ->assertExitCode(1);
+    }
 }

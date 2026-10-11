@@ -3,9 +3,9 @@
 namespace ItsJustVita\LaravelZnuny\Commands;
 
 use Illuminate\Console\Command;
-use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\Route;
-use ItsJustVita\LaravelZnuny\ZnunyManager;
+use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 
 class RoutesCommand extends Command
 {
@@ -13,13 +13,19 @@ class RoutesCommand extends Command
 
     protected $description = 'Show the REST routes a Znuny connection uses';
 
-    public function handle(ZnunyManager $manager): int
+    public function handle(): int
     {
         $name = (string) ($this->argument('connection') ?? config('znuny.default', 'default'));
+        $config = config("znuny.connections.{$name}");
 
         try {
-            $routes = $manager->connection($name)->client()->routes();
-        } catch (ZnunyException $e) {
+            if (! is_array($config)) {
+                throw new ZnunyConfigurationException("Znuny connection [{$name}] is not configured.");
+            }
+
+            // Only the route map is needed, so incomplete credentials do not matter here.
+            $routes = RouteMap::fromConfig($config['routes'] ?? null);
+        } catch (ZnunyConfigurationException $e) {
             $this->error("Znuny connection [{$name}] FAILED: {$e->getMessage()}");
 
             return self::FAILURE;
