@@ -289,4 +289,18 @@ final class ZnunyClientTransportTest extends TestCase
             $this->assertStringNotContainsString('topsecret', $e->getMessage());
         }
     }
+
+    public function test_an_empty_reply_points_to_the_web_service_name(): void
+    {
+        // Znuny closes the connection without an answer for an unknown web service name.
+        Http::fake(fn () => throw new ConnectionException('cURL error 52: Empty reply from server'));
+
+        try {
+            $this->client(['auth' => 'credentials'])->call('TicketSearch');
+            $this->fail('Expected ZnunyConnectionException');
+        } catch (ZnunyConnectionException $e) {
+            $this->assertStringContainsString('Empty reply from server', $e->getMessage());
+            $this->assertStringContainsString('the web service named in base_url does not exist', $e->getMessage());
+        }
+    }
 }
