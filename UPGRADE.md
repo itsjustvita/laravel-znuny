@@ -1,5 +1,26 @@
 # Upgrade guide
 
+## 0.2.0 → 0.2.1
+
+### Time zones
+
+Znuny reads search dates and returns dates in its `OTRSTimeZone`, which is UTC unless an administrator changed it. 0.2.0 used the app's time zone for both. If your app's time zone is not UTC:
+
+- date filters such as `whereChangedAfter(now()->subMinutes(5))` now find the right tickets;
+- `$ticket->created`, `$ticket->changed`, `$article->created` and `$entry->createTime` are Carbon instances in Znuny's time zone. They show the same wall-clock time as before but now point to the correct moment; use `->copy()->setTimezone(config('app.timezone'))` to display them in your app's time zone.
+
+If your Znuny's `OTRSTimeZone` is not UTC, set it per connection:
+
+```php
+'timezone' => env('ZNUNY_TIMEZONE', 'Europe/Berlin'),
+```
+
+and pass it to `$event->ticket('Europe/Berlin')` for webhook payloads.
+
+### `whereChangedBefore()`
+
+`whereChangedBefore($date)` now returns tickets whose last change (`$ticket->changed`) is before `$date`. In 0.2.0 it also returned tickets that were changed after `$date`, as long as they had any older history entry. To get the old behaviour, use `->where('TicketChangeTimeOlderDate', ...)` with a date in Znuny's time zone.
+
 ## 0.1.x → 0.2.0
 
 0.2.0 makes the package work with any Znuny installation. Most changes are additions, but a few affect existing installations.
