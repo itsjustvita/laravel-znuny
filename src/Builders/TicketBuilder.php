@@ -2,7 +2,9 @@
 
 namespace ItsJustVita\LaravelZnuny\Builders;
 
+use DateTimeImmutable;
 use DateTimeInterface;
+use DateTimeZone;
 use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -101,22 +103,28 @@ class TicketBuilder
 
     public function whereCreatedAfter(DateTimeInterface $date): self
     {
-        return $this->where('TicketCreateTimeNewerDate', $date->format('Y-m-d H:i:s'));
+        return $this->where('TicketCreateTimeNewerDate', $this->znunyTime($date));
     }
 
     public function whereCreatedBefore(DateTimeInterface $date): self
     {
-        return $this->where('TicketCreateTimeOlderDate', $date->format('Y-m-d H:i:s'));
+        return $this->where('TicketCreateTimeOlderDate', $this->znunyTime($date));
     }
 
+    /**
+     * Tickets with any change (history entry, e.g. a new article) after the date.
+     */
     public function whereChangedAfter(DateTimeInterface $date): self
     {
-        return $this->where('TicketChangeTimeNewerDate', $date->format('Y-m-d H:i:s'));
+        return $this->where('TicketChangeTimeNewerDate', $this->znunyTime($date));
     }
 
+    /**
+     * Tickets last changed before the date (the ticket's "Changed" time).
+     */
     public function whereChangedBefore(DateTimeInterface $date): self
     {
-        return $this->where('TicketChangeTimeOlderDate', $date->format('Y-m-d H:i:s'));
+        return $this->where('TicketLastChangeTimeOlderDate', $this->znunyTime($date));
     }
 
     /**
@@ -199,6 +207,16 @@ class TicketBuilder
                 yield $ticket;
             }
         }
+    }
+
+    /**
+     * Znuny reads search dates in its OTRSTimeZone.
+     */
+    protected function znunyTime(DateTimeInterface $date): string
+    {
+        return DateTimeImmutable::createFromInterface($date)
+            ->setTimezone(new DateTimeZone($this->client->settings()->timezone))
+            ->format('Y-m-d H:i:s');
     }
 
     /**

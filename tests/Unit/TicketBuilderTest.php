@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
 use Carbon\Carbon;
 use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Http\Client\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -84,7 +85,54 @@ final class TicketBuilderTest extends TestCase
             && $r['TicketCreateTimeNewerDate'] === '2026-01-01 08:00:00'
             && $r['TicketCreateTimeOlderDate'] === '2026-02-01 08:00:00'
             && $r['TicketChangeTimeNewerDate'] === '2026-03-01 08:00:00'
-            && $r['TicketChangeTimeOlderDate'] === '2026-04-01 08:00:00');
+            && $r['TicketLastChangeTimeOlderDate'] === '2026-04-01 08:00:00');
+    }
+
+    public function test_changed_before_compares_the_last_change_not_any_history_entry(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::tickets()->query()->whereChangedBefore(new DateTimeImmutable('2026-04-01 08:00:00'))->ids();
+
+        // TicketChangeTimeOlderDate matches every ticket with any history entry before the date.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketLastChangeTimeOlderDate'] === '2026-04-01 08:00:00'
+            && ! isset($r['TicketChangeTimeOlderDate']));
+    }
+
+    public function test_date_filters_are_sent_in_the_znuny_time_zone(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::tickets()->query()
+            ->whereCreatedAfter(new DateTimeImmutable('2026-07-01 10:00:00', new DateTimeZone('Europe/Vienna')))
+            ->whereChangedBefore(Carbon::parse('2026-07-01 18:00:00', 'Asia/Tokyo'))
+            ->ids();
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketCreateTimeNewerDate'] === '2026-07-01 08:00:00'
+            && $r['TicketLastChangeTimeOlderDate'] === '2026-07-01 09:00:00');
+    }
+
+    public function test_the_znuny_time_zone_is_configurable_per_connection(): void
+    {
+        config(['znuny.connections.default.timezone' => 'Europe/Berlin']);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::tickets()->query()->whereCreatedAfter(new DateTimeImmutable('2026-07-01 08:00:00', new DateTimeZone('UTC')))->ids();
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketCreateTimeNewerDate'] === '2026-07-01 10:00:00');
     }
 
     public function test_where_state_type_maps_to_state_type_param(): void

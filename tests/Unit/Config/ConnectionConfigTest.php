@@ -34,6 +34,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(3, $config->retries);
         $this->assertSame(100, $config->retryDelay);
         $this->assertSame(50, $config->batchSize);
+        $this->assertSame('UTC', $config->timezone);
         $this->assertTrue($config->usesSession());
         $this->assertSame('UserLogin', $config->loginKey());
     }
@@ -85,11 +86,22 @@ final class ConnectionConfigTest extends TestCase
         $this->make(['auth' => 'oauth']);
     }
 
+    public function test_the_time_zone_must_be_valid(): void
+    {
+        $this->assertSame('Europe/Berlin', $this->make(['timezone' => 'Europe/Berlin'])->timezone);
+
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [default] has invalid [timezone] value [Mars/Olympus].');
+
+        $this->make(['timezone' => 'Mars/Olympus']);
+    }
+
     public function test_published_config_file_defaults(): void
     {
         $config = require __DIR__.'/../../../config/znuny.php';
 
         $this->assertSame('generic-ticket-connector', $config['connections']['default']['routes']);
+        $this->assertSame('UTC', $config['connections']['default']['timezone']);
         $this->assertSame(50, $config['http']['batch_size']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);

@@ -1,0 +1,24 @@
+---
+# Ticket dynamic fields for the integration suite, imported with Admin::DynamicField::Import.
+DynamicFields:
+  OrderId:
+    Name: OrderId
+    Label: Order ID
+    ObjectType: Ticket
+    FieldType: Text
+    Config:
+      DefaultValue: ''
+  Tags:
+    Name: Tags
+    Label: Tags
+    ObjectType: Ticket
+    FieldType: Multiselect
+    Config:
+      DefaultValue: ''
+      PossibleNone: '0'
+      PossibleValues:
+        alpha: Alpha
+        beta: Beta
+        gamma: Gamma
+      TranslatableValues: '0'
+      TreeView: '0'

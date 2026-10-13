@@ -4,6 +4,24 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-13
+
+Fixes found by the extended integration suite, which now also covers dynamic fields, the `operation-name` preset, expired sessions, customer users, webhooks end to end, the artisan commands and Znuny's validation errors, and runs against Znuny 7.3.7 and 6.5.22. See [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- Connection option `timezone` (`ZNUNY_TIMEZONE`, default `UTC`): Znuny's `OTRSTimeZone`. `ZnunyWebhookReceived::ticket()` accepts it as an optional argument.
+
+### Fixed
+
+- Date filters sent dates in the app's time zone, but Znuny reads them in its own (UTC by default). In an app ahead of UTC, `whereChangedAfter(now()->subMinutes(5))` found nothing. Dates are now converted to the connection's `timezone`.
+- `created`, `changed` and `createTime` of `Ticket`, `Article` and `HistoryEntry` were read in the app's time zone and are now read in the connection's `timezone`. Empty dates are `null` instead of the current time.
+- `whereChangedBefore()` matched every ticket with any history entry before the date, which includes nearly all older tickets. It now compares the ticket's last change time.
+
+### Changed
+
+- README: which Znuny versions ship the Ready2Adopt example web service and how to set up older ones, the routes Znuny 6.0 and OTRS 6 need, and a corrected dot-notation example.
+
 ## [0.2.0] - 2026-10-11
 
 Works out of the box with the `GenericTicketConnectorREST` example web service that Znuny ships. See [UPGRADE.md](UPGRADE.md).
@@ -64,7 +82,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.0...v0.1.1

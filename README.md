@@ -34,7 +34,7 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 
 - PHP 8.3+
 - Laravel 12 or 13
-- Znuny 6.5 or 7.x with a Generic Interface web service that has a REST provider. Znuny 6.0 and OTRS 6 work too; set `'auth_transport' => 'payload'` there.
+- Znuny 6.5 or 7.x with a Generic Interface web service that has a REST provider. Znuny 6.0 and OTRS 6 work too: set `'auth_transport' => 'payload'` (they do not read authentication headers) and, for their example web service, `'routes' => 'generic-ticket-connector-classic'`.
 
 ## Installation
 
@@ -55,11 +55,13 @@ php artisan znuny:test-connection
 
 ## Setting up the web service in Znuny
 
-1. In Znuny open **Admin → Web Services → Add Web Service** and import the example web service `GenericTicketConnectorREST` (Znuny ships it in `var/webservices/examples/`).
+1. In Znuny open **Admin → Web Services → Add Web Service**.
+   - Znuny 6.5.11+ and 7.1.3+ list `GenericTicketConnectorREST` under **Ready2Adopt Web Services**. Import it there; the default route preset matches it.
+   - Older versions (Znuny 6.0, 6.5.0–6.5.10, 7.0, 7.1.0–7.1.2, OTRS 6) do not ship it. Use **Import web service** with [`development/webservices/GenericTicketConnectorREST.yml`](https://github.com/znuny/Znuny/blob/rel-7_3_7/development/webservices/GenericTicketConnectorREST.yml) from the Znuny repository and set `'routes' => 'generic-ticket-connector-classic'`.
 2. Keep the name `GenericTicketConnectorREST` or choose your own. The base URL is `https://<host>/otrs/nph-genericinterface.pl/Webservice/<name>`; use your installation's script alias if it is not `/otrs/`.
 3. Create an agent for the API and give it permissions on the queues it needs.
 
-The default route preset matches this web service, so nothing else needs to be configured. If your web service was set up from the older example in `development/webservices/` (it searches with `GET /Ticket`), set `'routes' => 'generic-ticket-connector-classic'`. `php artisan znuny:test-connection` tells you whether the routes match.
+Web services that were set up from the older example earlier (they search with `GET /Ticket`) also need `'routes' => 'generic-ticket-connector-classic'`. `php artisan znuny:test-connection` tells you whether the routes match.
 
 ## Configuration
 
@@ -79,9 +81,12 @@ The default route preset matches this web service, so nothing else needs to be c
         'verify_ssl'      => env('ZNUNY_VERIFY_SSL', true),
         'timeout'         => env('ZNUNY_TIMEOUT', 30),
         'connect_timeout' => env('ZNUNY_CONNECT_TIMEOUT', 3),
+        'timezone'        => env('ZNUNY_TIMEZONE', 'UTC'),
     ],
 ],
 ```
+
+`timezone` is Znuny's `OTRSTimeZone` (System Configuration). Znuny reads search dates and returns dates in this time zone, independent of your app's time zone. It is `UTC` unless an administrator changed it.
 
 A connection can also set `retries`, `retry_delay` (milliseconds) and `batch_size`; they default to the values under `http`. Retries repeat reads after timeouts and server errors. Writes such as `TicketCreate` and `TicketUpdate` are only repeated when no connection could be established, so a slow Znuny never receives the same ticket twice.
 
@@ -187,8 +192,9 @@ Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …
 ```php
 $ticket->owner;                                    // typed property
 $ticket->attribute('EscalationTime');              // raw field
-$ticket->attribute('CustomerUser.UserEmail');      // dot notation for nested data
 ```
+
+`attribute()` supports dot notation for nested data. `TicketGet` returns flat ticket fields, but webhook payloads include, for example, the customer user's data: `$event->ticket()->attribute('CustomerUser.UserEmail')`.
 
 > Znuny checks permissions before existence: `find()` on a ticket that does not exist usually throws `ZnunyAccessDeniedException`. `findMany()` skips tickets that are missing or not accessible.
 
@@ -217,6 +223,8 @@ Znuny::tickets()->where('OwnerIDs', [3, 4])->ids();
 // Dynamic field conditions (the default preset searches via POST; for the classic preset see Routes):
 Znuny::tickets()->query()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids();
 ```
+
+Date filters accept any `DateTimeInterface` and convert it to the connection's `timezone`; the dates of the returned tickets, articles and history entries are read in it as well. `whereChangedAfter()` matches tickets with any change after the date, including new articles. `whereChangedBefore()` compares the ticket's last change time (`$ticket->changed`).
 
 `get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page.
 
@@ -314,6 +322,7 @@ The package can receive Znuny's outgoing events and dispatch them as Laravel eve
    Event::listen(function (ZnunyWebhookReceived $event) {
        if ($event->is('TicketCreate')) {
            $ticket = $event->ticket();   // built from the payload; null if no ticket data was sent
+                                         // dates in UTC; pass Znuny's time zone otherwise: ticket('Europe/Berlin')
            // $event->ticketId, $event->articleId, $event->payload, $event->parameters
        }
    });
