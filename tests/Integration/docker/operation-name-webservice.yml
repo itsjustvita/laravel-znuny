@@ -1,0 +1,90 @@
+---
+# Routes named after the operations, as laravel-znuny 0.1 expected them ("operation-name" preset).
+Debugger:
+  DebugThreshold: error
+  TestMode: '0'
+Description: Ticket connector with operation-name routes (laravel-znuny integration suite)
+FrameworkVersion: 6.5.x
+Provider:
+  Operation:
+    SessionCreate:
+      Description: Create a Session
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Session::SessionCreate
+    SessionGet:
+      Description: Retrieve Session data
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Session::SessionGet
+    TicketCreate:
+      Description: Create a Ticket
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Ticket::TicketCreate
+    TicketGet:
+      Description: Retrieve Ticket data
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Ticket::TicketGet
+    TicketHistoryGet:
+      Description: Retrieve Ticket history data
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Ticket::TicketHistoryGet
+    TicketSearch:
+      Description: Search for Tickets
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Ticket::TicketSearch
+    TicketUpdate:
+      Description: Update a Ticket
+      MappingInbound: {}
+      MappingOutbound: {}
+      Type: Ticket::TicketUpdate
+  Transport:
+    Config:
+      AdditionalHeaders: ~
+      KeepAlive: '1'
+      MaxLength: '100000000'
+      RouteOperationMapping:
+        SessionCreate:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /SessionCreate
+        SessionGet:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /SessionGet
+        TicketCreate:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /TicketCreate
+        TicketGet:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /TicketGet/:TicketID
+        TicketHistoryGet:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /TicketHistoryGet
+        TicketSearch:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /TicketSearch
+        TicketUpdate:
+          ParserBackend: JSON
+          RequestMethod:
+          - POST
+          Route: /TicketUpdate/:TicketID
+    Type: HTTP::REST
+RemoteSystem: ''
+Requester:
+  Transport:
+    Type: ''

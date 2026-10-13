@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# Starts Znuny + MariaDB, installs the database, creates an API agent and a customer user,
-# and imports the stock GenericTicketConnectorREST web service plus a webhook requester.
+# Starts Znuny + MariaDB, installs the database, creates an API agent, a customer user and two
+# dynamic fields, and imports the stock GenericTicketConnectorREST web services, a web service
+# with operation-name routes and a webhook requester.
 set -euo pipefail
 
 cd "$(dirname "$0")"
 
 export ZNUNY_IMAGE="${ZNUNY_IMAGE:-cygnusnetworks/znuny:7.3.7}"
 export ZNUNY_PLATFORM="${ZNUNY_PLATFORM:-linux/amd64}"
+
+# Git ref for files that are not part of the image: rel-X_Y_Z for an X.Y.Z image tag.
+tag="${ZNUNY_IMAGE##*:}"
+if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then default_ref="rel-${tag//./_}"; else default_ref="rel-7_3_7"; fi
+ZNUNY_GIT_REF="${ZNUNY_GIT_REF:-$default_ref}"
 compose() { docker compose -p laravel-znuny-integration "$@"; }
 
 compose up -d db
@@ -52,15 +58,21 @@ console Admin::WebService::Add --name GenericTicketConnectorREST \
 
 # The classic example (development/webservices) is not part of the release; fetch it from GitHub.
 classic=$(mktemp)
-curl -fsSL "https://raw.githubusercontent.com/znuny/Znuny/${ZNUNY_GIT_REF:-rel-7_3_7}/development/webservices/GenericTicketConnectorREST.yml" -o "$classic"
+curl -fsSL "https://raw.githubusercontent.com/znuny/Znuny/${ZNUNY_GIT_REF}/development/webservices/GenericTicketConnectorREST.yml" -o "$classic"
 chmod 644 "$classic"
 compose cp "$classic" znuny:/tmp/GenericTicketConnectorRESTClassic.yml
 rm -f "$classic"
 console Admin::WebService::Add --name GenericTicketConnectorRESTClassic \
   --source-path /tmp/GenericTicketConnectorRESTClassic.yml || true
 
+compose cp ./operation-name-webservice.yml znuny:/tmp/operation-name-webservice.yml
+console Admin::WebService::Add --name OperationNameREST --source-path /tmp/operation-name-webservice.yml || true
+
 compose cp ./webhook-requester.yml znuny:/tmp/webhook-requester.yml
 console Admin::WebService::Add --name LaravelWebhook --source-path /tmp/webhook-requester.yml || true
+
+compose cp ./dynamic-fields.yml znuny:/tmp/dynamic-fields.yml
+console Admin::DynamicField::Import /tmp/dynamic-fields.yml
 
 echo "Checking the API login..."
 curl -fsS -X POST -H 'Content-Type: application/json' \
@@ -74,9 +86,11 @@ Znuny is ready:
 
   ZNUNY_INTEGRATION_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST
   ZNUNY_INTEGRATION_CLASSIC_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/GenericTicketConnectorRESTClassic
+  ZNUNY_INTEGRATION_OPERATION_NAME_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OperationNameREST
   ZNUNY_INTEGRATION_USERNAME=api-agent
   ZNUNY_INTEGRATION_PASSWORD=api-secret
   ZNUNY_INTEGRATION_CUSTOMER_USER=jane
   ZNUNY_INTEGRATION_CUSTOMER_PASSWORD=jane-secret
+  ZNUNY_INTEGRATION_WEBHOOK_LISTEN=0.0.0.0:8099
 
 TEXT
