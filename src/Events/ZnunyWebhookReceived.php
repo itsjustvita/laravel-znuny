@@ -29,11 +29,13 @@ final readonly class ZnunyWebhookReceived
 
     /**
      * The ticket sent along by Znuny's Ticket::Generic invoker, if any.
+     *
+     * @param  string  $timezone  Znuny's OTRSTimeZone, in which the payload's dates are given
      */
-    public function ticket(): ?Ticket
+    public function ticket(string $timezone = 'UTC'): ?Ticket
     {
         $data = $this->payload['Ticket'] ?? null;
 
-        return is_array($data) && $data !== [] ? Ticket::fromZnunyResponse($data) : null;
+        return is_array($data) && $data !== [] ? Ticket::fromZnunyResponse($data, $timezone) : null;
     }
 }

@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Config;
 
+use DateTimeZone;
+use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 
@@ -36,6 +38,7 @@ final readonly class ConnectionConfig
         public int $retries,
         public int $retryDelay,
         public int $batchSize,
+        public string $timezone = 'UTC',
     ) {}
 
     /**
@@ -71,6 +74,7 @@ final readonly class ConnectionConfig
             retries: max(0, (int) ($config['retries'] ?? $http['retries'] ?? 3)),
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
+            timezone: self::timezone($name, $config['timezone'] ?? null),
         );
     }
 
@@ -98,6 +102,27 @@ final readonly class ConnectionConfig
     public function loginKey(): string
     {
         return $this->userType === self::USER_CUSTOMER ? 'CustomerUserLogin' : 'UserLogin';
+    }
+
+    /**
+     * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns.
+     */
+    private static function timezone(string $connection, mixed $value): string
+    {
+        $value = trim((string) ($value ?? ''));
+        $value = $value === '' ? 'UTC' : $value;
+
+        try {
+            new DateTimeZone($value);
+        } catch (Exception) {
+            throw new ZnunyConfigurationException(sprintf(
+                'Znuny connection [%s] has invalid [timezone] value [%s]. Use the name of Znuny\'s OTRSTimeZone, e.g. UTC or Europe/Berlin.',
+                $connection,
+                $value,
+            ));
+        }
+
+        return $value;
     }
 
     /**

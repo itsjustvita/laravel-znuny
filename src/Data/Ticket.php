@@ -51,11 +51,13 @@ final readonly class Ticket
      * Accepts TicketGet rows and TicketDeepGet data (webhooks): articles as "Article" list,
      * "Articles" list or a single "Article" hash; dynamic fields as "DynamicField" list or
      * flat "DynamicField_<Name>" keys; "CustomerUser" as login or customer data hash.
+     *
+     * @param  string  $timezone  Znuny's OTRSTimeZone, in which it returns dates
      */
-    public static function fromZnunyResponse(array $data): self
+    public static function fromZnunyResponse(array $data, string $timezone = 'UTC'): self
     {
         $articles = collect(self::articleRows($data))
-            ->map(fn (array $article): Article => Article::fromZnunyResponse($article))
+            ->map(fn (array $article): Article => Article::fromZnunyResponse($article, $timezone))
             ->values();
 
         $dynamicFields = collect(self::dynamicFieldRows($data))
@@ -76,8 +78,8 @@ final readonly class Ticket
             customerId: $data['CustomerID'] ?? null,
             customerUserID: $data['CustomerUserID'] ?? null,
             customerUser: is_string($customerUser) ? $customerUser : ($data['CustomerUserID'] ?? null),
-            created: isset($data['Created']) ? Carbon::parse($data['Created']) : null,
-            changed: isset($data['Changed']) ? Carbon::parse($data['Changed']) : null,
+            created: self::optionalDate($data['Created'] ?? null, $timezone),
+            changed: self::optionalDate($data['Changed'] ?? null, $timezone),
             articles: $articles,
             dynamicFields: $dynamicFields,
             stateId: self::optionalString($data['StateID'] ?? null),
