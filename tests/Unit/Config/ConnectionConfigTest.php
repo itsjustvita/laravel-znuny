@@ -63,7 +63,53 @@ final class ConnectionConfigTest extends TestCase
     {
         $this->assertFalse($this->make(['verify_ssl' => 'false'])->verifySsl);
         $this->assertFalse($this->make(['verify_ssl' => false])->verifySsl);
+        $this->assertFalse($this->make(['verify_ssl' => '0'])->verifySsl);
+        $this->assertFalse($this->make(['verify_ssl' => 'off'])->verifySsl);
         $this->assertTrue($this->make(['verify_ssl' => '1'])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => 'true'])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => true])->verifySsl);
+    }
+
+    public function test_a_blank_verify_ssl_value_keeps_verification_on(): void
+    {
+        // An empty environment variable must not switch certificate verification off.
+        $this->assertTrue($this->make(['verify_ssl' => ''])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => ' '])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => null])->verifySsl);
+    }
+
+    public function test_verify_ssl_accepts_the_path_of_a_ca_bundle(): void
+    {
+        $bundle = (string) tempnam(sys_get_temp_dir(), 'znuny-ca-');
+
+        try {
+            $this->assertSame($bundle, $this->make(['verify_ssl' => $bundle])->verifySsl);
+            $this->assertSame(sys_get_temp_dir(), $this->make(['verify_ssl' => sys_get_temp_dir()])->verifySsl);
+        } finally {
+            unlink($bundle);
+        }
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function invalidVerifySslValues(): array
+    {
+        return [
+            'typo' => ['treu'],
+            'missing file' => ['/no/such/ca-bundle.pem'],
+            'number' => [2],
+            'list' => [['a']],
+        ];
+    }
+
+    #[DataProvider('invalidVerifySslValues')]
+    public function test_other_verify_ssl_values_are_rejected_instead_of_disabling_verification(mixed $value): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [default] has invalid [verify_ssl] value');
+
+        $this->make(['verify_ssl' => $value]);
     }
 
     #[DataProvider('missingKeys')]

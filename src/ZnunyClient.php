@@ -349,6 +349,8 @@ class ZnunyClient
             });
         }
 
-        return $this->settings->verifySsl ? $client : $client->withOptions(['verify' => false]);
+        return $this->settings->verifySsl === true
+            ? $client
+            : $client->withOptions(['verify' => $this->settings->verifySsl]);
     }
 }

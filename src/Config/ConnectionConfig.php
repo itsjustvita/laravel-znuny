@@ -46,7 +46,7 @@ final readonly class ConnectionConfig
         public string $auth,
         public string $userType,
         public string $authTransport,
-        public bool $verifySsl,
+        public bool|string $verifySsl,
         public int $timeout,
         public int $connectTimeout,
         public int $retries,
@@ -83,7 +83,7 @@ final readonly class ConnectionConfig
             auth: self::oneOf($name, 'auth', $config['auth'] ?? null, [self::AUTH_SESSION, self::AUTH_CREDENTIALS]),
             userType: self::oneOf($name, 'user_type', $config['user_type'] ?? null, [self::USER_AGENT, self::USER_CUSTOMER]),
             authTransport: self::oneOf($name, 'auth_transport', $config['auth_transport'] ?? null, [self::TRANSPORT_AUTO, self::TRANSPORT_PAYLOAD, self::TRANSPORT_HEADERS]),
-            verifySsl: filter_var($config['verify_ssl'] ?? true, FILTER_VALIDATE_BOOL),
+            verifySsl: self::verifySsl($name, $config['verify_ssl'] ?? null),
             timeout: (int) ($config['timeout'] ?? 30),
             connectTimeout: (int) ($config['connect_timeout'] ?? 3),
             retries: max(0, (int) ($config['retries'] ?? $http['retries'] ?? 3)),
@@ -155,6 +155,35 @@ final readonly class ConnectionConfig
         }
 
         return $value;
+    }
+
+    /**
+     * true, false or the path of a CA bundle to verify against. Other values are an
+     * error, so that a typo cannot switch certificate verification off.
+     */
+    private static function verifySsl(string $connection, mixed $value): bool|string
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return true;
+        }
+
+        if (is_scalar($value)) {
+            $switch = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+            if ($switch !== null) {
+                return $switch;
+            }
+
+            if (is_string($value) && file_exists($value)) {
+                return $value;
+            }
+        }
+
+        throw new ZnunyConfigurationException(sprintf(
+            'Znuny connection [%s] has invalid [verify_ssl] value [%s]. Use true, false or the path of a CA bundle.',
+            $connection,
+            is_scalar($value) ? (string) $value : gettype($value),
+        ));
     }
 
     /**
