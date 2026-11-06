@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-11-06
+
+Robustness fixes. See [UPGRADE.md](UPGRADE.md) for what is worth setting after the update.
+
+### Added
+
+- `search_limit` (`ZNUNY_SEARCH_LIMIT`; per connection or under `http`) and `ZnunySearchLimitExceededException`. Znuny cuts a search without a limit off at 500 tickets and does not say so. With a search limit, `ids()`, `get()`, `paginate()` and `lazy()` without `limit()` return every match up to that number and throw if more tickets match. It is off by default and will be on in 0.3.0; until then a search that returns exactly 500 tickets is logged as a warning.
+- `session.per_host` (`ZNUNY_SESSION_PER_HOST`, default `true`), see Fixed.
+- `verify_ssl` accepts the path of a CA bundle.
+- `customers()->tickets($id, limit: 25)`.
+- `ZnunyClient::sessionId()` is public.
+- README: troubleshooting section.
+
+### Fixed
+
+- Hosts that share a cache store but reach Znuny from different IP addresses invalidated each other's session with every request, because Znuny binds a session to the address that created it. Each host now keeps its own session.
+- `withArticle()` and `addArticle()` failed without a `contentType`, which Znuny requires. Articles are now sent as plain text by default.
+- `findMany()` sent one request per ticket when Znuny rejected a batch because of a single missing ticket. It now halves the batch and fetches ticket by ticket only once eight or fewer are left.
+- Nested config keys that were added after the config file was published (`http.search_limit`, `session.per_host`) had no effect, and neither had their environment variables. The `http` and `session` blocks are now merged with the package defaults.
+
+### Security
+
+- `verify_ssl` values that are not booleans switched certificate verification off, for example a typo or an empty environment variable. An empty value now leaves verification on, and any other value that is not the path of an existing CA bundle raises a `ZnunyConfigurationException`.
+
 ## [0.2.1] - 2026-11-06
 
 Fixes found by the extended integration suite, which now also covers dynamic fields, the `operation-name` preset, expired sessions, customer users, webhooks end to end, the artisan commands, Znuny's validation errors and a Znuny that does not run on UTC. It runs against Znuny 6.5 and 7.3.
@@ -86,7 +110,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.1...v0.1.2

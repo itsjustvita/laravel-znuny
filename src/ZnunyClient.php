@@ -130,7 +130,10 @@ class ZnunyClient
         return true;
     }
 
-    protected function sessionId(): string
+    /**
+     * The session ID of this connection; logs in if no session is cached.
+     */
+    public function sessionId(): string
     {
         return $this->sessionManager->sessionId($this->identityKey(), fn (): string => $this->createSession());
     }
@@ -309,6 +312,16 @@ class ZnunyClient
     }
 
     /**
+     * Write a warning to the package's log channel, if error logging is enabled.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function warn(string $message, array $context = []): void
+    {
+        $this->log('warning', 'log_errors', $message, ['connection' => $this->connection] + $context);
+    }
+
+    /**
      * @param  array<string, mixed>|Closure(): array<string, mixed>  $context  a closure is only evaluated when the entry is written
      */
     protected function log(string $level, string $toggle, string $message, array|Closure $context): void
@@ -349,6 +362,8 @@ class ZnunyClient
             });
         }
 
-        return $this->settings->verifySsl ? $client : $client->withOptions(['verify' => false]);
+        return $this->settings->verifySsl === true
+            ? $client
+            : $client->withOptions(['verify' => $this->settings->verifySsl]);
     }
 }

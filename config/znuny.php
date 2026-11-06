@@ -27,8 +27,8 @@ return [
     | auth_transport  "auto" (X-OTRS-Header-* headers for GET routes, request data
     |                 otherwise), "payload" or "headers" (headers need Znuny 6.5+).
     |
-    | Optional per connection: retries, retry_delay, batch_size (see "http") and
-    | timezone (see "timezone").
+    | Optional per connection: retries, retry_delay, batch_size, search_limit (see "http")
+    | and timezone (see "timezone").
     |
     */
 
@@ -55,11 +55,19 @@ return [
 
     'timezone' => env('ZNUNY_TIMEZONE', 'UTC'),
 
+    /*
+    | Znuny sessions are cached and reused. per_host keeps one session per host name:
+    | Znuny binds a session to the IP address that created it (SessionCheckRemoteIP), so
+    | servers and workers that share a cache store but reach Znuny from different
+    | addresses would otherwise invalidate each other's session with every request.
+    */
+
     'session' => [
         'cache_store' => env('ZNUNY_CACHE_STORE'),
         'cache_prefix' => 'znuny:session:',
         'ttl' => env('ZNUNY_SESSION_TTL', 21600),
         'auto_retry_on_expired' => true,
+        'per_host' => env('ZNUNY_SESSION_PER_HOST', true),
     ],
 
     /*
@@ -95,11 +103,21 @@ return [
 
     'dynamic_fields' => [],
 
-    // Reads are retried after timeouts and 5xx; writes only when no connection could be established.
+    /*
+    | Reads are retried after timeouts and 5xx; writes only when no connection could be
+    | established.
+    |
+    | search_limit: the most tickets a search without limit() may match. Znuny cuts a
+    | search off at its SearchLimit (500 by default) without saying so. With a search_limit
+    | the package asks for that many tickets and throws a ZnunySearchLimitExceededException
+    | when more match. Without it (null) no limit is sent and Znuny's cut-off applies.
+    */
+
     'http' => [
         'retries' => 3,
         'retry_delay' => 100,
         'batch_size' => 50,
+        'search_limit' => env('ZNUNY_SEARCH_LIMIT'),
     ],
 
     /*

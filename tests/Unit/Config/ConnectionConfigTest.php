@@ -36,6 +36,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(3, $config->retries);
         $this->assertSame(100, $config->retryDelay);
         $this->assertSame(50, $config->batchSize);
+        $this->assertNull($config->searchLimit);
         $this->assertSame('UTC', $config->timezone);
         $this->assertTrue($config->usesSession());
         $this->assertSame('UserLogin', $config->loginKey());
@@ -48,6 +49,47 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(1, $config->retries);
         $this->assertSame(250, $config->retryDelay);
         $this->assertSame(10, $config->batchSize);
+    }
+
+    public function test_the_search_limit_comes_from_the_connection_then_the_http_config(): void
+    {
+        $this->assertSame(200, $this->make(['search_limit' => '200'], ['search_limit' => 5000])->searchLimit);
+        $this->assertSame(5000, $this->make([], ['search_limit' => 5000])->searchLimit);
+        $this->assertSame(5000, $this->make([], ['search_limit' => ' 5000 '])->searchLimit);
+    }
+
+    public function test_the_search_limit_is_off_unless_set(): void
+    {
+        // Off: no limit is sent and Znuny cuts the result off at its own SearchLimit.
+        $this->assertNull($this->make()->searchLimit);
+        $this->assertNull($this->make(['search_limit' => null], ['search_limit' => 5000])->searchLimit);
+        $this->assertNull($this->make([], ['search_limit' => null])->searchLimit);
+        $this->assertNull($this->make(['search_limit' => ''])->searchLimit);
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function invalidSearchLimits(): array
+    {
+        return [
+            'zero' => [0],
+            'negative' => [-5],
+            'word' => ['unlimited'],
+            'thousands separator' => ['10.000'],
+            'false' => [false],
+            'too large for Znuny' => [PHP_INT_MAX],
+            'list' => [[500]],
+        ];
+    }
+
+    #[DataProvider('invalidSearchLimits')]
+    public function test_other_search_limits_are_rejected(mixed $value): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [default] has invalid [search_limit] value');
+
+        $this->make(['search_limit' => $value]);
     }
 
     public function test_enum_values_are_normalised(): void
@@ -63,7 +105,53 @@ final class ConnectionConfigTest extends TestCase
     {
         $this->assertFalse($this->make(['verify_ssl' => 'false'])->verifySsl);
         $this->assertFalse($this->make(['verify_ssl' => false])->verifySsl);
+        $this->assertFalse($this->make(['verify_ssl' => '0'])->verifySsl);
+        $this->assertFalse($this->make(['verify_ssl' => 'off'])->verifySsl);
         $this->assertTrue($this->make(['verify_ssl' => '1'])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => 'true'])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => true])->verifySsl);
+    }
+
+    public function test_a_blank_verify_ssl_value_keeps_verification_on(): void
+    {
+        // An empty environment variable must not switch certificate verification off.
+        $this->assertTrue($this->make(['verify_ssl' => ''])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => ' '])->verifySsl);
+        $this->assertTrue($this->make(['verify_ssl' => null])->verifySsl);
+    }
+
+    public function test_verify_ssl_accepts_the_path_of_a_ca_bundle(): void
+    {
+        $bundle = (string) tempnam(sys_get_temp_dir(), 'znuny-ca-');
+
+        try {
+            $this->assertSame($bundle, $this->make(['verify_ssl' => $bundle])->verifySsl);
+            $this->assertSame(sys_get_temp_dir(), $this->make(['verify_ssl' => sys_get_temp_dir()])->verifySsl);
+        } finally {
+            unlink($bundle);
+        }
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function invalidVerifySslValues(): array
+    {
+        return [
+            'typo' => ['treu'],
+            'missing file' => ['/no/such/ca-bundle.pem'],
+            'number' => [2],
+            'list' => [['a']],
+        ];
+    }
+
+    #[DataProvider('invalidVerifySslValues')]
+    public function test_other_verify_ssl_values_are_rejected_instead_of_disabling_verification(mixed $value): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [default] has invalid [verify_ssl] value');
+
+        $this->make(['verify_ssl' => $value]);
     }
 
     #[DataProvider('missingKeys')]
@@ -182,6 +270,8 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame('UTC', $config['timezone']);
         $this->assertArrayNotHasKey('timezone', $config['connections']['default']);
         $this->assertSame(50, $config['http']['batch_size']);
+        $this->assertNull($config['http']['search_limit']);
+        $this->assertTrue($config['session']['per_host']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);
         $this->assertArrayNotHasKey('services', $config['cache']['ttl']);

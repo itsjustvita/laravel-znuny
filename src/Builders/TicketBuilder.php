@@ -9,11 +9,15 @@ use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 
 class TicketBuilder
 {
+    /** Znuny's default for GenericInterface::Operation::TicketSearch###SearchLimit. */
+    private const ZNUNY_SEARCH_LIMIT = 500;
+
     /** @var array<string, mixed> */
     protected array $params = [];
 
@@ -177,12 +181,49 @@ class TicketBuilder
         return $this;
     }
 
-    /** @return Collection<int, string> */
+    /**
+     * The IDs of the matching tickets. Znuny cuts a search without a limit off at its SearchLimit
+     * (500 by default) and does not say so. With a search_limit on the connection, a search
+     * without limit() is complete or fails.
+     *
+     * @return Collection<int, string>
+     *
+     * @throws ZnunySearchLimitExceededException when more tickets match than the connection's search_limit
+     */
     public function ids(): Collection
     {
-        $ids = $this->client->call('TicketSearch', $this->params)['TicketID'] ?? [];
+        $params = $this->params;
+        // Znuny treats 0 and '' like a missing limit.
+        $limited = ! empty($params['Limit']);
+        $searchLimit = $limited ? null : $this->client->settings()->searchLimit;
 
-        return collect(array_map('strval', (array) $ids))->values();
+        if ($searchLimit !== null) {
+            // One more than allowed shows whether Znuny has more tickets than are returned.
+            $params['Limit'] = $searchLimit + 1;
+        }
+
+        $ids = array_map('strval', (array) ($this->client->call('TicketSearch', $params)['TicketID'] ?? []));
+
+        if (! $limited && $searchLimit === null && count($ids) === self::ZNUNY_SEARCH_LIMIT) {
+            $this->client->warn(sprintf(
+                'TicketSearch returned exactly %d tickets, which is where Znuny cuts a search off by default. '
+                .'Set "search_limit" (ZNUNY_SEARCH_LIMIT) to get an exception instead of a partial result, or call limit().',
+                self::ZNUNY_SEARCH_LIMIT,
+            ));
+        }
+
+        if ($searchLimit !== null && count($ids) > $searchLimit) {
+            throw (new ZnunySearchLimitExceededException(sprintf(
+                'The search matches more than %d tickets. Narrow it down, call limit() to accept only the first tickets, '
+                .'or raise the "search_limit" of the connection.',
+                $searchLimit,
+            )))
+                ->setOperation('TicketSearch')
+                ->setConnection($this->client->connection())
+                ->setRequestPayload($params);
+        }
+
+        return collect($ids)->values();
     }
 
     /** @return Collection<int, Ticket> */

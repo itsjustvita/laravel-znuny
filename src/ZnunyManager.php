@@ -210,12 +210,20 @@ class ZnunyManager
     {
         $store = $this->app['config']->get('znuny.session.cache_store');
         $cache = $store ? Cache::store($store) : Cache::store();
+        $prefix = (string) $this->app['config']->get('znuny.session.cache_prefix', 'znuny:session:');
+
+        // Znuny binds a session to the IP address that created it (SessionCheckRemoteIP). Hosts
+        // that share a cache store but reach Znuny from different addresses would invalidate
+        // each other's session with every request, so each host keeps its own. Only an
+        // explicit "false", "off", "no" or 0 switches that off.
+        $perHost = $this->app['config']->get('znuny.session.per_host');
+
+        if ($perHost === null || $perHost === '' || (filter_var($perHost, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true)) {
+            $prefix .= substr(hash('sha256', (string) gethostname()), 0, 12).':';
+        }
 
         return new SessionManager(
-            store: new SessionStore(
-                $cache,
-                (string) $this->app['config']->get('znuny.session.cache_prefix', 'znuny:session:'),
-            ),
+            store: new SessionStore($cache, $prefix),
             ttl: (int) $this->app['config']->get('znuny.session.ttl', 21600),
         );
     }

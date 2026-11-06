@@ -5,7 +5,6 @@ namespace ItsJustVita\LaravelZnuny\Tests\Integration;
 use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Builders\TicketCreateBuilder;
@@ -21,6 +20,7 @@ use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRouteNotFoundException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -169,7 +169,6 @@ final class ZnunyIntegrationTest extends TestCase
         $articleId = $znuny->tickets()->addArticle($ticket->id, [
             'subject' => 'Note',
             'body' => 'Internal note',
-            'contentType' => 'text/plain; charset=utf8',
             'communicationChannel' => 'Internal',
             'senderType' => 'agent',
             'isVisibleForCustomer' => false,
@@ -177,6 +176,8 @@ final class ZnunyIntegrationTest extends TestCase
 
         $this->assertNotNull($articleId);
         $note = $znuny->tickets()->find($ticket->id, withAttachments: true)->articles->firstWhere('id', $articleId);
+        // Znuny rejects articles without a content type; the package sends plain text by default.
+        $this->assertStringStartsWith('text/plain', (string) $note?->contentType);
         $this->assertSame("a,b\n1,2\n", $note?->attachments->firstWhere('filename', 'note.csv')?->content);
         $this->assertSame('open', $znuny->tickets()->find($ticket->id)->state);
         $this->assertContains('StateUpdate', $znuny->tickets()->history($ticket->id)->pluck('historyType')->all());
@@ -303,9 +304,35 @@ final class ZnunyIntegrationTest extends TestCase
     public function test_find_many_skips_unknown_ids(): void
     {
         $znuny = $this->znuny();
-        $ticket = $this->createTicket($znuny, 'Skip '.uniqid());
+        $a = $this->createTicket($znuny, 'Skip A '.uniqid());
+        $b = $this->createTicket($znuny, 'Skip B '.uniqid());
+        $c = $this->createTicket($znuny, 'Skip C '.uniqid());
 
-        $this->assertSame([$ticket->id], $znuny->tickets()->findMany([$ticket->id, '999999999'])->pluck('id')->all());
+        // Znuny rejects the whole batch; the package halves it until the unknown ticket is isolated.
+        $this->assertSame(
+            [$a->id, $b->id, $c->id],
+            $znuny->tickets()->findMany([$a->id, $b->id, '999999999', $c->id])->pluck('id')->all(),
+        );
+    }
+
+    public function test_a_search_is_complete_or_fails(): void
+    {
+        $title = 'Search limit '.uniqid();
+        $tickets = [];
+
+        foreach (range(1, 3) as $number) {
+            $tickets[] = $this->createTicket($this->znuny(), $title)->id;
+        }
+
+        $search = fn (?int $searchLimit) => $this->znuny(['search_limit' => $searchLimit])->tickets()->where('Title', $title);
+
+        $this->assertEqualsCanonicalizing($tickets, $search(3)->ids()->all());
+        $this->assertEqualsCanonicalizing($tickets, $search(null)->ids()->all());
+        $this->assertCount(2, $search(2)->limit(2)->ids());
+
+        $this->expectException(ZnunySearchLimitExceededException::class);
+
+        $search(2)->ids();
     }
 
     public function test_an_unknown_ticket_is_access_denied_or_not_found(): void
@@ -339,10 +366,12 @@ final class ZnunyIntegrationTest extends TestCase
      */
     private function endSession(ZnunyManager $znuny): void
     {
-        $sessionId = Cache::get('znuny:session:'.$znuny->client()->identityKey());
-        $this->assertIsString($sessionId);
-
-        $znuny->call('SessionDelete', ['SessionID' => $sessionId]);
+        // Znuny up to 6.5.11 and 7.1 authenticates SessionRemove with credentials, newer versions do not.
+        $znuny->call('SessionDelete', [
+            'SessionID' => $znuny->client()->sessionId(),
+            'UserLogin' => getenv('ZNUNY_INTEGRATION_USERNAME'),
+            'Password' => getenv('ZNUNY_INTEGRATION_PASSWORD'),
+        ]);
     }
 
     public function test_customer_users_create_tickets_and_find_their_own(): void

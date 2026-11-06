@@ -28,12 +28,14 @@ class CustomerResource extends Resource
         return Customer::fromZnunyResponse($response['CustomerUser'][0]);
     }
 
-    /** @return Collection<int, Ticket> */
-    public function tickets(string $customerId): Collection
+    /**
+     * @param  int|null  $limit  load only the first tickets instead of all
+     * @return Collection<int, Ticket>
+     */
+    public function tickets(string $customerId, ?int $limit = null): Collection
     {
-        return (new TicketResource($this->client))
-            ->query()
-            ->whereCustomerId($customerId)
-            ->get();
+        $query = (new TicketResource($this->client))->query()->whereCustomerId($customerId);
+
+        return ($limit === null ? $query : $query->limit($limit))->get();
     }
 }

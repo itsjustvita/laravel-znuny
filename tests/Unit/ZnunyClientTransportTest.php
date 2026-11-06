@@ -21,6 +21,7 @@ use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
+use ReflectionMethod;
 
 final class ZnunyClientTransportTest extends TestCase
 {
@@ -38,6 +39,24 @@ final class ZnunyClientTransportTest extends TestCase
             ], $config),
             sessionManager: new SessionManager(new SessionStore(Cache::store('array'), 'znuny:session:'), ttl: 60),
         );
+    }
+
+    public function test_certificate_verification_follows_the_setting(): void
+    {
+        $verify = fn (array $config): mixed => (new ReflectionMethod(ZnunyClient::class, 'httpClient'))
+            ->invoke($this->client($config))
+            ->getOptions()['verify'] ?? true;
+
+        $bundle = (string) tempnam(sys_get_temp_dir(), 'znuny-ca-');
+
+        try {
+            $this->assertTrue($verify([]));
+            $this->assertTrue($verify(['verify_ssl' => '']));
+            $this->assertFalse($verify(['verify_ssl' => false]));
+            $this->assertSame($bundle, $verify(['verify_ssl' => $bundle]));
+        } finally {
+            unlink($bundle);
+        }
     }
 
     public function test_stock_routes_create_a_session_and_send_get_requests_with_auth_headers(): void

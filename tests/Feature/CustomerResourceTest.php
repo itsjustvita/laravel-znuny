@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Data\Customer;
 use ItsJustVita\LaravelZnuny\Exceptions\CustomerNotFoundException;
@@ -63,5 +64,10 @@ final class CustomerResourceTest extends TestCase
 
         $this->assertCount(1, $tickets);
         $this->assertSame('5', $tickets->first()->id);
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && ! isset($r['Limit']));
+
+        Znuny::customers()->tickets('12345', limit: 25);
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && ($r['Limit'] ?? null) === 25);
     }
 }

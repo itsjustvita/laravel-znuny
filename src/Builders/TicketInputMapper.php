@@ -68,12 +68,21 @@ class TicketInputMapper
     }
 
     /**
+     * Articles are plain text unless a content type is given: Znuny rejects articles
+     * without ContentType (or MimeType and Charset).
+     *
      * @param  array<string, mixed>  $input
      * @return array<string, mixed>
      */
     public static function mapArticle(array $input): array
     {
-        return self::map($input, self::ARTICLE_KEYS);
+        $article = self::map($input, self::ARTICLE_KEYS);
+
+        if (! isset($article['ContentType']) && ! isset($article['MimeType'])) {
+            $article['ContentType'] = 'text/plain; charset=utf8';
+        }
+
+        return $article;
     }
 
     /**
