@@ -26,6 +26,22 @@ final class HistoryEntryTest extends TestCase
         $this->assertSame('4', $entry->attribute('StateID'));
     }
 
+    public function test_the_create_time_is_read_in_the_znuny_time_zone(): void
+    {
+        date_default_timezone_set('Asia/Tokyo');
+
+        try {
+            $utc = HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'CreateTime' => '2026-07-01 08:00:00']);
+            $berlin = HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'CreateTime' => '2026-07-01 08:00:00'], 'Europe/Berlin');
+        } finally {
+            date_default_timezone_set('UTC');
+        }
+
+        $this->assertSame(strtotime('2026-07-01 08:00:00 UTC'), $utc->createTime->getTimestamp());
+        $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $berlin->createTime->getTimestamp());
+        $this->assertSame('2026-07-01 08:00:00', $berlin->toArray()['CreateTime']);
+    }
+
     public function test_article_id_zero_means_no_article(): void
     {
         $this->assertNull(HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'ArticleID' => '0'])->articleId);

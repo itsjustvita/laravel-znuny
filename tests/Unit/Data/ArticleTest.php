@@ -31,6 +31,14 @@ final class ArticleTest extends TestCase
         $this->assertInstanceOf(Carbon::class, $article->created);
     }
 
+    public function test_the_create_time_is_read_in_the_given_znuny_time_zone(): void
+    {
+        $article = Article::fromZnunyResponse(['ArticleID' => '5', 'CreateTime' => '2026-07-01 08:00:00'], 'Europe/Berlin');
+
+        $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $article->created->getTimestamp());
+        $this->assertSame('2026-07-01 08:00:00', $article->toArray()['CreateTime']);
+    }
+
     public function test_it_serializes_to_array(): void
     {
         $article = new Article(

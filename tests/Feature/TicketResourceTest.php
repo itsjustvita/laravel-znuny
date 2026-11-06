@@ -297,6 +297,25 @@ final class TicketResourceTest extends TestCase
         Event::assertDispatched(ZnunyArticleAdded::class, fn (ZnunyArticleAdded $e) => $e->articleId === '900');
     }
 
+    public function test_dates_are_read_in_the_time_zone_of_the_connection(): void
+    {
+        config(['znuny.connections.default.timezone' => 'Europe/Berlin']);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketGet*' => Http::response(['Ticket' => [['TicketID' => '42', 'Created' => '2026-07-01 08:00:00']]]),
+            '*TicketHistoryGet' => Http::response(['TicketHistory' => [['TicketID' => '42', 'History' => [
+                ['HistoryType' => 'NewTicket', 'Name' => 'New Ticket [42] created.', 'CreateTime' => '2026-07-01 08:00:00'],
+            ]]]]),
+        ]);
+
+        $expected = strtotime('2026-07-01 06:00:00 UTC');
+
+        $this->assertSame($expected, Znuny::tickets()->find('42')->created->getTimestamp());
+        $this->assertSame($expected, Znuny::tickets()->findMany(['42'])->first()->created->getTimestamp());
+        $this->assertSame($expected, Znuny::tickets()->history('42')->first()->createTime->getTimestamp());
+    }
+
     public function test_history_returns_entries(): void
     {
         Http::fake([

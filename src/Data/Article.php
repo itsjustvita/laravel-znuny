@@ -31,7 +31,10 @@ final readonly class Article
         public array $attributes = [],
     ) {}
 
-    public static function fromZnunyResponse(array $data): self
+    /**
+     * @param  string  $timezone  Znuny's OTRSTimeZone, in which it returns dates
+     */
+    public static function fromZnunyResponse(array $data, string $timezone = 'UTC'): self
     {
         $attachments = collect(is_array($data['Attachment'] ?? null) ? $data['Attachment'] : [])
             ->filter(fn (mixed $row): bool => is_array($row))
@@ -46,7 +49,7 @@ final readonly class Article
             communicationChannel: $data['CommunicationChannel'] ?? null,
             senderType: $data['SenderType'] ?? null,
             from: $data['From'] ?? null,
-            created: isset($data['CreateTime']) ? Carbon::parse($data['CreateTime']) : null,
+            created: self::optionalDate($data['CreateTime'] ?? null, $timezone),
             to: self::optionalString($data['To'] ?? null),
             cc: self::optionalString($data['Cc'] ?? null),
             bcc: self::optionalString($data['Bcc'] ?? null),

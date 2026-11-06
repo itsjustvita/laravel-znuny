@@ -41,6 +41,42 @@ final class TicketTest extends TestCase
         $this->assertSame('2026-04-08 10:00:00', $ticket->created->format('Y-m-d H:i:s'));
     }
 
+    public function test_dates_are_read_in_the_znuny_time_zone_not_the_app_time_zone(): void
+    {
+        $payload = [
+            'TicketID' => '1',
+            'Created' => '2026-07-01 08:00:00',
+            'Changed' => '2026-07-01 09:30:00',
+            'Article' => [['ArticleID' => '5', 'CreateTime' => '2026-07-01 08:00:05']],
+        ];
+
+        date_default_timezone_set('Asia/Tokyo');
+
+        try {
+            $utc = Ticket::fromZnunyResponse($payload);
+            $berlin = Ticket::fromZnunyResponse($payload, 'Europe/Berlin');
+        } finally {
+            date_default_timezone_set('UTC');
+        }
+
+        $this->assertSame(strtotime('2026-07-01 08:00:00 UTC'), $utc->created->getTimestamp());
+        $this->assertSame(strtotime('2026-07-01 09:30:00 UTC'), $utc->changed->getTimestamp());
+        $this->assertSame(strtotime('2026-07-01 08:00:05 UTC'), $utc->articles->first()->created->getTimestamp());
+        $this->assertSame('2026-07-01 08:00:00', $utc->toArray()['Created']);
+
+        $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $berlin->created->getTimestamp());
+        $this->assertSame(strtotime('2026-07-01 06:00:05 UTC'), $berlin->articles->first()->created->getTimestamp());
+        $this->assertSame('2026-07-01 08:00:00', $berlin->toArray()['Created']);
+    }
+
+    public function test_empty_dates_are_null(): void
+    {
+        $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'Created' => '', 'Changed' => '']);
+
+        $this->assertNull($ticket->created);
+        $this->assertNull($ticket->changed);
+    }
+
     public function test_it_handles_minimal_payload(): void
     {
         $ticket = Ticket::fromZnunyResponse([

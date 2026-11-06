@@ -42,7 +42,7 @@ class TicketResource extends Resource
                 ->setRequestPayload($payload);
         }
 
-        return Ticket::fromZnunyResponse($data);
+        return Ticket::fromZnunyResponse($data, $this->client->settings()->timezone);
     }
 
     /**
@@ -145,7 +145,7 @@ class TicketResource extends Resource
 
         return collect(is_array($entries) ? $entries : [])
             ->filter(fn (mixed $entry): bool => is_array($entry))
-            ->map(fn (array $entry): HistoryEntry => HistoryEntry::fromZnunyResponse($entry))
+            ->map(fn (array $entry): HistoryEntry => HistoryEntry::fromZnunyResponse($entry, $this->client->settings()->timezone))
             ->values();
     }
 
@@ -222,7 +222,7 @@ class TicketResource extends Resource
 
         foreach (is_array($rows) ? $rows : [] as $row) {
             if (is_array($row) && isset($row['TicketID'])) {
-                $tickets[] = Ticket::fromZnunyResponse($row);
+                $tickets[] = Ticket::fromZnunyResponse($row, $this->client->settings()->timezone);
             }
         }
 

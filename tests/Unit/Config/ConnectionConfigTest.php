@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Config;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
@@ -34,6 +36,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(3, $config->retries);
         $this->assertSame(100, $config->retryDelay);
         $this->assertSame(50, $config->batchSize);
+        $this->assertSame('UTC', $config->timezone);
         $this->assertTrue($config->usesSession());
         $this->assertSame('UserLogin', $config->loginKey());
     }
@@ -85,11 +88,99 @@ final class ConnectionConfigTest extends TestCase
         $this->make(['auth' => 'oauth']);
     }
 
+    public function test_the_time_zone_must_be_valid(): void
+    {
+        $this->assertSame('Europe/Berlin', $this->make(['timezone' => 'Europe/Berlin'])->timezone);
+
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [default] has invalid [timezone] value [Mars/Olympus].');
+
+        $this->make(['timezone' => 'Mars/Olympus']);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function timeZonesWithoutDaylightSavingRules(): array
+    {
+        return [
+            'abbreviation' => ['CEST'],
+            'offset' => ['+02:00'],
+            'GMT offset' => ['GMT+2'],
+        ];
+    }
+
+    #[DataProvider('timeZonesWithoutDaylightSavingRules')]
+    public function test_abbreviations_and_offsets_are_not_accepted_as_time_zone(string $timezone): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage("Znuny connection [default] has invalid [timezone] value [{$timezone}]. Use the IANA name of Znuny's OTRSTimeZone");
+
+        $this->make(['timezone' => $timezone]);
+    }
+
+    public function test_the_global_time_zone_is_used_unless_the_connection_sets_one(): void
+    {
+        $config = ['base_url' => 'https://znuny.test/ws', 'username' => 'agent', 'password' => 'secret'];
+
+        $this->assertSame('Europe/Berlin', ConnectionConfig::fromArray('default', $config, [], 'Europe/Berlin')->timezone);
+        $this->assertSame('Asia/Tokyo', ConnectionConfig::fromArray('default', $config + ['timezone' => 'Asia/Tokyo'], [], 'Europe/Berlin')->timezone);
+        $this->assertSame('UTC', ConnectionConfig::fromArray('default', $config)->timezone);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string, 2: int, 3: int}> name, zone used, winter and summer offset in hours
+     */
+    public static function legacyZoneNames(): array
+    {
+        return [
+            'CET' => ['CET', 'Europe/Brussels', 1, 2],
+            'MET' => ['MET', 'Europe/Brussels', 1, 2],
+            'EET' => ['EET', 'Europe/Athens', 2, 3],
+            'WET' => ['WET', 'Europe/Lisbon', 0, 1],
+            'EST' => ['EST', 'America/Panama', -5, -5],
+            'MST' => ['MST', 'America/Phoenix', -7, -7],
+            'HST' => ['HST', 'Pacific/Honolulu', -10, -10],
+        ];
+    }
+
+    /**
+     * Znuny offers these names for OTRSTimeZone, but PHP reads them as fixed offsets without daylight saving time.
+     */
+    #[DataProvider('legacyZoneNames')]
+    public function test_legacy_zone_names_znuny_offers_are_mapped_to_their_region(string $name, string $zone, int $winter, int $summer): void
+    {
+        $timezone = new DateTimeZone($this->make(['timezone' => $name])->timezone);
+
+        $this->assertSame($zone, $timezone->getName());
+        $this->assertSame($winter * 3600, $timezone->getOffset(new DateTimeImmutable('2026-01-15 12:00:00 UTC')));
+        $this->assertSame($summer * 3600, $timezone->getOffset(new DateTimeImmutable('2026-07-15 12:00:00 UTC')));
+    }
+
+    public function test_a_blank_connection_time_zone_falls_back_to_the_global_one(): void
+    {
+        $config = ['base_url' => 'https://znuny.test/ws', 'username' => 'agent', 'password' => 'secret'];
+
+        $this->assertSame('Europe/Berlin', ConnectionConfig::fromArray('default', $config + ['timezone' => ''], [], 'Europe/Berlin')->timezone);
+        $this->assertSame('Europe/Berlin', ConnectionConfig::fromArray('default', $config + ['timezone' => ' '], [], 'Europe/Berlin')->timezone);
+        $this->assertSame('Europe/Berlin', ConnectionConfig::fromArray('default', $config + ['timezone' => null], [], 'Europe/Berlin')->timezone);
+    }
+
+    public function test_iana_time_zone_names_are_accepted(): void
+    {
+        $this->assertSame('America/Argentina/Buenos_Aires', $this->make(['timezone' => ' America/Argentina/Buenos_Aires '])->timezone);
+        $this->assertSame('Etc/GMT-2', $this->make(['timezone' => 'Etc/GMT-2'])->timezone);
+        $this->assertSame('UTC', $this->make(['timezone' => ''])->timezone);
+        $this->assertSame('UTC', $this->make(['timezone' => null])->timezone);
+    }
+
     public function test_published_config_file_defaults(): void
     {
         $config = require __DIR__.'/../../../config/znuny.php';
 
         $this->assertSame('generic-ticket-connector', $config['connections']['default']['routes']);
+        $this->assertSame('UTC', $config['timezone']);
+        $this->assertArrayNotHasKey('timezone', $config['connections']['default']);
         $this->assertSame(50, $config['http']['batch_size']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);

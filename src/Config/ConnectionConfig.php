@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Config;
 
+use DateTimeZone;
+use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 
@@ -21,6 +23,20 @@ final readonly class ConnectionConfig
 
     public const TRANSPORT_HEADERS = 'headers';
 
+    /**
+     * Zone names Znuny offers for OTRSTimeZone that PHP reads as fixed offsets without
+     * daylight saving time, mapped to the regions the time zone database links them to.
+     */
+    private const LEGACY_TIMEZONES = [
+        'CET' => 'Europe/Brussels',
+        'MET' => 'Europe/Brussels',
+        'EET' => 'Europe/Athens',
+        'WET' => 'Europe/Lisbon',
+        'EST' => 'America/Panama',
+        'MST' => 'America/Phoenix',
+        'HST' => 'Pacific/Honolulu',
+    ];
+
     public function __construct(
         public string $name,
         public string $baseUrl,
@@ -36,13 +52,15 @@ final readonly class ConnectionConfig
         public int $retries,
         public int $retryDelay,
         public int $batchSize,
+        public string $timezone = 'UTC',
     ) {}
 
     /**
      * @param  array<string, mixed>  $config  one entry of znuny.connections (or a runtime config)
      * @param  array<string, mixed>  $http  the global znuny.http config used as fallback
+     * @param  string|null  $timezone  the global znuny.timezone used as fallback
      */
-    public static function fromArray(string $name, array $config, array $http = []): self
+    public static function fromArray(string $name, array $config, array $http = [], ?string $timezone = null): self
     {
         $required = [
             'base_url' => trim((string) ($config['base_url'] ?? '')),
@@ -71,6 +89,7 @@ final readonly class ConnectionConfig
             retries: max(0, (int) ($config['retries'] ?? $http['retries'] ?? 3)),
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
+            timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
         );
     }
 
@@ -98,6 +117,44 @@ final readonly class ConnectionConfig
     public function loginKey(): string
     {
         return $this->userType === self::USER_CUSTOMER ? 'CustomerUserLogin' : 'UserLogin';
+    }
+
+    /**
+     * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns. The
+     * connection's own value wins over the global one; without either it is UTC, Znuny's default.
+     */
+    public static function timezoneFor(string $connection, mixed $own, mixed $global = null): string
+    {
+        $value = 'UTC';
+
+        foreach ([$own, $global] as $candidate) {
+            $candidate = trim((string) ($candidate ?? ''));
+
+            if ($candidate !== '') {
+                $value = $candidate;
+
+                break;
+            }
+        }
+
+        $value = self::LEGACY_TIMEZONES[strtoupper($value)] ?? $value;
+
+        try {
+            // Abbreviations (CEST) and offsets (+02:00) have no location and ignore daylight saving time.
+            $valid = (new DateTimeZone($value))->getLocation() !== false;
+        } catch (Exception) {
+            $valid = false;
+        }
+
+        if (! $valid) {
+            throw new ZnunyConfigurationException(sprintf(
+                "Znuny connection [%s] has invalid [timezone] value [%s]. Use the IANA name of Znuny's OTRSTimeZone, e.g. UTC or Europe/Berlin; abbreviations and offsets are not supported.",
+                $connection,
+                $value,
+            ));
+        }
+
+        return $value;
     }
 
     /**

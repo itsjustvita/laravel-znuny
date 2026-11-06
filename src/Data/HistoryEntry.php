@@ -18,15 +18,17 @@ final readonly class HistoryEntry
         public array $attributes = [],
     ) {}
 
-    public static function fromZnunyResponse(array $data): self
+    /**
+     * @param  string  $timezone  Znuny's OTRSTimeZone, in which it returns dates
+     */
+    public static function fromZnunyResponse(array $data, string $timezone = 'UTC'): self
     {
         $articleId = self::optionalString($data['ArticleID'] ?? null);
-        $createTime = self::optionalString($data['CreateTime'] ?? null);
 
         return new self(
             historyType: (string) ($data['HistoryType'] ?? ''),
             name: (string) ($data['Name'] ?? ''),
-            createTime: $createTime !== null ? Carbon::parse($createTime) : null,
+            createTime: self::optionalDate($data['CreateTime'] ?? null, $timezone),
             createBy: self::optionalString($data['CreateBy'] ?? null),
             articleId: $articleId === '0' ? null : $articleId,
             attributes: $data,

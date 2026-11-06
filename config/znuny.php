@@ -27,7 +27,8 @@ return [
     | auth_transport  "auto" (X-OTRS-Header-* headers for GET routes, request data
     |                 otherwise), "payload" or "headers" (headers need Znuny 6.5+).
     |
-    | Optional per connection: retries, retry_delay, batch_size (see "http").
+    | Optional per connection: retries, retry_delay, batch_size (see "http") and
+    | timezone (see "timezone").
     |
     */
 
@@ -45,6 +46,14 @@ return [
             'connect_timeout' => env('ZNUNY_CONNECT_TIMEOUT', 3),
         ],
     ],
+
+    /*
+    | Znuny's OTRSTimeZone (System Configuration), "UTC" unless an administrator changed
+    | it. Search dates are sent and returned dates are read in this time zone, whatever
+    | the time zone of your app is. A connection can override it with its own "timezone".
+    */
+
+    'timezone' => env('ZNUNY_TIMEZONE', 'UTC'),
 
     'session' => [
         'cache_store' => env('ZNUNY_CACHE_STORE'),
