@@ -18,6 +18,9 @@ use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 
 class TicketResource extends Resource
 {
+    /** A rejected batch of up to this many tickets is fetched ticket by ticket. */
+    private const SINGLE_FETCH_THRESHOLD = 8;
+
     /**
      * @param  array<string, mixed>  $ticket
      */
@@ -200,7 +203,8 @@ class TicketResource extends Resource
 
     /**
      * Znuny rejects a whole batch with AccessDenied when one ticket is missing or not
-     * accessible, so a rejected batch is halved until the offending tickets are isolated.
+     * accessible. A rejected batch is halved, which isolates a few missing tickets quickly;
+     * small batches are fetched ticket by ticket, which bounds the cost when many are missing.
      *
      * @param  list<string>  $ids
      * @param  array<string, int>  $options
@@ -215,9 +219,12 @@ class TicketResource extends Resource
                 return [];
             }
 
-            $halves = array_chunk($ids, intdiv(count($ids) + 1, 2));
+            $size = count($ids) <= self::SINGLE_FETCH_THRESHOLD ? 1 : intdiv(count($ids) + 1, 2);
 
-            return array_merge($this->fetchChunk($halves[0], $options), $this->fetchChunk($halves[1], $options));
+            return array_merge(...array_map(
+                fn (array $chunk): array => $this->fetchChunk($chunk, $options),
+                array_chunk($ids, $size),
+            ));
         }
 
         $tickets = [];

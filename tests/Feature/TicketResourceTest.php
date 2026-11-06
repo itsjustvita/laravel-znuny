@@ -246,17 +246,59 @@ final class TicketResourceTest extends TestCase
             array_values(array_diff($ids, ['9'])),
             Znuny::tickets()->findMany($ids)->pluck('id')->all(),
         );
+        // A rejected batch is halved; once it has at most eight tickets they are fetched one by one.
         $this->assertSame([
             '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
             '1,2,3,4,5,6,7,8',
             '9,10,11,12,13,14,15,16',
-            '9,10,11,12',
-            '9,10',
-            '9',
-            '10',
-            '11,12',
-            '13,14,15,16',
+            '9', '10', '11', '12', '13', '14', '15', '16',
         ], $ticketGets);
+    }
+
+    public function test_find_many_loses_no_ticket_of_a_rejected_batch_with_an_odd_size(): void
+    {
+        $ticketGets = 0;
+
+        Http::fake(function (Request $request) use (&$ticketGets) {
+            if (str_ends_with($request->url(), '/SessionCreate')) {
+                return Http::response(['SessionID' => 'S1']);
+            }
+
+            $ticketGets++;
+            $ids = explode(',', (string) substr($request->url(), strrpos($request->url(), '/') + 1));
+
+            return in_array('9', $ids, true)
+                ? Http::response(['Error' => ['ErrorCode' => 'TicketGet.AccessDenied', 'ErrorMessage' => 'TicketGet: User does not have access to the ticket!']])
+                : Http::response(['Ticket' => array_map(fn (string $id): array => $this->ticket($id), $ids)]);
+        });
+
+        $ids = array_map('strval', range(1, 35));
+
+        $this->assertSame(
+            array_values(array_diff($ids, ['9'])),
+            Znuny::tickets()->findMany($ids)->pluck('id')->all(),
+        );
+        // 35 → 18 + 17 → 9 + 9 → 5 + 4, then four single requests: far fewer than one per ticket.
+        $this->assertSame(11, $ticketGets);
+    }
+
+    public function test_find_many_stays_cheap_when_every_ticket_is_missing(): void
+    {
+        $ticketGets = 0;
+
+        Http::fake(function (Request $request) use (&$ticketGets) {
+            if (str_ends_with($request->url(), '/SessionCreate')) {
+                return Http::response(['SessionID' => 'S1']);
+            }
+
+            $ticketGets++;
+
+            return Http::response(['Error' => ['ErrorCode' => 'TicketGet.AccessDenied', 'ErrorMessage' => 'TicketGet: User does not have access to the ticket!']]);
+        });
+
+        $this->assertCount(0, Znuny::tickets()->findMany(range(1, 50)));
+        // Halving alone would need 99 requests; one per ticket needed 51.
+        $this->assertSame(65, $ticketGets);
     }
 
     public function test_find_many_without_ids_sends_nothing(): void
