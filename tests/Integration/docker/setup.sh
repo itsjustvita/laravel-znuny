@@ -85,6 +85,9 @@ curl -fsS -X POST -H 'Content-Type: application/json' \
   http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Session \
   | grep -q SessionID || { echo "The API agent cannot log in; see the output above." >&2; exit 1; }
 
+# The zone Znuny really uses: a re-run without ZNUNY_OTRS_TIMEZONE keeps an earlier setting.
+timezone=$(console Admin::Config::Read --setting-name OTRSTimeZone | awk '/^Setting: OTRSTimeZone/ { getline; print; exit }')
+
 cat <<TEXT
 
 Znuny is ready:
@@ -97,6 +100,6 @@ Znuny is ready:
   ZNUNY_INTEGRATION_CUSTOMER_USER=jane
   ZNUNY_INTEGRATION_CUSTOMER_PASSWORD=jane-secret
   ZNUNY_INTEGRATION_WEBHOOK_LISTEN=0.0.0.0:8099
-  ZNUNY_INTEGRATION_TIMEZONE=${ZNUNY_OTRS_TIMEZONE:-UTC}
+  ZNUNY_INTEGRATION_TIMEZONE=${timezone:-UTC}
 
 TEXT

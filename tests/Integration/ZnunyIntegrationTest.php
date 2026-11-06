@@ -3,6 +3,8 @@
 namespace ItsJustVita\LaravelZnuny\Tests\Integration;
 
 use Closure;
+use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -389,7 +391,8 @@ final class ZnunyIntegrationTest extends TestCase
             ->assertSuccessful();
 
         // A time zone that is hours away from Znuny's.
-        $elsewhere = $this->timezone() === 'Asia/Tokyo' ? 'America/New_York' : 'Asia/Tokyo';
+        $offset = (new DateTimeZone($this->timezone()))->getOffset(new DateTimeImmutable);
+        $elsewhere = $offset > 5 * 3600 ? 'America/New_York' : 'Asia/Tokyo';
         config(['znuny.connections.elsewhere' => ['timezone' => $elsewhere] + $live]);
 
         $this->artisan('znuny:test-connection', ['connection' => 'elsewhere'])
