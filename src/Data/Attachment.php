@@ -48,6 +48,9 @@ final readonly class Attachment
         );
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function fromZnunyResponse(array $data): self
     {
         $raw = (string) ($data['Content'] ?? '');
@@ -79,6 +82,9 @@ final readonly class Attachment
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

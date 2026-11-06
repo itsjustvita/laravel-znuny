@@ -17,7 +17,9 @@ class QueueResource extends Resource
         return $this->remember('queues', function () {
             $response = $this->client->call('QueueList');
 
-            return collect($response['Queue'] ?? [])
+            $rows = $response['Queue'] ?? [];
+
+            return collect(is_array($rows) ? $rows : [])
                 ->map(fn (array $row) => Queue::fromZnunyResponse($row))
                 ->values();
         });

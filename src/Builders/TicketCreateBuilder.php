@@ -52,7 +52,7 @@ class TicketCreateBuilder
     }
 
     /**
-     * @param  list<Attachment>  $attachments
+     * @param  array<array-key, Attachment>  $attachments
      */
     public function withAttachments(array $attachments): self
     {

@@ -16,7 +16,9 @@ class PriorityResource extends Resource
         return $this->remember('priorities', function () {
             $response = $this->client->call('PriorityList');
 
-            return collect($response['Priority'] ?? [])
+            $rows = $response['Priority'] ?? [];
+
+            return collect(is_array($rows) ? $rows : [])
                 ->map(fn (array $row) => Priority::fromZnunyResponse($row))
                 ->values();
         });

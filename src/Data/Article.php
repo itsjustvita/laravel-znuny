@@ -33,6 +33,7 @@ final readonly class Article
 
     /**
      * @param  string  $timezone  Znuny's OTRSTimeZone, in which it returns dates
+     * @param  array<string, mixed>  $data
      */
     public static function fromZnunyResponse(array $data, string $timezone = 'UTC'): self
     {
@@ -59,6 +60,9 @@ final readonly class Article
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

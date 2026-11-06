@@ -37,6 +37,10 @@ final readonly class ConnectionConfig
         'HST' => 'Pacific/Honolulu',
     ];
 
+    /**
+     * @param  int<1, max>  $batchSize
+     * @param  int<1, max>|null  $searchLimit
+     */
     public function __construct(
         public string $name,
         public string $baseUrl,
@@ -164,6 +168,8 @@ final readonly class ConnectionConfig
     /**
      * The most tickets a search without limit() may match. Without it (null or blank) no
      * limit is sent and Znuny cuts the result off at its own SearchLimit.
+     *
+     * @return int<1, max>|null
      */
     private static function searchLimit(string $connection, mixed $value): ?int
     {
@@ -184,7 +190,7 @@ final readonly class ConnectionConfig
             ));
         }
 
-        return $limit;
+        return max(1, $limit);
     }
 
     /**

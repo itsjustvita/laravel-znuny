@@ -53,6 +53,7 @@ final readonly class Ticket
      * flat "DynamicField_<Name>" keys; "CustomerUser" as login or customer data hash.
      *
      * @param  string  $timezone  Znuny's OTRSTimeZone, in which it returns dates
+     * @param  array<string, mixed>  $data
      */
     public static function fromZnunyResponse(array $data, string $timezone = 'UTC'): self
     {
@@ -99,6 +100,9 @@ final readonly class Ticket
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [
@@ -133,7 +137,10 @@ final readonly class Ticket
         ];
     }
 
-    /** @return list<array<string, mixed>> */
+    /**
+     * @param  array<string, mixed>  $data
+     * @return list<array<string, mixed>>
+     */
     private static function articleRows(array $data): array
     {
         foreach (['Article', 'Articles'] as $key) {
@@ -149,7 +156,10 @@ final readonly class Ticket
         return is_array($single) && $single !== [] && ! array_is_list($single) ? [$single] : [];
     }
 
-    /** @return list<array{Name: string, Value: mixed}> */
+    /**
+     * @param  array<array-key, mixed>  $data  numeric keys of decoded JSON are integers
+     * @return list<array<mixed>>
+     */
     private static function dynamicFieldRows(array $data): array
     {
         $rows = $data['DynamicField'] ?? null;

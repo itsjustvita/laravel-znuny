@@ -9,6 +9,9 @@ final readonly class HistoryEntry
 {
     use HasAttributes;
 
+    /**
+     * @param  array<string, mixed>  $attributes  raw Znuny fields
+     */
     public function __construct(
         public string $historyType,
         public string $name,
@@ -20,6 +23,7 @@ final readonly class HistoryEntry
 
     /**
      * @param  string  $timezone  Znuny's OTRSTimeZone, in which it returns dates
+     * @param  array<string, mixed>  $data
      */
     public static function fromZnunyResponse(array $data, string $timezone = 'UTC'): self
     {
@@ -35,6 +39,9 @@ final readonly class HistoryEntry
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

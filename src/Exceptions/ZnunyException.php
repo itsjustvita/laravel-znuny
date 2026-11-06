@@ -13,8 +13,14 @@ abstract class ZnunyException extends RuntimeException
 
     protected string $connection = '';
 
+    /**
+     * @var array<string, mixed>
+     */
     protected array $requestPayload = [];
 
+    /**
+     * @var array<array-key, mixed>
+     */
     protected array $responseBody = [];
 
     protected ?int $httpStatus = null;
@@ -55,6 +61,9 @@ abstract class ZnunyException extends RuntimeException
         return $this->connection;
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     public function setRequestPayload(array $payload): static
     {
         $this->requestPayload = Redactor::redact($payload);
@@ -62,11 +71,17 @@ abstract class ZnunyException extends RuntimeException
         return $this;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getRequestPayload(): array
     {
         return $this->requestPayload;
     }
 
+    /**
+     * @param  array<array-key, mixed>  $body
+     */
     public function setResponseBody(array $body): static
     {
         $this->responseBody = Redactor::redact($body);
@@ -74,6 +89,9 @@ abstract class ZnunyException extends RuntimeException
         return $this;
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getResponseBody(): array
     {
         return $this->responseBody;
@@ -91,6 +109,9 @@ abstract class ZnunyException extends RuntimeException
         return $this->httpStatus;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function context(): array
     {
         return [

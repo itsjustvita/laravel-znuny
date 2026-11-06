@@ -18,7 +18,7 @@ final class RouteMap
      * Build the map from a connection's "routes" value: a preset name, or an array of
      * "Operation" => "METHOD /Path/:Param" with an optional "extends" preset.
      *
-     * @param  string|array<string, mixed>|null  $config
+     * @param  string|array<array-key, mixed>|null  $config
      */
     public static function fromConfig(string|array|null $config): self
     {

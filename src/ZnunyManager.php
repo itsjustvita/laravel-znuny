@@ -152,7 +152,7 @@ class ZnunyManager
 
     public function flushAll(): void
     {
-        $connections = array_keys((array) $this->app['config']->get('znuny.connections', []));
+        $connections = array_keys((array) $this->config('znuny.connections', []));
         $manager = $this->buildCacheManager();
 
         foreach ($connections as $name) {
@@ -164,9 +164,14 @@ class ZnunyManager
         }
     }
 
+    protected function config(string $key, mixed $default = null): mixed
+    {
+        return $this->app->make('config')->get($key, $default);
+    }
+
     protected function defaultConnection(): string
     {
-        return (string) $this->app['config']->get('znuny.default', 'default');
+        return (string) $this->config('znuny.default', 'default');
     }
 
     /**
@@ -182,9 +187,12 @@ class ZnunyManager
         ]));
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function configFor(string $name): array
     {
-        $config = $this->app['config']->get("znuny.connections.{$name}");
+        $config = $this->config("znuny.connections.{$name}");
 
         if (! is_array($config)) {
             throw new ZnunyConfigurationException("Znuny connection [{$name}] is not configured.");
@@ -195,28 +203,28 @@ class ZnunyManager
 
     protected function buildCacheManager(): CacheManager
     {
-        $store = $this->app['config']->get('znuny.cache.store');
+        $store = $this->config('znuny.cache.store');
         $cache = $store ? Cache::store($store) : Cache::store();
 
         return new CacheManager(
             cache: $cache,
-            prefix: (string) $this->app['config']->get('znuny.cache.prefix', 'znuny:lookup:'),
-            ttls: (array) $this->app['config']->get('znuny.cache.ttl', []),
-            enabled: (bool) $this->app['config']->get('znuny.cache.enabled', true),
+            prefix: (string) $this->config('znuny.cache.prefix', 'znuny:lookup:'),
+            ttls: (array) $this->config('znuny.cache.ttl', []),
+            enabled: (bool) $this->config('znuny.cache.enabled', true),
         );
     }
 
     protected function buildSessionManager(): SessionManager
     {
-        $store = $this->app['config']->get('znuny.session.cache_store');
+        $store = $this->config('znuny.session.cache_store');
         $cache = $store ? Cache::store($store) : Cache::store();
-        $prefix = (string) $this->app['config']->get('znuny.session.cache_prefix', 'znuny:session:');
+        $prefix = (string) $this->config('znuny.session.cache_prefix', 'znuny:session:');
 
         // Znuny binds a session to the IP address that created it (SessionCheckRemoteIP). Hosts
         // that share a cache store but reach Znuny from different addresses would invalidate
         // each other's session with every request, so each host keeps its own. Only an
         // explicit "false", "off", "no" or 0 switches that off.
-        $perHost = $this->app['config']->get('znuny.session.per_host');
+        $perHost = $this->config('znuny.session.per_host');
 
         if ($perHost === null || $perHost === '' || (filter_var($perHost, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true)) {
             $prefix .= substr(hash('sha256', (string) gethostname()), 0, 12).':';
@@ -224,7 +232,7 @@ class ZnunyManager
 
         return new SessionManager(
             store: new SessionStore($cache, $prefix),
-            ttl: (int) $this->app['config']->get('znuny.session.ttl', 21600),
+            ttl: (int) $this->config('znuny.session.ttl', 21600),
         );
     }
 }

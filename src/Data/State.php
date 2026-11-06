@@ -8,6 +8,9 @@ final readonly class State
 {
     use HasAttributes;
 
+    /**
+     * @param  array<string, mixed>  $attributes  raw Znuny fields
+     */
     public function __construct(
         public string $id,
         public string $name,
@@ -17,6 +20,9 @@ final readonly class State
         public array $attributes = [],
     ) {}
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function fromZnunyResponse(array $data): self
     {
         $validId = (string) ($data['ValidID'] ?? '1');
@@ -31,6 +37,9 @@ final readonly class State
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

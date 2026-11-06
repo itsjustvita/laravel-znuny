@@ -16,7 +16,9 @@ class StateResource extends Resource
         return $this->remember('states', function () {
             $response = $this->client->call('StateList');
 
-            return collect($response['State'] ?? [])
+            $rows = $response['State'] ?? [];
+
+            return collect(is_array($rows) ? $rows : [])
                 ->map(fn (array $row) => State::fromZnunyResponse($row))
                 ->values();
         });

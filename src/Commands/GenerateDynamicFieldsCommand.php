@@ -22,10 +22,18 @@ class GenerateDynamicFieldsCommand extends Command
             return self::SUCCESS;
         }
 
-        $target = (string) ($this->option('output') ?? app_path('Znuny/DynamicFields.php'));
+        $output = $this->option('output');
+        $target = is_string($output) && $output !== '' ? $output : app_path('Znuny/DynamicFields.php');
         @mkdir(dirname($target), 0777, true);
 
         $stub = file_get_contents(__DIR__.'/../../stubs/DynamicFields.stub');
+
+        if ($stub === false) {
+            $this->error('The stub for the DynamicFields helper could not be read.');
+
+            return self::FAILURE;
+        }
+
         $methods = $this->buildMethods($fields);
 
         $contents = str_replace('{{ methods }}', $methods, $stub);
@@ -37,6 +45,9 @@ class GenerateDynamicFieldsCommand extends Command
         return self::SUCCESS;
     }
 
+    /**
+     * @param  array<string, array<string, mixed>>  $fields
+     */
     private function buildMethods(array $fields): string
     {
         $methods = [];

@@ -20,10 +20,10 @@ class ZnunyServiceProvider extends ServiceProvider
         $this->mergeNestedConfig(['http', 'session']);
 
         // Without a channel definition Laravel would write an emergency entry on every request.
-        $channel = (string) $this->app['config']->get('znuny.logging.channel', 'znuny');
+        $channel = (string) $this->app->make('config')->get('znuny.logging.channel', 'znuny');
 
-        if ($this->app['config']->get("logging.channels.{$channel}") === null) {
-            $this->app['config']->set("logging.channels.{$channel}", [
+        if ($this->app->make('config')->get("logging.channels.{$channel}") === null) {
+            $this->app->make('config')->set("logging.channels.{$channel}", [
                 'driver' => 'daily',
                 'path' => $this->app->storagePath('logs/znuny.log'),
                 'level' => 'debug',
@@ -51,9 +51,9 @@ class ZnunyServiceProvider extends ServiceProvider
         $defaults = require __DIR__.'/../config/znuny.php';
 
         foreach ($blocks as $block) {
-            $this->app['config']->set("znuny.{$block}", array_merge(
+            $this->app->make('config')->set("znuny.{$block}", array_merge(
                 $defaults[$block],
-                (array) $this->app['config']->get("znuny.{$block}", []),
+                (array) $this->app->make('config')->get("znuny.{$block}", []),
             ));
         }
     }
@@ -73,7 +73,7 @@ class ZnunyServiceProvider extends ServiceProvider
             ]);
         }
 
-        $this->app['router']->aliasMiddleware('znuny.webhook', AuthenticateWebhook::class);
+        $this->app->make('router')->aliasMiddleware('znuny.webhook', AuthenticateWebhook::class);
 
         if ((bool) config('znuny.webhooks.enabled', false)) {
             $this->registerWebhookRoutes();

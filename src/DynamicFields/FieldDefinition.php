@@ -4,6 +4,9 @@ namespace ItsJustVita\LaravelZnuny\DynamicFields;
 
 final readonly class FieldDefinition
 {
+    /**
+     * @param  list<mixed>|null  $allowed
+     */
     public function __construct(
         public string $name,
         public string $type,
@@ -12,6 +15,9 @@ final readonly class FieldDefinition
         public int|float|null $max = null,
     ) {}
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function fromArray(string $name, array $data): self
     {
         return new self(
