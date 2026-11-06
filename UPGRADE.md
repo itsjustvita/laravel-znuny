@@ -2,24 +2,33 @@
 
 ## 0.2.0 → 0.2.1
 
-### Time zones
+### Time zones (check before you upgrade)
 
-Znuny reads search dates and returns dates in its `OTRSTimeZone`, which is UTC unless an administrator changed it. 0.2.0 used the app's time zone for both. If your app's time zone is not UTC:
+**If your Znuny's `OTRSTimeZone` is not UTC, set `ZNUNY_TIMEZONE` to it when you upgrade**, for example `ZNUNY_TIMEZONE=Europe/Berlin`. Without it, dates and date filters are off by Znuny's UTC offset. This also applies if 0.2.0 worked for you because your app and Znuny use the same time zone.
 
-- date filters such as `whereChangedAfter(now()->subMinutes(5))` now find the right tickets;
-- `$ticket->created`, `$ticket->changed`, `$article->created` and `$entry->createTime` are Carbon instances in Znuny's time zone. They show the same wall-clock time as before but now point to the correct moment; use `->copy()->setTimezone(config('app.timezone'))` to display them in your app's time zone.
+Znuny reads search dates and returns dates in its `OTRSTimeZone`. 0.2.0 used the time zone of your app instead; 0.2.1 uses the new `timezone` option, which defaults to `UTC` like Znuny does.
 
-If your Znuny's `OTRSTimeZone` is not UTC, set it per connection:
+| Znuny's `OTRSTimeZone` | Time zone of your app | 0.2.0 | 0.2.1 |
+|---|---|---|---|
+| UTC | UTC | correct | correct |
+| UTC | not UTC | wrong | correct |
+| not UTC | same as Znuny | correct | correct once `ZNUNY_TIMEZONE` is set |
+| not UTC | different | wrong | correct once `ZNUNY_TIMEZONE` is set |
 
-```php
-'timezone' => env('ZNUNY_TIMEZONE', 'Europe/Berlin'),
-```
-
-and pass it to `$event->ticket('Europe/Berlin')` for webhook payloads.
+- You find `OTRSTimeZone` in Znuny under Admin → System Configuration. `php artisan znuny:test-connection` now compares your setting with the dates Znuny returns and fails with a hint if they do not match.
+- `ZNUNY_TIMEZONE` also works with a config file that was published before 0.2.1. To set the time zone per connection, add a `timezone` key to the connection.
+- `$ticket->created`, `$ticket->changed`, `$article->created` and `$entry->createTime` are Carbon instances in Znuny's time zone. Use `->copy()->setTimezone(config('app.timezone'))` to display them in your app's time zone.
+- `$event->ticket()` reads the dates of webhook payloads in the configured time zone. If a webhook comes from a Znuny with another time zone, pass it: `$event->ticket('Europe/Berlin')`.
 
 ### `whereChangedBefore()`
 
 `whereChangedBefore($date)` now returns tickets whose last change (`$ticket->changed`) is before `$date`. In 0.2.0 it also returned tickets that were changed after `$date`, as long as they had any older history entry. To get the old behaviour, use `->where('TicketChangeTimeOlderDate', ...)` with a date in Znuny's time zone.
+
+`whereChangedAfter()` still matches tickets with any history entry after the date. For a window on the last change, combine the new `whereLastChangedAfter()` and `whereLastChangedBefore()`.
+
+### `znuny:test-connection`
+
+The command now also fetches the newest ticket with `TicketGet` and checks the time zone. It exits with an error when the web service has no `TicketGet` route or when the time zone setting does not match Znuny's dates.
 
 ## 0.1.x → 0.2.0
 

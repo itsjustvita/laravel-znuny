@@ -53,6 +53,8 @@ ZNUNY_PASSWORD=secret
 php artisan znuny:test-connection
 ```
 
+The command checks the login, the routes and the [time zone](#time-zone) setting.
+
 ## Setting up the web service in Znuny
 
 1. In Znuny open **Admin → Web Services → Add Web Service**.
@@ -81,12 +83,9 @@ Web services that were set up from the older example earlier (they search with `
         'verify_ssl'      => env('ZNUNY_VERIFY_SSL', true),
         'timeout'         => env('ZNUNY_TIMEOUT', 30),
         'connect_timeout' => env('ZNUNY_CONNECT_TIMEOUT', 3),
-        'timezone'        => env('ZNUNY_TIMEZONE', 'UTC'),
     ],
 ],
 ```
-
-`timezone` is Znuny's `OTRSTimeZone` (System Configuration). Znuny reads search dates and returns dates in this time zone, independent of your app's time zone. It is `UTC` unless an administrator changed it.
 
 A connection can also set `retries`, `retry_delay` (milliseconds) and `batch_size`; they default to the values under `http`. Retries repeat reads after timeouts and server errors. Writes such as `TicketCreate` and `TicketUpdate` are only repeated when no connection could be established, so a slow Znuny never receives the same ticket twice.
 
@@ -122,6 +121,16 @@ For `GET` routes the parameters go into the query string the way Znuny parses it
 | `auth_transport` | `auto`: `X-OTRS-Header-*` headers for `GET` routes, request data otherwise. `payload`: always in the request data. `headers`: always as headers. | `auto` |
 
 Headers keep session IDs and passwords out of URLs and access logs. They need Znuny 6.5 or newer; on older versions use `payload`.
+
+### Time zone
+
+```php
+'timezone' => env('ZNUNY_TIMEZONE', 'UTC'),
+```
+
+Znuny reads search dates and returns dates in its `OTRSTimeZone` (Admin → System Configuration), whatever the time zone of your app is. It is `UTC` unless an administrator changed it. If your Znuny uses another time zone, set `ZNUNY_TIMEZONE` to its IANA name, for example `Europe/Berlin`; otherwise dates and date filters are off by Znuny's UTC offset. A connection can override the value with its own `timezone` key.
+
+`php artisan znuny:test-connection` compares the setting with the dates Znuny returns and fails with a hint if they do not match.
 
 ### Multiple and runtime connections
 
@@ -176,6 +185,7 @@ Znuny::tickets()->update('12345', ['state' => 'open'], dynamicFields: ['OrderId'
 $articleId = Znuny::tickets()->addArticle('12345', [
     'subject'              => 'Internal note',
     'body'                 => 'Customer called back.',
+    'contentType'          => 'text/plain; charset=utf8',
     'communicationChannel' => 'Internal',
     'senderType'           => 'agent',
     'isVisibleForCustomer' => false,
@@ -185,7 +195,7 @@ Znuny::tickets()->close('12345');                  // state "closed successful"
 $history = Znuny::tickets()->history('12345');     // Collection<HistoryEntry>
 ```
 
-Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …). Any other key is passed to Znuny unchanged, so `'HistoryComment' => '…'` works too.
+Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …). Any other key is passed to Znuny unchanged, so `'HistoryComment' => '…'` works too. Znuny requires a `contentType` (or `mimeType` and `charset`) for every article.
 
 `Ticket`, `Article` and the other DTOs expose typed properties plus every raw field Znuny returned:
 
@@ -224,7 +234,14 @@ Znuny::tickets()->where('OwnerIDs', [3, 4])->ids();
 Znuny::tickets()->query()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids();
 ```
 
-Date filters accept any `DateTimeInterface` and convert it to the connection's `timezone`; the dates of the returned tickets, articles and history entries are read in it as well. `whereChangedAfter()` matches tickets with any change after the date, including new articles. `whereChangedBefore()` compares the ticket's last change time (`$ticket->changed`).
+Date filters accept any `DateTimeInterface` and convert it to Znuny's [time zone](#time-zone); the dates of the returned tickets, articles and history entries are read in it as well.
+
+| Filter | Compares |
+|---|---|
+| `whereCreatedAfter()`, `whereCreatedBefore()` | the creation time (`$ticket->created`) |
+| `whereLastChangedAfter()`, `whereLastChangedBefore()` | the time of the last change (`$ticket->changed`) |
+| `whereChangedAfter()` | the ticket history: any entry after the date |
+| `whereChangedBefore()` | same as `whereLastChangedBefore()` |
 
 `get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page.
 
@@ -322,7 +339,7 @@ The package can receive Znuny's outgoing events and dispatch them as Laravel eve
    Event::listen(function (ZnunyWebhookReceived $event) {
        if ($event->is('TicketCreate')) {
            $ticket = $event->ticket();   // built from the payload; null if no ticket data was sent
-                                         // dates in UTC; pass Znuny's time zone otherwise: ticket('Europe/Berlin')
+                                         // dates use the configured time zone; for another Znuny: ticket('Europe/Berlin')
            // $event->ticketId, $event->articleId, $event->payload, $event->parameters
        }
    });
@@ -402,7 +419,7 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 
 | Command | Purpose |
 |---|---|
-| `znuny:test-connection [connection]` | Shows the connection settings, logs in and runs a `TicketSearch` to check routing and permissions |
+| `znuny:test-connection [connection]` | Shows the connection settings, logs in, runs a `TicketSearch` and a `TicketGet` to check routing and permissions, and compares the time zone setting with the dates Znuny returns |
 | `znuny:routes [connection]` | Prints the effective route map |
 | `znuny:cache-clear [connection] [--resource=queues] [--all]` | Clears cached lookups |
 | `znuny:generate-fields [--output=path]` | Generates a typed dynamic field helper from the config |
