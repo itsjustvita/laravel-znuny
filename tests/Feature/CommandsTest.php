@@ -2,22 +2,104 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 
 final class CommandsTest extends TestCase
 {
-    public function test_test_connection_command_reports_success(): void
+    /**
+     * Fake a Znuny whose newest ticket was created an hour ago and whose dates use the given UTC offset.
+     */
+    private function fakeZnunyWithOffset(int $offset): void
     {
+        $this->travelTo('2026-07-01 09:00:00');
+
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*TicketSearch' => Http::response(['TicketID' => ['1']]),
+            '*TicketSearch' => Http::response(['TicketID' => ['7']]),
+            '*TicketGet/7' => Http::response(['Ticket' => [[
+                'TicketID' => '7',
+                'Created' => gmdate('Y-m-d H:i:s', now()->getTimestamp() - 3600 + $offset),
+                'Age' => 3600,
+            ]]]),
         ]);
+    }
+
+    public function test_test_connection_command_reports_success(): void
+    {
+        $this->fakeZnunyWithOffset(0);
 
         $this->artisan('znuny:test-connection')
             ->expectsOutputToContain('operation-name')
+            ->expectsOutputToContain('TicketGet')
             ->expectsOutputToContain('Znuny connection [default] OK')
             ->assertExitCode(0);
+
+        Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/TicketSearch') && $request['Limit'] === 1);
+    }
+
+    public function test_test_connection_fails_when_znuny_uses_another_time_zone(): void
+    {
+        $this->fakeZnunyWithOffset(7200);
+
+        $this->artisan('znuny:test-connection')
+            ->expectsOutputToContain('Znuny returns dates in UTC+02:00')
+            ->expectsOutputToContain('ZNUNY_TIMEZONE')
+            ->assertExitCode(1);
+    }
+
+    public function test_test_connection_accepts_the_configured_znuny_time_zone(): void
+    {
+        config()->set('znuny.connections.default.timezone', 'Europe/Berlin');
+        $this->fakeZnunyWithOffset(7200);
+
+        $this->artisan('znuny:test-connection')
+            ->expectsOutputToContain('Europe/Berlin')
+            ->expectsOutputToContain('Znuny connection [default] OK')
+            ->assertExitCode(0);
+    }
+
+    public function test_test_connection_cannot_check_the_time_zone_without_a_readable_ticket(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch' => Http::response(['TicketID' => []]),
+        ]);
+
+        $this->artisan('znuny:test-connection')
+            ->expectsOutputToContain('not verified')
+            ->expectsOutputToContain('Znuny connection [default] OK')
+            ->assertExitCode(0);
+
+        Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'TicketGet'));
+    }
+
+    public function test_test_connection_cannot_check_the_time_zone_without_age_and_creation_time(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch' => Http::response(['TicketID' => ['7']]),
+            '*TicketGet/7' => Http::response(['Ticket' => [['TicketID' => '7', 'Title' => 'Mapped away']]]),
+        ]);
+
+        $this->artisan('znuny:test-connection')
+            ->expectsOutputToContain('not verified')
+            ->expectsOutputToContain('Znuny connection [default] OK')
+            ->assertExitCode(0);
+    }
+
+    public function test_test_connection_reports_a_missing_ticket_get_route(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch' => Http::response(['TicketID' => ['7']]),
+            '*TicketGet/7' => Http::response("HTTP::REST Error while determine Operation for request URI '/TicketGet/7'.", 500),
+        ]);
+
+        $this->artisan('znuny:test-connection')
+            ->expectsOutputToContain('POST /TicketGet/7')
+            ->assertExitCode(1);
     }
 
     public function test_test_connection_command_reports_failure(): void
