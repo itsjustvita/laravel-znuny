@@ -366,7 +366,12 @@ final class ZnunyIntegrationTest extends TestCase
      */
     private function endSession(ZnunyManager $znuny): void
     {
-        $znuny->call('SessionDelete', ['SessionID' => $znuny->client()->sessionId()]);
+        // Znuny up to 6.5.11 and 7.1 authenticates SessionRemove with credentials, newer versions do not.
+        $znuny->call('SessionDelete', [
+            'SessionID' => $znuny->client()->sessionId(),
+            'UserLogin' => getenv('ZNUNY_INTEGRATION_USERNAME'),
+            'Password' => getenv('ZNUNY_INTEGRATION_PASSWORD'),
+        ]);
     }
 
     public function test_customer_users_create_tickets_and_find_their_own(): void
