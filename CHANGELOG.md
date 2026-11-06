@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+Robustness fixes. Three of them change behaviour, see [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- `search_limit` (`ZNUNY_SEARCH_LIMIT`, default 10 000; per connection or under `http`) and `ZnunySearchLimitExceededException`.
+- `session.per_host` (`ZNUNY_SESSION_PER_HOST`, default `true`).
+- `verify_ssl` accepts the path of a CA bundle.
+- `ZnunyClient::sessionId()` is public, for session operations such as `SessionGet` and `SessionDelete`.
+- README: troubleshooting section.
+
+### Fixed
+
+- Searches without `limit()` were cut off at 500 tickets without notice, because Znuny applies its `SearchLimit` when the request has no limit. `ids()`, `get()`, `paginate()` and `lazy()` now return every match up to `search_limit` and throw if more tickets match.
+- Hosts that share a cache store but reach Znuny from different IP addresses invalidated each other's session with every request, because Znuny binds a session to the address that created it. Each host now keeps its own session.
+- `withArticle()` and `addArticle()` failed without a `contentType`, which Znuny requires. Articles are now sent as plain text by default.
+- `findMany()` sent one request per ticket when Znuny rejected a batch because of a single missing ticket. It now halves the batch until the ticket is isolated.
+
+### Security
+
+- `verify_ssl` values that were not booleans, such as a CA bundle path, a typo or an empty environment variable, switched certificate verification off. They now raise a `ZnunyConfigurationException`; an empty value leaves verification on.
+
 ## [0.2.1] - 2026-11-06
 
 Fixes found by the extended integration suite, which now also covers dynamic fields, the `operation-name` preset, expired sessions, customer users, webhooks end to end, the artisan commands, Znuny's validation errors and a Znuny that does not run on UTC. It runs against Znuny 6.5 and 7.3.

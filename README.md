@@ -27,6 +27,7 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 - [Logging](#logging)
 - [Exceptions](#exceptions)
 - [Artisan commands](#artisan-commands)
+- [Troubleshooting](#troubleshooting)
 - [Testing your application](#testing-your-application)
 - [Upgrading](#upgrading)
 
@@ -87,7 +88,9 @@ Web services that were set up from the older example earlier (they search with `
 ],
 ```
 
-A connection can also set `retries`, `retry_delay` (milliseconds) and `batch_size`; they default to the values under `http`. Retries repeat reads after timeouts and server errors. Writes such as `TicketCreate` and `TicketUpdate` are only repeated when no connection could be established, so a slow Znuny never receives the same ticket twice.
+`verify_ssl` is `true`, `false` or the path of a CA bundle; any other value is rejected, so a typo cannot switch certificate verification off.
+
+A connection can also set `retries`, `retry_delay` (milliseconds), `batch_size` and `search_limit`; they default to the values under `http`. Retries repeat reads after timeouts and server errors. Writes such as `TicketCreate` and `TicketUpdate` are only repeated when no connection could be established, so a slow Znuny never receives the same ticket twice.
 
 ### Routes
 
@@ -121,6 +124,8 @@ For `GET` routes the parameters go into the query string the way Znuny parses it
 | `auth_transport` | `auto`: `X-OTRS-Header-*` headers for `GET` routes, request data otherwise. `payload`: always in the request data. `headers`: always as headers. | `auto` |
 
 Headers keep session IDs and passwords out of URLs and access logs. They need Znuny 6.5 or newer; on older versions use `payload`.
+
+Znuny binds a session to the IP address that created it and deletes it when another address uses it. The package therefore keeps one session per host name, so servers and workers that share a cache store do not invalidate each other's session. If a single host reaches Znuny from changing addresses, use `'auth' => 'credentials'` or switch off `SessionCheckRemoteIP` in Znuny. Set `ZNUNY_SESSION_PER_HOST=false` to share one session between all hosts again.
 
 ### Time zone
 
@@ -185,7 +190,6 @@ Znuny::tickets()->update('12345', ['state' => 'open'], dynamicFields: ['OrderId'
 $articleId = Znuny::tickets()->addArticle('12345', [
     'subject'              => 'Internal note',
     'body'                 => 'Customer called back.',
-    'contentType'          => 'text/plain; charset=utf8',
     'communicationChannel' => 'Internal',
     'senderType'           => 'agent',
     'isVisibleForCustomer' => false,
@@ -195,7 +199,7 @@ Znuny::tickets()->close('12345');                  // state "closed successful"
 $history = Znuny::tickets()->history('12345');     // Collection<HistoryEntry>
 ```
 
-Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …). Any other key is passed to Znuny unchanged, so `'HistoryComment' => '…'` works too. Znuny requires a `contentType` (or `mimeType` and `charset`) for every article.
+Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …). Any other key is passed to Znuny unchanged, so `'HistoryComment' => '…'` works too. Articles are sent as `text/plain; charset=utf8` unless you pass a `contentType` (or `mimeType` and `charset`).
 
 `Ticket`, `Article` and the other DTOs expose typed properties plus every raw field Znuny returned:
 
@@ -244,6 +248,8 @@ Date filters accept any `DateTimeInterface` and convert it to Znuny's [time zone
 | `whereChangedBefore()` | same as `whereLastChangedBefore()` |
 
 `get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page.
+
+A search without `limit()` is complete or fails. Znuny itself cuts a search off at 500 tickets (its `SearchLimit`) without saying so. The package therefore asks for up to `search_limit` tickets (10 000 by default) and throws a `ZnunySearchLimitExceededException` if more match. In that case narrow the search down, call `limit()` to accept only the first tickets, or raise the limit with `ZNUNY_SEARCH_LIMIT` or the connection's `search_limit`.
 
 ## Attachments
 
@@ -408,6 +414,7 @@ ZnunyException (abstract, extends RuntimeException)
 │   ├── TicketNotFoundException
 │   ├── CustomerNotFoundException
 │   └── QueueNotFoundException
+├── ZnunySearchLimitExceededException    // a search without limit() matches more than search_limit tickets
 ├── ZnunyRateLimitException
 ├── ZnunyServerException                 // HTTP 5xx, unexpected responses
 └── GenericZnunyException                // everything else
@@ -423,6 +430,17 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 | `znuny:routes [connection]` | Prints the effective route map |
 | `znuny:cache-clear [connection] [--resource=queues] [--all]` | Clears cached lookups |
 | `znuny:generate-fields [--output=path]` | Generates a typed dynamic field helper from the config |
+
+## Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| Dates are off by one or more hours, or date filters miss tickets | The `timezone` setting does not match Znuny's `OTRSTimeZone`. Set `ZNUNY_TIMEZONE`; `php artisan znuny:test-connection` tells you whether it is right. See [Time zone](#time-zone). |
+| `ZnunyRouteNotFoundException` | The routes of the connection do not match the web service. `php artisan znuny:routes` prints the routes the package uses; pick the matching preset or map the routes. See [Routes](#routes). |
+| `ZnunyConnectionException` with "Empty reply from server" | The web service named in `base_url` does not exist in Znuny. |
+| `ZnunyAccessDeniedException` for a ticket that should not exist | Znuny checks permissions before existence, so a missing ticket is reported as access denied. |
+| `ZnunySearchLimitExceededException` | A search without `limit()` matches more than `search_limit` tickets. Narrow it down, call `limit()`, or raise `ZNUNY_SEARCH_LIMIT`. See [Searching tickets](#searching-tickets). |
+| `ZnunySessionRefreshed` fires on almost every request | Requests reach Znuny from changing IP addresses, and Znuny deletes a session that another address uses. See [Authentication](#authentication). |
 
 ## Testing your application
 

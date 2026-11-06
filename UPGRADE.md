@@ -1,5 +1,29 @@
 # Upgrade guide
 
+## 0.2.1 → 0.2.2
+
+### Searches are complete or fail
+
+Znuny cuts a `TicketSearch` off at 500 tickets (its `SearchLimit`) unless the request carries a limit, and does not say so. Until 0.2.1, `ids()`, `get()`, `paginate()` and `lazy()` without `limit()` therefore returned at most 500 tickets.
+
+They now return every matching ticket up to the new `search_limit` (10 000 by default) and throw a `ZnunySearchLimitExceededException` if more match. What this means for you:
+
+- Searches that match between 501 and 10 000 tickets now return all of them, which also means more `TicketGet` requests for `get()` and `lazy()`.
+- If you want only the first tickets, say so with `limit()`, for example `->limit(500)`.
+- Raise the limit with `ZNUNY_SEARCH_LIMIT` or the connection's `search_limit`. `'search_limit' => null` restores the old behaviour.
+
+### One session per host
+
+Znuny binds a session to the IP address that created it. The package now caches one session per host name, so hosts that share a cache store no longer invalidate each other's session. After the update every host logs in once; there is nothing to do. `ZNUNY_SESSION_PER_HOST=false` shares one session between all hosts as before.
+
+### `verify_ssl`
+
+A value that is neither a boolean nor the path of an existing CA bundle now raises a `ZnunyConfigurationException`. Until 0.2.1 such a value switched certificate verification off, and so did an empty `ZNUNY_VERIFY_SSL=`. An empty value now leaves verification on; set `ZNUNY_VERIFY_SSL=false` if you really want it off.
+
+### Articles
+
+Articles without `contentType` (or `mimeType` and `charset`) are sent as `text/plain; charset=utf8`. Znuny rejected them before, so no working code changes.
+
 ## 0.2.0 → 0.2.1
 
 ### Time zones (check before you upgrade)
