@@ -4,6 +4,10 @@ namespace ItsJustVita\LaravelZnuny\Events;
 
 final readonly class ZnunyResponseReceived
 {
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $response
+     */
     public function __construct(
         public string $connection,
         public string $operation,

@@ -8,12 +8,18 @@ final readonly class DynamicField
 {
     use HasAttributes;
 
+    /**
+     * @param  array<string, mixed>  $attributes  raw Znuny fields
+     */
     public function __construct(
         public string $name,
         public mixed $value,
         public array $attributes = [],
     ) {}
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function fromZnunyResponse(array $data): self
     {
         return new self(
@@ -23,6 +29,9 @@ final readonly class DynamicField
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

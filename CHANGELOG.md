@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+### Changed
+
+- The integration suite runs in CI against Znuny 6.5, 7.0, 7.1, 7.2 and 7.3, and against a Znuny that does not run on UTC.
+- PHPDoc array types throughout the package, which passes PHPStan at level 8 now. Applications that use static analysis get more precise types.
+
 ## [0.2.2] - 2026-11-06
 
 Robustness fixes. See [UPGRADE.md](UPGRADE.md) for what is worth setting after the update.

@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny\Webhooks;
 
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use ItsJustVita\LaravelZnuny\Events\ZnunyWebhookReceived;
 use stdClass;
 
@@ -17,7 +18,9 @@ class WebhookController
             return new JsonResponse(['Error' => 'The request body must be a JSON object.'], 400);
         }
 
-        $parameters = $request->route()?->originalParameters() ?? [];
+        // There is no route when the controller is called outside the router.
+        $route = ($request->getRouteResolver())();
+        $parameters = $route instanceof Route ? $route->originalParameters() : [];
         $routeEvent = $parameters['event'] ?? null;
 
         event(new ZnunyWebhookReceived(

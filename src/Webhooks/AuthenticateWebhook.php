@@ -33,6 +33,9 @@ class AuthenticateWebhook
         return $next($request);
     }
 
+    /**
+     * @param  array<string, mixed>  $config
+     */
     private function validToken(Request $request, array $config): bool
     {
         $expected = (string) ($config['token'] ?? '');
@@ -41,9 +44,11 @@ class AuthenticateWebhook
             return $this->reject('ZNUNY_WEBHOOK_TOKEN is not set');
         }
 
+        $header = $request->header((string) ($config['header'] ?? 'X-Znuny-Token'));
+
         $candidates = [
             (string) $request->bearerToken(),
-            (string) $request->header((string) ($config['header'] ?? 'X-Znuny-Token'), ''),
+            is_string($header) ? $header : '',
         ];
 
         foreach ($candidates as $candidate) {
@@ -55,6 +60,9 @@ class AuthenticateWebhook
         return false;
     }
 
+    /**
+     * @param  array<string, mixed>  $config
+     */
     private function validBasic(Request $request, array $config): bool
     {
         $username = (string) ($config['username'] ?? '');

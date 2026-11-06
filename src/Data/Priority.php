@@ -8,6 +8,9 @@ final readonly class Priority
 {
     use HasAttributes;
 
+    /**
+     * @param  array<string, mixed>  $attributes  raw Znuny fields
+     */
     public function __construct(
         public string $id,
         public string $name,
@@ -16,6 +19,9 @@ final readonly class Priority
         public array $attributes = [],
     ) {}
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
     public static function fromZnunyResponse(array $data): self
     {
         $validId = (string) ($data['ValidID'] ?? '1');
@@ -29,6 +35,9 @@ final readonly class Priority
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toArray(): array
     {
         return [

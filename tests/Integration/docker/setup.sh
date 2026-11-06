@@ -6,12 +6,12 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-export ZNUNY_IMAGE="${ZNUNY_IMAGE:-cygnusnetworks/znuny:7.3.7}"
+export ZNUNY_IMAGE="${ZNUNY_IMAGE:-cygnusnetworks/znuny:7.3.8}"
 export ZNUNY_PLATFORM="${ZNUNY_PLATFORM:-linux/amd64}"
 
 # Git ref for files that are not part of the image: rel-X_Y_Z for an X.Y.Z image tag.
 tag="${ZNUNY_IMAGE##*:}"
-if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then default_ref="rel-${tag//./_}"; else default_ref="rel-7_3_7"; fi
+if [[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then default_ref="rel-${tag//./_}"; else default_ref="rel-7_3_8"; fi
 ZNUNY_GIT_REF="${ZNUNY_GIT_REF:-$default_ref}"
 compose() { docker compose -p laravel-znuny-integration "$@"; }
 
@@ -58,15 +58,27 @@ console Admin::User::Add --user-name api-agent --first-name API --last-name Agen
 console Admin::Group::UserLink --user-name api-agent --group-name users --permission rw || true
 console Admin::CustomerUser::Add --user-name jane --first-name Jane --last-name Doe \
   --email-address jane@example.com --customer-id acme --password jane-secret || true
-console Admin::WebService::Add --name GenericTicketConnectorREST \
-  --source-path /opt/otrs/var/webservices/examples/GenericTicketConnectorREST.yml || true
+# Downloads a file from the Znuny repository and copies it into the container.
+fetch() {
+  local file
+  file=$(mktemp)
+  curl -fsSL "https://raw.githubusercontent.com/znuny/Znuny/$1" -o "$file"
+  chmod 644 "$file"
+  compose cp "$file" "znuny:$2"
+  rm -f "$file"
+}
+
+# Znuny ships the example web service since 6.5.11 and 7.1.3. Older versions have the
+# operations it uses, so they get the file of a newer release.
+example=/opt/otrs/var/webservices/examples/GenericTicketConnectorREST.yml
+if ! compose exec -T znuny test -f "$example"; then
+  example=/tmp/GenericTicketConnectorREST.yml
+  fetch "rel-7_3_8/var/webservices/examples/GenericTicketConnectorREST.yml" "$example"
+fi
+console Admin::WebService::Add --name GenericTicketConnectorREST --source-path "$example" || true
 
 # The classic example (development/webservices) is not part of the release; fetch it from GitHub.
-classic=$(mktemp)
-curl -fsSL "https://raw.githubusercontent.com/znuny/Znuny/${ZNUNY_GIT_REF}/development/webservices/GenericTicketConnectorREST.yml" -o "$classic"
-chmod 644 "$classic"
-compose cp "$classic" znuny:/tmp/GenericTicketConnectorRESTClassic.yml
-rm -f "$classic"
+fetch "${ZNUNY_GIT_REF}/development/webservices/GenericTicketConnectorREST.yml" /tmp/GenericTicketConnectorRESTClassic.yml
 console Admin::WebService::Add --name GenericTicketConnectorRESTClassic \
   --source-path /tmp/GenericTicketConnectorRESTClassic.yml || true
 

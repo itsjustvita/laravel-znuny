@@ -75,26 +75,41 @@ class TicketBuilder
         return $this;
     }
 
+    /**
+     * @param  string|list<string>  $states
+     */
     public function whereState(string|array $states): self
     {
         return $this->where('States', (array) $states);
     }
 
+    /**
+     * @param  string|list<string>  $types
+     */
     public function whereStateType(string|array $types): self
     {
         return $this->where('StateType', (array) $types);
     }
 
+    /**
+     * @param  string|list<string>  $queues
+     */
     public function whereQueue(string|array $queues): self
     {
         return $this->where('Queues', (array) $queues);
     }
 
+    /**
+     * @param  string|int|list<string|int>  $ids
+     */
     public function whereQueueId(string|int|array $ids): self
     {
         return $this->where('QueueIDs', array_map('strval', (array) $ids));
     }
 
+    /**
+     * @param  string|list<string>  $priorities
+     */
     public function wherePriority(string|array $priorities): self
     {
         return $this->where('Priorities', (array) $priorities);
@@ -236,6 +251,8 @@ class TicketBuilder
 
     /**
      * Fetches all matching IDs, then loads only the tickets of the requested page.
+     *
+     * @return LengthAwarePaginator<int, Ticket>
      */
     public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
     {

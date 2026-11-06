@@ -2,6 +2,7 @@
 
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
 [![Tests](https://img.shields.io/github/actions/workflow/status/itsjustvita/laravel-znuny/tests.yml?branch=main&label=tests&style=flat-square)](https://github.com/itsjustvita/laravel-znuny/actions/workflows/tests.yml)
+[![Znuny 6.5 to 7.3](https://img.shields.io/github/actions/workflow/status/itsjustvita/laravel-znuny/integration.yml?branch=main&label=znuny%206.5%20to%207.3&style=flat-square)](https://github.com/itsjustvita/laravel-znuny/actions/workflows/integration.yml)
 [![Total Downloads](https://img.shields.io/packagist/dt/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
 [![PHP Version](https://img.shields.io/packagist/php-v/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
 [![License](https://img.shields.io/packagist/l/itsjustvita/laravel-znuny.svg?style=flat-square)](https://packagist.org/packages/itsjustvita/laravel-znuny)
@@ -35,7 +36,7 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 
 - PHP 8.3+
 - Laravel 12 or 13
-- Znuny 6.5 or 7.x with a Generic Interface web service that has a REST provider. Znuny 6.0 and OTRS 6 work too: set `'auth_transport' => 'payload'` (they do not read authentication headers) and, for their example web service, `'routes' => 'generic-ticket-connector-classic'`.
+- Znuny 6.5 or 7.x with a Generic Interface web service that has a REST provider. Every change is tested against real Znuny 6.5, 7.0, 7.1, 7.2 and 7.3 instances. Znuny 6.0 and OTRS 6 work too: set `'auth_transport' => 'payload'` (they do not read authentication headers) and, for their example web service, `'routes' => 'generic-ticket-connector-classic'`.
 
 ## Installation
 

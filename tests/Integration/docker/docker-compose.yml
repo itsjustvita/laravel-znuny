@@ -18,7 +18,7 @@ services:
       retries: 30
 
   znuny:
-    image: ${ZNUNY_IMAGE:-cygnusnetworks/znuny:7.3.7}
+    image: ${ZNUNY_IMAGE:-cygnusnetworks/znuny:7.3.8}
     # The community image is only published for amd64; Apple Silicon runs it emulated.
     platform: ${ZNUNY_PLATFORM:-linux/amd64}
     depends_on:

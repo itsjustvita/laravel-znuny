@@ -12,6 +12,9 @@ class ExceptionMapper
 
     /**
      * Map a body that contains Znuny's {"Error": {"ErrorCode", "ErrorMessage"}} structure.
+     *
+     * @param  array<array-key, mixed>  $body
+     * @param  array<string, mixed>  $payload
      */
     public function fromErrorResponse(
         array $body,
@@ -39,6 +42,9 @@ class ExceptionMapper
 
     /**
      * Map an HTTP error status whose JSON body has no "Error" structure.
+     *
+     * @param  array<array-key, mixed>  $body
+     * @param  array<string, mixed>  $payload
      */
     public function fromHttpStatus(int $status, array $body, string $operation, string $connection, array $payload): ZnunyException
     {
@@ -60,6 +66,7 @@ class ExceptionMapper
      * Map any unsuccessful response: Znuny error bodies, HTTP errors, missing routes and non-JSON bodies.
      *
      * @param  array<array-key, mixed>|null  $json  the decoded body, null when it is not JSON
+     * @param  array<string, mixed>  $payload
      */
     public function fromResponse(
         int $status,
@@ -118,6 +125,9 @@ class ExceptionMapper
         return $this->decorate($exception, $operation, $connection, $payload, $this->raw($rawBody), '', $status);
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     */
     public function fromTransportError(Throwable $previous, string $operation, string $connection, array $payload): ZnunyConnectionException
     {
         $exception = new ZnunyConnectionException($previous->getMessage(), 0, $previous);
@@ -212,7 +222,10 @@ class ExceptionMapper
         };
     }
 
-    /** @return array{0: string, 1: string} */
+    /**
+     * @param  array<array-key, mixed>  $body
+     * @return array{0: string, 1: string}
+     */
     private function errorParts(array $body): array
     {
         $error = is_array($body['Error'] ?? null) ? $body['Error'] : [];
@@ -220,6 +233,10 @@ class ExceptionMapper
         return [(string) ($error['ErrorCode'] ?? ''), (string) ($error['ErrorMessage'] ?? '')];
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array<array-key, mixed>  $body
+     */
     private function decorate(
         ZnunyException $exception,
         string $operation,

@@ -6,6 +6,9 @@ use Illuminate\Contracts\Cache\Repository;
 
 class CacheManager
 {
+    /**
+     * @param  array<string, int|string|null>  $ttls  seconds per resource
+     */
     public function __construct(
         private readonly Repository $cache,
         private readonly string $prefix,
@@ -13,6 +16,12 @@ class CacheManager
         private readonly bool $enabled,
     ) {}
 
+    /**
+     * @template T
+     *
+     * @param  callable(): T  $resolver
+     * @return T
+     */
     public function remember(string $connection, string $resource, callable $resolver): mixed
     {
         if (! $this->enabled) {
@@ -21,7 +30,7 @@ class CacheManager
 
         $key = $this->key($connection, $resource);
 
-        return $this->cache->remember($key, $this->ttlFor($resource), $resolver);
+        return $this->cache->remember($key, $this->ttlFor($resource), $resolver(...));
     }
 
     public function flush(string $connection, ?string $resource = null): void

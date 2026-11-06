@@ -25,9 +25,10 @@ class CacheClearCommand extends Command
 
         $connection = (string) ($this->argument('connection') ?? config('znuny.default', 'default'));
         $resource = $this->option('resource');
+        $resource = is_string($resource) && $resource !== '' ? $resource : null;
 
         $manager->connection($connection)->flush($resource);
-        $label = $resource ? "{$resource} " : '';
+        $label = $resource !== null ? "{$resource} " : '';
         $this->info("Znuny {$label}cache cleared for connection [{$connection}].");
 
         return self::SUCCESS;

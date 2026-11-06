@@ -16,7 +16,9 @@ class TypeResource extends Resource
         return $this->remember('types', function () {
             $response = $this->client->call('TypeList');
 
-            return collect($response['Type'] ?? [])
+            $rows = $response['Type'] ?? [];
+
+            return collect(is_array($rows) ? $rows : [])
                 ->map(fn (array $row) => Type::fromZnunyResponse($row))
                 ->values();
         });

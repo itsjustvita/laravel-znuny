@@ -288,6 +288,8 @@ class ZnunyClient
 
     /**
      * Dispatch the failure event, write the error log and hand the exception back for throwing.
+     *
+     * @param  array<string, mixed>  $redacted
      */
     protected function failed(string $operation, PreparedRequest $request, array $redacted, ZnunyException $exception): ZnunyException
     {

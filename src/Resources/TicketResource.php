@@ -162,11 +162,17 @@ class TicketResource extends Resource
         return $this->query()->where($field, $value);
     }
 
+    /**
+     * @param  string|list<string>  $states
+     */
     public function whereState(string|array $states): TicketBuilder
     {
         return $this->query()->whereState($states);
     }
 
+    /**
+     * @param  string|list<string>  $queues
+     */
     public function whereQueue(string|array $queues): TicketBuilder
     {
         return $this->query()->whereQueue($queues);
@@ -219,7 +225,7 @@ class TicketResource extends Resource
                 return [];
             }
 
-            $size = count($ids) <= self::SINGLE_FETCH_THRESHOLD ? 1 : intdiv(count($ids) + 1, 2);
+            $size = count($ids) <= self::SINGLE_FETCH_THRESHOLD ? 1 : max(1, intdiv(count($ids) + 1, 2));
 
             return array_merge(...array_map(
                 fn (array $chunk): array => $this->fetchChunk($chunk, $options),

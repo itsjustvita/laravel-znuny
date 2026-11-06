@@ -2,13 +2,15 @@
 
 The integration suite runs the package against a real Znuny. It is skipped unless `ZNUNY_INTEGRATION_URL` is set.
 
+GitHub Actions runs it for every change to the code against Znuny 6.5, 7.0, 7.1, 7.2 and 7.3, and once against a Znuny that does not run on UTC (`.github/workflows/integration.yml`).
+
 ## Start Znuny in Docker
 
 Requires Docker with Compose v2. The setup uses the community image [`cygnusnetworks/znuny`](https://hub.docker.com/r/cygnusnetworks/znuny), which is not an official Znuny image.
 
 ```bash
-tests/Integration/docker/setup.sh                                          # Znuny 7.3.7 on http://localhost:8080
-ZNUNY_IMAGE=cygnusnetworks/znuny:6.5.22 tests/Integration/docker/setup.sh  # another version
+tests/Integration/docker/setup.sh                                          # Znuny 7.3.8 on http://localhost:8080
+ZNUNY_IMAGE=cygnusnetworks/znuny:6.5.26 tests/Integration/docker/setup.sh  # another version
 ZNUNY_OTRS_TIMEZONE=Europe/Berlin tests/Integration/docker/setup.sh        # a Znuny that does not run on UTC
 ```
 
@@ -16,7 +18,7 @@ The setup creates:
 
 - the agent `api-agent` (password `api-secret`) and the customer user `jane` (password `jane-secret`, customer `acme`);
 - the ticket dynamic fields `OrderId` (text) and `Tags` (multiselect with `alpha`, `beta`, `gamma`);
-- the web services `GenericTicketConnectorREST` (the Ready2Adopt example), `GenericTicketConnectorRESTClassic` (the example from `development/webservices/`, downloaded from GitHub for the image's version) and `OperationNameREST` (routes named after the operations, as the `operation-name` preset expects);
+- the web services `GenericTicketConnectorREST` (the Ready2Adopt example; versions that do not ship it get the file of a newer release), `GenericTicketConnectorRESTClassic` (the example from `development/webservices/`, downloaded from GitHub for the image's version) and `OperationNameREST` (routes named after the operations, as the `operation-name` preset expects);
 - the web service `LaravelWebhook`. Its `Ticket::Generic` invoker posts every `TicketCreate` event to `http://host.docker.internal:8099/znuny/webhooks/TicketCreate` with the header `X-Znuny-Token: integration-token`.
 
 ## Run the suite
