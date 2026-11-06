@@ -53,6 +53,7 @@ final readonly class ConnectionConfig
         public int $retryDelay,
         public int $batchSize,
         public string $timezone = 'UTC',
+        public ?int $searchLimit = 10000,
     ) {}
 
     /**
@@ -90,6 +91,11 @@ final readonly class ConnectionConfig
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
+            searchLimit: self::searchLimit(match (true) {
+                array_key_exists('search_limit', $config) => $config['search_limit'],
+                array_key_exists('search_limit', $http) => $http['search_limit'],
+                default => 10000,
+            }),
         );
     }
 
@@ -155,6 +161,19 @@ final readonly class ConnectionConfig
         }
 
         return $value;
+    }
+
+    /**
+     * The most tickets a search without limit() may match. null switches the check off:
+     * no limit is sent and Znuny cuts the result off at its own SearchLimit.
+     */
+    private static function searchLimit(mixed $value): ?int
+    {
+        if ($value === null || (is_string($value) && trim($value) === '')) {
+            return null;
+        }
+
+        return max(1, (int) $value);
     }
 
     /**

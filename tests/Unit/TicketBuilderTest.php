@@ -9,6 +9,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use Znuny;
 
@@ -52,6 +53,107 @@ final class TicketBuilderTest extends TestCase
             && ($r['SortBy'] ?? null) === 'Created'
             && ($r['OrderBy'] ?? null) === 'Down'
             && ($r['Limit'] ?? null) === 50);
+    }
+
+    public function test_searches_without_a_limit_ask_for_one_ticket_more_than_the_search_limit(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2']]),
+        ]);
+
+        $this->assertSame(['1', '2'], Znuny::tickets()->where('CustomerID', '12345')->ids()->all());
+
+        // Znuny cuts results off at 500 unless a limit is sent, without saying so.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 10001);
+    }
+
+    public function test_a_search_that_matches_more_than_the_search_limit_fails_instead_of_returning_a_part(): void
+    {
+        config(['znuny.connections.default.search_limit' => 3]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4']]),
+        ]);
+
+        try {
+            Znuny::tickets()->whereState('open')->ids();
+            $this->fail('Expected a ZnunySearchLimitExceededException');
+        } catch (ZnunySearchLimitExceededException $e) {
+            $this->assertStringContainsString('more than 3 tickets', $e->getMessage());
+            $this->assertStringContainsString('limit()', $e->getMessage());
+            $this->assertSame('TicketSearch', $e->getOperation());
+            $this->assertSame('default', $e->getConnection());
+            $this->assertSame(4, $e->getRequestPayload()['Limit']);
+        }
+    }
+
+    public function test_a_search_that_matches_exactly_the_search_limit_is_complete(): void
+    {
+        config(['znuny.connections.default.search_limit' => 3]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3']]),
+        ]);
+
+        $this->assertSame(['1', '2', '3'], Znuny::tickets()->whereState('open')->ids()->all());
+    }
+
+    public function test_an_explicit_limit_accepts_a_partial_result(): void
+    {
+        config(['znuny.connections.default.search_limit' => 3]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5']]),
+        ]);
+
+        $this->assertCount(5, Znuny::tickets()->whereState('open')->limit(5)->ids());
+        $this->assertCount(5, Znuny::tickets()->where('Limit', 5)->ids());
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 5);
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 4);
+    }
+
+    public function test_without_a_search_limit_znunys_own_limit_applies(): void
+    {
+        config(['znuny.connections.default.search_limit' => null]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2']]),
+        ]);
+
+        $this->assertCount(2, Znuny::tickets()->whereState('open')->ids());
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && ! isset($r['Limit']));
+    }
+
+    public function test_pagination_and_lazy_loading_fail_on_an_incomplete_search_too(): void
+    {
+        config(['znuny.connections.default.search_limit' => 2]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3']]),
+        ]);
+
+        foreach ([
+            fn () => Znuny::tickets()->whereState('open')->paginate(),
+            fn () => iterator_to_array(Znuny::tickets()->whereState('open')->lazy()),
+            fn () => Znuny::tickets()->whereState('open')->get(),
+        ] as $search) {
+            try {
+                $search();
+                $this->fail('Expected a ZnunySearchLimitExceededException');
+            } catch (ZnunySearchLimitExceededException) {
+                $this->addToAssertionCount(1);
+            }
+        }
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketGet'));
     }
 
     public function test_where_created_after_translates_to_timestamp(): void

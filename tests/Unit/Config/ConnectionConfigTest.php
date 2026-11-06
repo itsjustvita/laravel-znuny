@@ -36,6 +36,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(3, $config->retries);
         $this->assertSame(100, $config->retryDelay);
         $this->assertSame(50, $config->batchSize);
+        $this->assertSame(10000, $config->searchLimit);
         $this->assertSame('UTC', $config->timezone);
         $this->assertTrue($config->usesSession());
         $this->assertSame('UserLogin', $config->loginKey());
@@ -48,6 +49,21 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(1, $config->retries);
         $this->assertSame(250, $config->retryDelay);
         $this->assertSame(10, $config->batchSize);
+    }
+
+    public function test_the_search_limit_comes_from_the_connection_then_the_http_config(): void
+    {
+        $this->assertSame(200, $this->make(['search_limit' => '200'], ['search_limit' => 5000])->searchLimit);
+        $this->assertSame(5000, $this->make([], ['search_limit' => 5000])->searchLimit);
+        $this->assertSame(1, $this->make(['search_limit' => 0])->searchLimit);
+    }
+
+    public function test_the_search_limit_can_be_switched_off(): void
+    {
+        // null: send no limit and accept whatever Znuny's own SearchLimit returns.
+        $this->assertNull($this->make(['search_limit' => null], ['search_limit' => 5000])->searchLimit);
+        $this->assertNull($this->make([], ['search_limit' => null])->searchLimit);
+        $this->assertNull($this->make(['search_limit' => ''])->searchLimit);
     }
 
     public function test_enum_values_are_normalised(): void
@@ -228,6 +244,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame('UTC', $config['timezone']);
         $this->assertArrayNotHasKey('timezone', $config['connections']['default']);
         $this->assertSame(50, $config['http']['batch_size']);
+        $this->assertSame(10000, $config['http']['search_limit']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);
         $this->assertArrayNotHasKey('services', $config['cache']['ttl']);

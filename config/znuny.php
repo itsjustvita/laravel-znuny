@@ -27,8 +27,8 @@ return [
     | auth_transport  "auto" (X-OTRS-Header-* headers for GET routes, request data
     |                 otherwise), "payload" or "headers" (headers need Znuny 6.5+).
     |
-    | Optional per connection: retries, retry_delay, batch_size (see "http") and
-    | timezone (see "timezone").
+    | Optional per connection: retries, retry_delay, batch_size, search_limit (see "http")
+    | and timezone (see "timezone").
     |
     */
 
@@ -95,11 +95,21 @@ return [
 
     'dynamic_fields' => [],
 
-    // Reads are retried after timeouts and 5xx; writes only when no connection could be established.
+    /*
+    | Reads are retried after timeouts and 5xx; writes only when no connection could be
+    | established.
+    |
+    | search_limit: the most tickets a search without limit() may match. Znuny itself cuts
+    | results off at 500 without saying so; the package asks for up to search_limit tickets
+    | and throws a ZnunySearchLimitExceededException when there are more. null sends no
+    | limit and accepts Znuny's cut-off.
+    */
+
     'http' => [
         'retries' => 3,
         'retry_delay' => 100,
         'batch_size' => 50,
+        'search_limit' => env('ZNUNY_SEARCH_LIMIT', 10000),
     ],
 
     /*

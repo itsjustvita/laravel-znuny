@@ -9,6 +9,7 @@ use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 
@@ -177,12 +178,38 @@ class TicketBuilder
         return $this;
     }
 
-    /** @return Collection<int, string> */
+    /**
+     * The IDs of all matching tickets. Without limit() the search is complete or fails: Znuny
+     * would cut the result off at its SearchLimit (500 by default) without saying so.
+     *
+     * @return Collection<int, string>
+     *
+     * @throws ZnunySearchLimitExceededException when more tickets match than the connection's search_limit
+     */
     public function ids(): Collection
     {
-        $ids = $this->client->call('TicketSearch', $this->params)['TicketID'] ?? [];
+        $params = $this->params;
+        $searchLimit = isset($params['Limit']) ? null : $this->client->settings()->searchLimit;
 
-        return collect(array_map('strval', (array) $ids))->values();
+        if ($searchLimit !== null) {
+            // One more than allowed shows whether Znuny has more tickets than are returned.
+            $params['Limit'] = $searchLimit + 1;
+        }
+
+        $ids = array_map('strval', (array) ($this->client->call('TicketSearch', $params)['TicketID'] ?? []));
+
+        if ($searchLimit !== null && count($ids) > $searchLimit) {
+            throw (new ZnunySearchLimitExceededException(sprintf(
+                'The search matches more than %d tickets. Narrow it down, call limit() to accept only the first tickets, '
+                .'or raise the "search_limit" of the connection.',
+                $searchLimit,
+            )))
+                ->setOperation('TicketSearch')
+                ->setConnection($this->client->connection())
+                ->setRequestPayload($params);
+        }
+
+        return collect($ids)->values();
     }
 
     /** @return Collection<int, Ticket> */
