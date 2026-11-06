@@ -131,8 +131,7 @@ class ZnunyClient
     }
 
     /**
-     * The session ID of this connection; logs in if no session is cached. Use it for
-     * session operations, e.g. call('SessionGet', ['SessionID' => $client->sessionId()]).
+     * The session ID of this connection; logs in if no session is cached.
      */
     public function sessionId(): string
     {
@@ -310,6 +309,16 @@ class ZnunyClient
         ]);
 
         return $exception;
+    }
+
+    /**
+     * Write a warning to the package's log channel, if error logging is enabled.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    public function warn(string $message, array $context = []): void
+    {
+        $this->log('warning', 'log_errors', $message, ['connection' => $this->connection] + $context);
     }
 
     /**

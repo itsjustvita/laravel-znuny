@@ -15,6 +15,9 @@ use ItsJustVita\LaravelZnuny\ZnunyClient;
 
 class TicketBuilder
 {
+    /** Znuny's default for GenericInterface::Operation::TicketSearch###SearchLimit. */
+    private const ZNUNY_SEARCH_LIMIT = 500;
+
     /** @var array<string, mixed> */
     protected array $params = [];
 
@@ -179,8 +182,9 @@ class TicketBuilder
     }
 
     /**
-     * The IDs of all matching tickets. Without limit() the search is complete or fails: Znuny
-     * would cut the result off at its SearchLimit (500 by default) without saying so.
+     * The IDs of the matching tickets. Znuny cuts a search without a limit off at its SearchLimit
+     * (500 by default) and does not say so. With a search_limit on the connection, a search
+     * without limit() is complete or fails.
      *
      * @return Collection<int, string>
      *
@@ -189,7 +193,9 @@ class TicketBuilder
     public function ids(): Collection
     {
         $params = $this->params;
-        $searchLimit = isset($params['Limit']) ? null : $this->client->settings()->searchLimit;
+        // Znuny treats 0 and '' like a missing limit.
+        $limited = ! empty($params['Limit']);
+        $searchLimit = $limited ? null : $this->client->settings()->searchLimit;
 
         if ($searchLimit !== null) {
             // One more than allowed shows whether Znuny has more tickets than are returned.
@@ -197,6 +203,14 @@ class TicketBuilder
         }
 
         $ids = array_map('strval', (array) ($this->client->call('TicketSearch', $params)['TicketID'] ?? []));
+
+        if (! $limited && $searchLimit === null && count($ids) === self::ZNUNY_SEARCH_LIMIT) {
+            $this->client->warn(sprintf(
+                'TicketSearch returned exactly %d tickets, which is where Znuny cuts a search off by default. '
+                .'Set "search_limit" (ZNUNY_SEARCH_LIMIT) to get an exception instead of a partial result, or call limit().',
+                self::ZNUNY_SEARCH_LIMIT,
+            ));
+        }
 
         if ($searchLimit !== null && count($ids) > $searchLimit) {
             throw (new ZnunySearchLimitExceededException(sprintf(

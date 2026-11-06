@@ -36,7 +36,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(3, $config->retries);
         $this->assertSame(100, $config->retryDelay);
         $this->assertSame(50, $config->batchSize);
-        $this->assertSame(10000, $config->searchLimit);
+        $this->assertNull($config->searchLimit);
         $this->assertSame('UTC', $config->timezone);
         $this->assertTrue($config->usesSession());
         $this->assertSame('UserLogin', $config->loginKey());
@@ -55,15 +55,41 @@ final class ConnectionConfigTest extends TestCase
     {
         $this->assertSame(200, $this->make(['search_limit' => '200'], ['search_limit' => 5000])->searchLimit);
         $this->assertSame(5000, $this->make([], ['search_limit' => 5000])->searchLimit);
-        $this->assertSame(1, $this->make(['search_limit' => 0])->searchLimit);
+        $this->assertSame(5000, $this->make([], ['search_limit' => ' 5000 '])->searchLimit);
     }
 
-    public function test_the_search_limit_can_be_switched_off(): void
+    public function test_the_search_limit_is_off_unless_set(): void
     {
-        // null: send no limit and accept whatever Znuny's own SearchLimit returns.
+        // Off: no limit is sent and Znuny cuts the result off at its own SearchLimit.
+        $this->assertNull($this->make()->searchLimit);
         $this->assertNull($this->make(['search_limit' => null], ['search_limit' => 5000])->searchLimit);
         $this->assertNull($this->make([], ['search_limit' => null])->searchLimit);
         $this->assertNull($this->make(['search_limit' => ''])->searchLimit);
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function invalidSearchLimits(): array
+    {
+        return [
+            'zero' => [0],
+            'negative' => [-5],
+            'word' => ['unlimited'],
+            'thousands separator' => ['10.000'],
+            'false' => [false],
+            'too large for Znuny' => [PHP_INT_MAX],
+            'list' => [[500]],
+        ];
+    }
+
+    #[DataProvider('invalidSearchLimits')]
+    public function test_other_search_limits_are_rejected(mixed $value): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Znuny connection [default] has invalid [search_limit] value');
+
+        $this->make(['search_limit' => $value]);
     }
 
     public function test_enum_values_are_normalised(): void
@@ -244,7 +270,8 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame('UTC', $config['timezone']);
         $this->assertArrayNotHasKey('timezone', $config['connections']['default']);
         $this->assertSame(50, $config['http']['batch_size']);
-        $this->assertSame(10000, $config['http']['search_limit']);
+        $this->assertNull($config['http']['search_limit']);
+        $this->assertTrue($config['session']['per_host']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);
         $this->assertArrayNotHasKey('services', $config['cache']['ttl']);

@@ -6,8 +6,10 @@ use Carbon\Carbon;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Http\Client\Request;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
@@ -55,8 +57,10 @@ final class TicketBuilderTest extends TestCase
             && ($r['Limit'] ?? null) === 50);
     }
 
-    public function test_searches_without_a_limit_ask_for_one_ticket_more_than_the_search_limit(): void
+    public function test_with_a_search_limit_searches_ask_for_one_ticket_more(): void
     {
+        config(['znuny.connections.default.search_limit' => 500]);
+
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::response(['TicketID' => ['1', '2']]),
@@ -64,8 +68,50 @@ final class TicketBuilderTest extends TestCase
 
         $this->assertSame(['1', '2'], Znuny::tickets()->where('CustomerID', '12345')->ids()->all());
 
-        // Znuny cuts results off at 500 unless a limit is sent, without saying so.
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 10001);
+        // One more than allowed shows whether Znuny has more tickets than are returned.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 501);
+    }
+
+    public function test_a_limit_that_znuny_ignores_does_not_switch_the_search_limit_off(): void
+    {
+        config(['znuny.connections.default.search_limit' => 3]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2']]),
+        ]);
+
+        // Znuny reads 0 and '' as "no limit given" and falls back to its own SearchLimit.
+        Znuny::tickets()->whereState('open')->limit(0)->ids();
+        Znuny::tickets()->where('Limit', '')->ids();
+
+        Http::assertSentCount(3);
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] !== 4);
+    }
+
+    public function test_a_result_of_exactly_500_tickets_is_logged_as_a_likely_cut_off(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::sequence()
+                ->push(['TicketID' => array_map('strval', range(1, 500))])
+                ->push(['TicketID' => array_map('strval', range(1, 499))])
+                ->push(['TicketID' => array_map('strval', range(1, 500))]),
+        ]);
+
+        $warnings = [];
+        Event::listen(function (MessageLogged $message) use (&$warnings): void {
+            if ($message->level === 'warning') {
+                $warnings[] = $message->message;
+            }
+        });
+
+        Znuny::tickets()->whereState('open')->ids();           // 500: Znuny's default SearchLimit
+        Znuny::tickets()->whereState('open')->ids();           // 499: complete
+        Znuny::tickets()->whereState('open')->limit(500)->ids(); // 500, but asked for
+
+        $this->assertCount(1, $warnings);
+        $this->assertStringContainsString('search_limit', $warnings[0]);
     }
 
     public function test_a_search_that_matches_more_than_the_search_limit_fails_instead_of_returning_a_part(): void

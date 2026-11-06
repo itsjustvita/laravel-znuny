@@ -53,7 +53,7 @@ final readonly class ConnectionConfig
         public int $retryDelay,
         public int $batchSize,
         public string $timezone = 'UTC',
-        public ?int $searchLimit = 10000,
+        public ?int $searchLimit = null,
     ) {}
 
     /**
@@ -91,11 +91,9 @@ final readonly class ConnectionConfig
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
-            searchLimit: self::searchLimit(match (true) {
-                array_key_exists('search_limit', $config) => $config['search_limit'],
-                array_key_exists('search_limit', $http) => $http['search_limit'],
-                default => 10000,
-            }),
+            searchLimit: self::searchLimit($name, array_key_exists('search_limit', $config)
+                ? $config['search_limit']
+                : $http['search_limit'] ?? null),
         );
     }
 
@@ -164,16 +162,29 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * The most tickets a search without limit() may match. null switches the check off:
-     * no limit is sent and Znuny cuts the result off at its own SearchLimit.
+     * The most tickets a search without limit() may match. Without it (null or blank) no
+     * limit is sent and Znuny cuts the result off at its own SearchLimit.
      */
-    private static function searchLimit(mixed $value): ?int
+    private static function searchLimit(string $connection, mixed $value): ?int
     {
         if ($value === null || (is_string($value) && trim($value) === '')) {
             return null;
         }
 
-        return max(1, (int) $value);
+        // Up to eight digits, like Znuny's own SearchLimit setting.
+        $limit = is_int($value) || is_string($value)
+            ? filter_var($value, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 99_999_999]])
+            : false;
+
+        if ($limit === false) {
+            throw new ZnunyConfigurationException(sprintf(
+                'Znuny connection [%s] has invalid [search_limit] value [%s]. Use a number between 1 and 99999999, or null to switch it off.',
+                $connection,
+                is_scalar($value) ? var_export($value, true) : gettype($value),
+            ));
+        }
+
+        return $limit;
     }
 
     /**
@@ -199,7 +210,7 @@ final readonly class ConnectionConfig
         }
 
         throw new ZnunyConfigurationException(sprintf(
-            'Znuny connection [%s] has invalid [verify_ssl] value [%s]. Use true, false or the path of a CA bundle.',
+            'Znuny connection [%s] has invalid [verify_ssl] value [%s]. Use true, false or the absolute path of an existing CA bundle.',
             $connection,
             is_scalar($value) ? (string) $value : gettype($value),
         ));
