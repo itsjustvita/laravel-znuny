@@ -222,6 +222,43 @@ final class TicketResourceTest extends TestCase
         $this->assertSame(['1'], Znuny::tickets()->findMany(['1', '404'])->pluck('id')->all());
     }
 
+    public function test_find_many_halves_a_rejected_batch_instead_of_fetching_every_ticket_alone(): void
+    {
+        $ticketGets = [];
+
+        Http::fake(function (Request $request) use (&$ticketGets) {
+            if (str_ends_with($request->url(), '/SessionCreate')) {
+                return Http::response(['SessionID' => 'S1']);
+            }
+
+            $ids = explode(',', (string) substr($request->url(), strrpos($request->url(), '/') + 1));
+            $ticketGets[] = implode(',', $ids);
+
+            // Znuny rejects the whole batch when one ticket is missing.
+            return in_array('9', $ids, true)
+                ? Http::response(['Error' => ['ErrorCode' => 'TicketGet.AccessDenied', 'ErrorMessage' => 'TicketGet: User does not have access to the ticket!']])
+                : Http::response(['Ticket' => array_map(fn (string $id): array => $this->ticket($id), $ids)]);
+        });
+
+        $ids = array_map('strval', range(1, 16));
+
+        $this->assertSame(
+            array_values(array_diff($ids, ['9'])),
+            Znuny::tickets()->findMany($ids)->pluck('id')->all(),
+        );
+        $this->assertSame([
+            '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16',
+            '1,2,3,4,5,6,7,8',
+            '9,10,11,12,13,14,15,16',
+            '9,10,11,12',
+            '9,10',
+            '9',
+            '10',
+            '11,12',
+            '13,14,15,16',
+        ], $ticketGets);
+    }
+
     public function test_find_many_without_ids_sends_nothing(): void
     {
         Http::fake();

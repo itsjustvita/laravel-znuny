@@ -200,7 +200,7 @@ class TicketResource extends Resource
 
     /**
      * Znuny rejects a whole batch with AccessDenied when one ticket is missing or not
-     * accessible, so a rejected batch is retried ticket by ticket.
+     * accessible, so a rejected batch is halved until the offending tickets are isolated.
      *
      * @param  list<string>  $ids
      * @param  array<string, int>  $options
@@ -215,7 +215,9 @@ class TicketResource extends Resource
                 return [];
             }
 
-            return array_merge(...array_map(fn (string $id): array => $this->fetchChunk([$id], $options), $ids));
+            $halves = array_chunk($ids, intdiv(count($ids) + 1, 2));
+
+            return array_merge($this->fetchChunk($halves[0], $options), $this->fetchChunk($halves[1], $options));
         }
 
         $tickets = [];
