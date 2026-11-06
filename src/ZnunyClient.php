@@ -52,7 +52,12 @@ class ZnunyClient
         protected readonly SessionManager $sessionManager,
         protected readonly ExceptionMapper $exceptionMapper = new ExceptionMapper,
     ) {
-        $this->settings = ConnectionConfig::fromArray($connection, $config, (array) config('znuny.http', []));
+        $this->settings = ConnectionConfig::fromArray(
+            $connection,
+            $config,
+            (array) config('znuny.http', []),
+            config('znuny.timezone'),
+        );
         $this->requests = new RequestBuilder($this->settings);
     }
 

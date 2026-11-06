@@ -96,12 +96,52 @@ final class ConnectionConfigTest extends TestCase
         $this->make(['timezone' => 'Mars/Olympus']);
     }
 
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function timeZonesWithoutDaylightSavingRules(): array
+    {
+        return [
+            'abbreviation' => ['CEST'],
+            'abbreviation that is also a zone name' => ['CET'],
+            'offset' => ['+02:00'],
+            'GMT offset' => ['GMT+2'],
+        ];
+    }
+
+    #[DataProvider('timeZonesWithoutDaylightSavingRules')]
+    public function test_abbreviations_and_offsets_are_not_accepted_as_time_zone(string $timezone): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage("Znuny connection [default] has invalid [timezone] value [{$timezone}]. Use the IANA name of Znuny's OTRSTimeZone");
+
+        $this->make(['timezone' => $timezone]);
+    }
+
+    public function test_the_global_time_zone_is_used_unless_the_connection_sets_one(): void
+    {
+        $config = ['base_url' => 'https://znuny.test/ws', 'username' => 'agent', 'password' => 'secret'];
+
+        $this->assertSame('Europe/Berlin', ConnectionConfig::fromArray('default', $config, [], 'Europe/Berlin')->timezone);
+        $this->assertSame('Asia/Tokyo', ConnectionConfig::fromArray('default', $config + ['timezone' => 'Asia/Tokyo'], [], 'Europe/Berlin')->timezone);
+        $this->assertSame('UTC', ConnectionConfig::fromArray('default', $config)->timezone);
+    }
+
+    public function test_iana_time_zone_names_are_accepted(): void
+    {
+        $this->assertSame('America/Argentina/Buenos_Aires', $this->make(['timezone' => ' America/Argentina/Buenos_Aires '])->timezone);
+        $this->assertSame('Etc/GMT-2', $this->make(['timezone' => 'Etc/GMT-2'])->timezone);
+        $this->assertSame('UTC', $this->make(['timezone' => ''])->timezone);
+        $this->assertSame('UTC', $this->make(['timezone' => null])->timezone);
+    }
+
     public function test_published_config_file_defaults(): void
     {
         $config = require __DIR__.'/../../../config/znuny.php';
 
         $this->assertSame('generic-ticket-connector', $config['connections']['default']['routes']);
-        $this->assertSame('UTC', $config['connections']['default']['timezone']);
+        $this->assertSame('UTC', $config['timezone']);
+        $this->assertArrayNotHasKey('timezone', $config['connections']['default']);
         $this->assertSame(50, $config['http']['batch_size']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);

@@ -44,8 +44,9 @@ final readonly class ConnectionConfig
     /**
      * @param  array<string, mixed>  $config  one entry of znuny.connections (or a runtime config)
      * @param  array<string, mixed>  $http  the global znuny.http config used as fallback
+     * @param  string|null  $timezone  the global znuny.timezone used as fallback
      */
-    public static function fromArray(string $name, array $config, array $http = []): self
+    public static function fromArray(string $name, array $config, array $http = [], ?string $timezone = null): self
     {
         $required = [
             'base_url' => trim((string) ($config['base_url'] ?? '')),
@@ -74,7 +75,7 @@ final readonly class ConnectionConfig
             retries: max(0, (int) ($config['retries'] ?? $http['retries'] ?? 3)),
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
-            timezone: self::timezone($name, $config['timezone'] ?? null),
+            timezone: self::timezoneFor($name, $config['timezone'] ?? $timezone),
         );
     }
 
@@ -106,17 +107,23 @@ final readonly class ConnectionConfig
 
     /**
      * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns.
+     * Empty values mean UTC, Znuny's default.
      */
-    private static function timezone(string $connection, mixed $value): string
+    public static function timezoneFor(string $connection, mixed $value): string
     {
         $value = trim((string) ($value ?? ''));
         $value = $value === '' ? 'UTC' : $value;
 
         try {
-            new DateTimeZone($value);
+            // Abbreviations (CEST) and offsets (+02:00) have no location and ignore daylight saving time.
+            $valid = (new DateTimeZone($value))->getLocation() !== false;
         } catch (Exception) {
+            $valid = false;
+        }
+
+        if (! $valid) {
             throw new ZnunyConfigurationException(sprintf(
-                'Znuny connection [%s] has invalid [timezone] value [%s]. Use the name of Znuny\'s OTRSTimeZone, e.g. UTC or Europe/Berlin.',
+                "Znuny connection [%s] has invalid [timezone] value [%s]. Use the IANA name of Znuny's OTRSTimeZone, e.g. UTC or Europe/Berlin; abbreviations and offsets are not supported.",
                 $connection,
                 $value,
             ));

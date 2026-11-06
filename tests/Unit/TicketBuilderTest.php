@@ -120,6 +120,36 @@ final class TicketBuilderTest extends TestCase
             && $r['TicketLastChangeTimeOlderDate'] === '2026-07-01 09:00:00');
     }
 
+    public function test_the_global_time_zone_applies_to_connections_without_their_own(): void
+    {
+        // A config file published before 0.2.1 has no "timezone" key at all; the package's own
+        // config supplies the global one, so ZNUNY_TIMEZONE works without republishing.
+        $this->assertArrayNotHasKey('timezone', config('znuny.connections.default'));
+        $this->assertSame('UTC', config('znuny.timezone'));
+        config(['znuny.timezone' => 'Europe/Berlin']);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        $date = new DateTimeImmutable('2026-07-01 08:00:00', new DateTimeZone('UTC'));
+
+        Znuny::tickets()->query()->whereCreatedAfter($date)->ids();
+        Znuny::build([
+            'base_url' => 'https://other.test/ws',
+            'username' => 'agent',
+            'password' => 'secret',
+            'routes' => 'operation-name',
+        ])->tickets()->query()->whereCreatedAfter($date)->ids();
+
+        Http::assertSentCount(4);
+        Http::assertSent(fn (Request $r) => str_starts_with($r->url(), 'https://znuny.test') && str_contains($r->url(), 'TicketSearch')
+            && $r['TicketCreateTimeNewerDate'] === '2026-07-01 10:00:00');
+        Http::assertSent(fn (Request $r) => str_starts_with($r->url(), 'https://other.test') && str_contains($r->url(), 'TicketSearch')
+            && $r['TicketCreateTimeNewerDate'] === '2026-07-01 10:00:00');
+    }
+
     public function test_the_znuny_time_zone_is_configurable_per_connection(): void
     {
         config(['znuny.connections.default.timezone' => 'Europe/Berlin']);
