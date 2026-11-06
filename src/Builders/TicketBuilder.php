@@ -120,9 +120,25 @@ class TicketBuilder
     }
 
     /**
-     * Tickets last changed before the date (the ticket's "Changed" time).
+     * Same as whereLastChangedBefore().
      */
     public function whereChangedBefore(DateTimeInterface $date): self
+    {
+        return $this->whereLastChangedBefore($date);
+    }
+
+    /**
+     * Tickets whose change time ($ticket->changed) is after the date.
+     */
+    public function whereLastChangedAfter(DateTimeInterface $date): self
+    {
+        return $this->where('TicketLastChangeTimeNewerDate', $this->znunyTime($date));
+    }
+
+    /**
+     * Tickets whose change time ($ticket->changed) is before the date.
+     */
+    public function whereLastChangedBefore(DateTimeInterface $date): self
     {
         return $this->where('TicketLastChangeTimeOlderDate', $this->znunyTime($date));
     }

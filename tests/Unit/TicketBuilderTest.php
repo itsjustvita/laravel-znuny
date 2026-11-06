@@ -103,6 +103,24 @@ final class TicketBuilderTest extends TestCase
             && ! isset($r['TicketChangeTimeOlderDate']));
     }
 
+    public function test_last_change_filters_form_a_window_on_the_change_time(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::tickets()->query()
+            ->whereLastChangedAfter(new DateTimeImmutable('2026-03-01 08:00:00'))
+            ->whereLastChangedBefore(new DateTimeImmutable('2026-04-01 08:00:00'))
+            ->ids();
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketLastChangeTimeNewerDate'] === '2026-03-01 08:00:00'
+            && $r['TicketLastChangeTimeOlderDate'] === '2026-04-01 08:00:00'
+            && ! isset($r['TicketChangeTimeNewerDate']));
+    }
+
     public function test_date_filters_are_sent_in_the_znuny_time_zone(): void
     {
         Http::fake([
