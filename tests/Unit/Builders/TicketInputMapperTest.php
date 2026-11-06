@@ -40,6 +40,7 @@ final class TicketInputMapperTest extends TestCase
             'NoAgentNotify' => 0,
             'HistoryType' => 'AddNote',
             'HistoryComment' => 'via API',
+            'ContentType' => 'text/html; charset=utf8',
         ], TicketInputMapper::mapArticle([
             'subject' => 's',
             'to' => 'a@example.com',
@@ -48,7 +49,29 @@ final class TicketInputMapperTest extends TestCase
             'noAgentNotify' => false,
             'historyType' => 'AddNote',
             'historyComment' => 'via API',
+            'contentType' => 'text/html; charset=utf8',
         ]));
+    }
+
+    public function test_articles_are_plain_text_unless_a_content_type_is_given(): void
+    {
+        // Znuny rejects articles without ContentType (or MimeType and Charset).
+        $this->assertSame(
+            ['Subject' => 's', 'Body' => 'b', 'ContentType' => 'text/plain; charset=utf8'],
+            TicketInputMapper::mapArticle(['subject' => 's', 'body' => 'b']),
+        );
+    }
+
+    public function test_a_given_content_type_or_mime_type_is_kept(): void
+    {
+        $this->assertSame(
+            ['ContentType' => 'text/html; charset=utf8'],
+            TicketInputMapper::mapArticle(['ContentType' => 'text/html; charset=utf8']),
+        );
+        $this->assertSame(
+            ['MimeType' => 'text/html', 'Charset' => 'utf8'],
+            TicketInputMapper::mapArticle(['mimeType' => 'text/html', 'charset' => 'utf8']),
+        );
     }
 
     public function test_dynamic_fields_become_name_value_pairs(): void
