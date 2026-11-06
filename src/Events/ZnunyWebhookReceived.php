@@ -51,7 +51,8 @@ final readonly class ZnunyWebhookReceived
 
         return ConnectionConfig::timezoneFor(
             $connection,
-            config("znuny.connections.{$connection}.timezone") ?? config('znuny.timezone'),
+            config("znuny.connections.{$connection}.timezone"),
+            config('znuny.timezone'),
         );
     }
 }

@@ -46,6 +46,10 @@ final class ZnunyWebhookReceivedTest extends TestCase
 
         $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $this->event()->ticket()?->created?->getTimestamp());
 
+        config(['znuny.connections.default.timezone' => '']);
+
+        $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $this->event()->ticket()?->created?->getTimestamp());
+
         config(['znuny.connections.default.timezone' => 'Asia/Tokyo']);
 
         $this->assertSame(strtotime('2026-06-30 23:00:00 UTC'), $this->event()->ticket()?->created?->getTimestamp());

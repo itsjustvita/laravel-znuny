@@ -23,6 +23,20 @@ final readonly class ConnectionConfig
 
     public const TRANSPORT_HEADERS = 'headers';
 
+    /**
+     * Zone names Znuny offers for OTRSTimeZone that PHP reads as fixed offsets without
+     * daylight saving time, mapped to the regions the time zone database links them to.
+     */
+    private const LEGACY_TIMEZONES = [
+        'CET' => 'Europe/Brussels',
+        'MET' => 'Europe/Brussels',
+        'EET' => 'Europe/Athens',
+        'WET' => 'Europe/Lisbon',
+        'EST' => 'America/Panama',
+        'MST' => 'America/Phoenix',
+        'HST' => 'Pacific/Honolulu',
+    ];
+
     public function __construct(
         public string $name,
         public string $baseUrl,
@@ -75,7 +89,7 @@ final readonly class ConnectionConfig
             retries: max(0, (int) ($config['retries'] ?? $http['retries'] ?? 3)),
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
-            timezone: self::timezoneFor($name, $config['timezone'] ?? $timezone),
+            timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
         );
     }
 
@@ -106,13 +120,24 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns.
-     * Empty values mean UTC, Znuny's default.
+     * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns. The
+     * connection's own value wins over the global one; without either it is UTC, Znuny's default.
      */
-    public static function timezoneFor(string $connection, mixed $value): string
+    public static function timezoneFor(string $connection, mixed $own, mixed $global = null): string
     {
-        $value = trim((string) ($value ?? ''));
-        $value = $value === '' ? 'UTC' : $value;
+        $value = 'UTC';
+
+        foreach ([$own, $global] as $candidate) {
+            $candidate = trim((string) ($candidate ?? ''));
+
+            if ($candidate !== '') {
+                $value = $candidate;
+
+                break;
+            }
+        }
+
+        $value = self::LEGACY_TIMEZONES[strtoupper($value)] ?? $value;
 
         try {
             // Abbreviations (CEST) and offsets (+02:00) have no location and ignore daylight saving time.
