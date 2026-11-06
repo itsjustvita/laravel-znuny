@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny;
 
+use Illuminate\Contracts\Foundation\CachesConfiguration;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use ItsJustVita\LaravelZnuny\Commands\CacheClearCommand;
@@ -16,6 +17,7 @@ class ZnunyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/znuny.php', 'znuny');
+        $this->mergeNestedConfig(['http', 'session']);
 
         // Without a channel definition Laravel would write an emergency entry on every request.
         $channel = (string) $this->app['config']->get('znuny.logging.channel', 'znuny');
@@ -31,6 +33,29 @@ class ZnunyServiceProvider extends ServiceProvider
 
         $this->app->singleton(ZnunyManager::class, fn ($app) => new ZnunyManager($app));
         $this->app->alias(ZnunyManager::class, 'znuny');
+    }
+
+    /**
+     * mergeConfigFrom() merges only the top level. A config file published by an earlier
+     * release therefore hides nested keys that were added later, and their environment
+     * variables with them.
+     *
+     * @param  list<string>  $blocks
+     */
+    protected function mergeNestedConfig(array $blocks): void
+    {
+        if ($this->app instanceof CachesConfiguration && $this->app->configurationIsCached()) {
+            return;
+        }
+
+        $defaults = require __DIR__.'/../config/znuny.php';
+
+        foreach ($blocks as $block) {
+            $this->app['config']->set("znuny.{$block}", array_merge(
+                $defaults[$block],
+                (array) $this->app['config']->get("znuny.{$block}", []),
+            ));
+        }
     }
 
     public function boot(): void
