@@ -6,6 +6,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Znuny;
 
 /**
@@ -52,6 +53,44 @@ final class SessionScopeTest extends TestCase
 
         Http::assertSent(fn (Request $r): bool => str_ends_with($r->url(), '/TicketSearch') && $r['SessionID'] === 'SHARED_SESSION');
         Http::assertNotSent(fn (Request $r): bool => str_ends_with($r->url(), '/SessionCreate'));
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function switchedOff(): array
+    {
+        return ['false' => [false], '"false"' => ['false'], '"off"' => ['off'], '"no"' => ['no'], '"0"' => ['0'], '0' => [0]];
+    }
+
+    #[DataProvider('switchedOff')]
+    public function test_per_host_sessions_can_be_switched_off_with_any_boolean_like_value(mixed $value): void
+    {
+        config(['znuny.session.per_host' => $value]);
+        $this->fakeZnuny();
+
+        Znuny::call('TicketSearch');
+
+        $this->assertSame('OWN_SESSION', Cache::get('znuny:session:'.Znuny::client()->identityKey()));
+    }
+
+    /**
+     * @return array<string, array{0: mixed}>
+     */
+    public static function notSwitchedOff(): array
+    {
+        return ['true' => [true], '"true"' => ['true'], '"on"' => ['on'], 'blank' => [''], 'null' => [null], 'typo' => ['flase']];
+    }
+
+    #[DataProvider('notSwitchedOff')]
+    public function test_per_host_sessions_stay_on_for_any_other_value(mixed $value): void
+    {
+        config(['znuny.session.per_host' => $value]);
+        $this->fakeZnuny();
+
+        Znuny::call('TicketSearch');
+
+        $this->assertSame('OWN_SESSION', Cache::get($this->sessionKey((string) gethostname())));
     }
 
     public function test_the_session_id_of_a_connection_can_be_read(): void
