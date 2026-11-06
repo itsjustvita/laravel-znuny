@@ -128,9 +128,9 @@ Headers keep session IDs and passwords out of URLs and access logs. They need Zn
 'timezone' => env('ZNUNY_TIMEZONE', 'UTC'),
 ```
 
-Znuny reads search dates and returns dates in its `OTRSTimeZone` (Admin → System Configuration), whatever the time zone of your app is. It is `UTC` unless an administrator changed it. If your Znuny uses another time zone, set `ZNUNY_TIMEZONE` to its IANA name, for example `Europe/Berlin`; otherwise dates and date filters are off by Znuny's UTC offset. A connection can override the value with its own `timezone` key.
+Znuny reads search dates and returns dates in its `OTRSTimeZone` (Admin → System Configuration), whatever the time zone of your app is. It is `UTC` unless an administrator changed it. If your Znuny uses another time zone, set `ZNUNY_TIMEZONE` to the name Znuny shows, for example `Europe/Berlin`; otherwise dates and date filters are off by Znuny's UTC offset. Offsets and abbreviations that Znuny does not offer, such as `+02:00` or `CEST`, are rejected because they ignore daylight saving time; the legacy names `CET`, `EET`, `MET`, `WET`, `EST`, `MST` and `HST` are replaced by their region, for example `CET` by `Europe/Brussels`. A connection can override the value with its own `timezone` key.
 
-`php artisan znuny:test-connection` compares the setting with the dates Znuny returns and fails with a hint if they do not match.
+`php artisan znuny:test-connection` checks the setting against the dates Znuny returns. It compares the UTC offsets for the newest ticket and, if they exist, for tickets from about four and eight months ago, and fails with a hint if they differ.
 
 ### Multiple and runtime connections
 

@@ -12,8 +12,8 @@ Fixes found by the extended integration suite, which now also covers dynamic fie
 
 ### Added
 
-- Option `timezone` (`ZNUNY_TIMEZONE`, default `UTC`): Znuny's `OTRSTimeZone`, as an IANA name. It can be set globally and per connection. `ZnunyWebhookReceived::ticket()` uses it and accepts another time zone as an optional argument.
-- `znuny:test-connection` fetches the newest ticket with `TicketGet` and fails with a hint when the `timezone` setting does not match the dates Znuny returns.
+- Option `timezone` (`ZNUNY_TIMEZONE`, default `UTC`): Znuny's `OTRSTimeZone`, by the name Znuny shows. It can be set globally and per connection. `ZnunyWebhookReceived::ticket()` uses it and accepts another time zone as an optional argument.
+- `znuny:test-connection` fetches the newest ticket and tickets from about four and eight months ago with `TicketGet` and fails with a hint when the `timezone` setting does not match their dates.
 - Search: `whereLastChangedAfter()` and `whereLastChangedBefore()` for the ticket's last change time.
 
 ### Fixed
