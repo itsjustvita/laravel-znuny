@@ -48,6 +48,11 @@ curl -fsS http://localhost:8080/otrs/index.pl >/dev/null || { echo "Znuny did no
 
 console() { compose exec -T -u otrs znuny /opt/otrs/bin/otrs.Console.pl "$@"; }
 
+# Znuny keeps UTC unless ZNUNY_OTRS_TIMEZONE names another OTRSTimeZone, e.g. Europe/Berlin.
+if [ -n "${ZNUNY_OTRS_TIMEZONE:-}" ]; then
+  console Admin::Config::Update --setting-name OTRSTimeZone --value "$ZNUNY_OTRS_TIMEZONE"
+fi
+
 console Admin::User::Add --user-name api-agent --first-name API --last-name Agent \
   --email-address api-agent@example.com --password api-secret || true
 console Admin::Group::UserLink --user-name api-agent --group-name users --permission rw || true
@@ -80,7 +85,7 @@ curl -fsS -X POST -H 'Content-Type: application/json' \
   http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST/Session \
   | grep -q SessionID || { echo "The API agent cannot log in; see the output above." >&2; exit 1; }
 
-cat <<'TEXT'
+cat <<TEXT
 
 Znuny is ready:
 
@@ -92,5 +97,6 @@ Znuny is ready:
   ZNUNY_INTEGRATION_CUSTOMER_USER=jane
   ZNUNY_INTEGRATION_CUSTOMER_PASSWORD=jane-secret
   ZNUNY_INTEGRATION_WEBHOOK_LISTEN=0.0.0.0:8099
+  ZNUNY_INTEGRATION_TIMEZONE=${ZNUNY_OTRS_TIMEZONE:-UTC}
 
 TEXT

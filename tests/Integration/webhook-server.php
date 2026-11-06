@@ -18,6 +18,7 @@ $app = Application::create(options: [
         'env' => [
             'ZNUNY_WEBHOOKS_ENABLED=true',
             'ZNUNY_WEBHOOK_TOKEN="'.getenv('ZNUNY_WEBHOOK_TOKEN').'"',
+            'ZNUNY_TIMEZONE="'.(getenv('ZNUNY_TIMEZONE') ?: 'UTC').'"',
         ],
     ],
 ]);
@@ -29,6 +30,7 @@ $app['events']->listen(function (ZnunyWebhookReceived $event): void {
         'articleId' => $event->articleId,
         'parameters' => $event->parameters,
         'ticket' => $event->ticket()?->toArray(),
+        'createdTimestamp' => $event->ticket()?->created?->getTimestamp(),
         'customerEmail' => $event->ticket()?->attribute('CustomerUser.UserEmail'),
     ])."\n", FILE_APPEND | LOCK_EX);
 });

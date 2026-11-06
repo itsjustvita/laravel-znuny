@@ -9,6 +9,7 @@ Requires Docker with Compose v2. The setup uses the community image [`cygnusnetw
 ```bash
 tests/Integration/docker/setup.sh                                          # Znuny 7.3.7 on http://localhost:8080
 ZNUNY_IMAGE=cygnusnetworks/znuny:6.5.22 tests/Integration/docker/setup.sh  # another version
+ZNUNY_OTRS_TIMEZONE=Europe/Berlin tests/Integration/docker/setup.sh        # a Znuny that does not run on UTC
 ```
 
 The setup creates:
@@ -32,7 +33,7 @@ ZNUNY_INTEGRATION_WEBHOOK_LISTEN=0.0.0.0:8099 \
 vendor/bin/phpunit --testsuite Integration
 ```
 
-Only `ZNUNY_INTEGRATION_URL`, `ZNUNY_INTEGRATION_USERNAME` and `ZNUNY_INTEGRATION_PASSWORD` are required; tests that need another variable are skipped without it. Against your own Znuny the tests expect the queue `Raw`, the states `new` and `open`, the priority `3 normal` and the dynamic fields above. Set `ZNUNY_INTEGRATION_TIMEZONE` if its `OTRSTimeZone` is not UTC.
+Only `ZNUNY_INTEGRATION_URL`, `ZNUNY_INTEGRATION_USERNAME` and `ZNUNY_INTEGRATION_PASSWORD` are required; tests that need another variable are skipped without it. Against your own Znuny the tests expect the queue `Raw`, the states `new` and `open`, the priority `3 normal` and the dynamic fields above. Set `ZNUNY_INTEGRATION_TIMEZONE` if its `OTRSTimeZone` is not UTC; the setup prints the value to use.
 
 With `ZNUNY_INTEGRATION_WEBHOOK_LISTEN`, the webhook test serves `tests/Integration/webhook-server.php` (a Laravel application with the package's webhook endpoint) on that address with `php -S`, creates a ticket and waits for the `ZnunyWebhookReceived` event. Znuny must reach the address as `host.docker.internal:8099`.
 

@@ -68,7 +68,7 @@ final class ZnunyIntegrationTest extends TestCase
             'password' => getenv('ZNUNY_INTEGRATION_PASSWORD'),
             'routes' => $routes,
             'retries' => 0,
-            'timezone' => getenv('ZNUNY_INTEGRATION_TIMEZONE') ?: 'UTC',
+            'timezone' => $this->timezone(),
         ], $config);
 
         return Znuny::build(['name' => 'integration-'.md5(serialize($config))] + $config);
@@ -87,6 +87,14 @@ final class ZnunyIntegrationTest extends TestCase
             'password' => $password,
             'user_type' => 'customer',
         ]);
+    }
+
+    /**
+     * The OTRSTimeZone of the Znuny under test.
+     */
+    private function timezone(): string
+    {
+        return getenv('ZNUNY_INTEGRATION_TIMEZONE') ?: 'UTC';
     }
 
     private function customerUser(): string
@@ -250,18 +258,21 @@ final class ZnunyIntegrationTest extends TestCase
         }
     }
 
-    public function test_changed_before_means_last_changed_before(): void
+    public function test_change_filters_compare_the_last_change_and_the_history(): void
     {
         $znuny = $this->znuny();
         $title = 'Last change '.uniqid();
         $ticket = $this->createTicket($znuny, $title);
-        sleep(2);
-        $between = now();
-        sleep(2);
+
+        // A moment on Znuny's own clock, so the clock of this machine does not matter.
+        $between = $ticket->created->copy()->addSecond();
+        sleep(3);
         $znuny->tickets()->update($ticket->id, ['state' => 'open']);
         $search = fn () => $znuny->tickets()->where('Title', $title);
 
         $this->assertSame([], $search()->whereChangedBefore($between)->ids()->all());
+        $this->assertSame([], $search()->whereLastChangedBefore($between)->ids()->all());
+        $this->assertSame([$ticket->id], $search()->whereLastChangedAfter($between)->ids()->all());
         $this->assertSame([$ticket->id], $search()->whereChangedAfter($between)->ids()->all());
         $this->assertSame([$ticket->id], $search()->whereCreatedBefore($between)->ids()->all());
     }
@@ -367,11 +378,23 @@ final class ZnunyIntegrationTest extends TestCase
             'password' => getenv('ZNUNY_INTEGRATION_PASSWORD'),
         ];
 
-        config(['znuny.connections.live' => ['base_url' => getenv('ZNUNY_INTEGRATION_URL')] + $credentials]);
+        $live = ['base_url' => getenv('ZNUNY_INTEGRATION_URL'), 'timezone' => $this->timezone()] + $credentials;
+        config(['znuny.connections.live' => $live]);
+        $this->createTicket($this->znuny(), 'Artisan '.uniqid());
 
         $this->artisan('znuny:test-connection', ['connection' => 'live'])
+            ->expectsOutputToContain('Time zone')
+            ->doesntExpectOutputToContain('not verified')
             ->expectsOutputToContain('Znuny connection [live] OK')
             ->assertSuccessful();
+
+        // A time zone that is hours away from Znuny's.
+        $elsewhere = $this->timezone() === 'Asia/Tokyo' ? 'America/New_York' : 'Asia/Tokyo';
+        config(['znuny.connections.elsewhere' => ['timezone' => $elsewhere] + $live]);
+
+        $this->artisan('znuny:test-connection', ['connection' => 'elsewhere'])
+            ->expectsOutputToContain('ZNUNY_TIMEZONE')
+            ->assertFailed();
 
         $this->artisan('znuny:routes', ['connection' => 'live'])
             ->expectsOutputToContain('Connection [live] uses preset generic-ticket-connector.')
@@ -402,17 +425,37 @@ final class ZnunyIntegrationTest extends TestCase
         $server = new Process([PHP_BINARY, '-S', $listen, __DIR__.'/webhook-server.php'], env: [
             'ZNUNY_WEBHOOK_TOKEN' => 'integration-token',
             'ZNUNY_WEBHOOK_CAPTURE' => $capture,
+            'ZNUNY_TIMEZONE' => $this->timezone(),
         ]);
         $server->start();
 
+        // Fails when the server is gone, e.g. because another process already uses the port.
+        $running = function () use ($server, $listen): void {
+            if (! $server->isRunning()) {
+                $this->fail("The webhook server on {$listen} exited: ".trim($server->getErrorOutput()));
+            }
+        };
+
         try {
-            $this->waitFor(fn (): bool => @fsockopen('127.0.0.1', $port) !== false, "the webhook server on port {$port}");
+            usleep(300_000);
+
+            $this->waitFor(function () use ($running, $port): bool {
+                $running();
+                $socket = @fsockopen('127.0.0.1', $port);
+
+                return $socket !== false && fclose($socket);
+            }, "the webhook server on port {$port}");
 
             $ticket = $this->createTicket($this->znuny(), 'Webhook '.uniqid());
 
-            $received = $this->waitFor(fn (): ?array => collect(file($capture, FILE_IGNORE_NEW_LINES) ?: [])
-                ->map(fn (string $line): array => json_decode($line, true))
-                ->firstWhere('ticketId', $ticket->id), "the TicketCreate webhook of ticket {$ticket->id}");
+            $received = $this->waitFor(function () use ($running, $capture, $ticket): ?array {
+                $running();
+
+                // A line that is still being written does not decode yet.
+                return collect(file($capture, FILE_IGNORE_NEW_LINES) ?: [])
+                    ->map(fn (string $line): mixed => json_decode($line, true))
+                    ->first(fn (mixed $event): bool => is_array($event) && ($event['ticketId'] ?? null) === $ticket->id);
+            }, "the TicketCreate webhook of ticket {$ticket->id}");
         } finally {
             $server->stop();
             @unlink($capture);
@@ -422,6 +465,7 @@ final class ZnunyIntegrationTest extends TestCase
         $this->assertSame(['event' => 'TicketCreate'], $received['parameters']);
         $this->assertSame($ticket->title, $received['ticket']['Title']);
         $this->assertSame($this->customerUser(), $received['ticket']['CustomerUser']);
+        $this->assertSame($ticket->created->getTimestamp(), $received['createdTimestamp']);
         $this->assertStringContainsString('@', (string) $received['customerEmail']);
     }
 }
