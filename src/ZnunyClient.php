@@ -130,7 +130,11 @@ class ZnunyClient
         return true;
     }
 
-    protected function sessionId(): string
+    /**
+     * The session ID of this connection; logs in if no session is cached. Use it for
+     * session operations, e.g. call('SessionGet', ['SessionID' => $client->sessionId()]).
+     */
+    public function sessionId(): string
     {
         return $this->sessionManager->sessionId($this->identityKey(), fn (): string => $this->createSession());
     }

@@ -55,11 +55,19 @@ return [
 
     'timezone' => env('ZNUNY_TIMEZONE', 'UTC'),
 
+    /*
+    | Znuny sessions are cached and reused. per_host keeps one session per host name:
+    | Znuny binds a session to the IP address that created it (SessionCheckRemoteIP), so
+    | servers and workers that share a cache store but reach Znuny from different
+    | addresses would otherwise invalidate each other's session with every request.
+    */
+
     'session' => [
         'cache_store' => env('ZNUNY_CACHE_STORE'),
         'cache_prefix' => 'znuny:session:',
         'ttl' => env('ZNUNY_SESSION_TTL', 21600),
         'auto_retry_on_expired' => true,
+        'per_host' => env('ZNUNY_SESSION_PER_HOST', true),
     ],
 
     /*
