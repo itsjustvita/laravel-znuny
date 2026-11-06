@@ -4,26 +4,27 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
-Robustness fixes. Three of them change behaviour, see [UPGRADE.md](UPGRADE.md).
+Robustness fixes. See [UPGRADE.md](UPGRADE.md) for what is worth setting after the update.
 
 ### Added
 
-- `search_limit` (`ZNUNY_SEARCH_LIMIT`, default 10 000; per connection or under `http`) and `ZnunySearchLimitExceededException`.
-- `session.per_host` (`ZNUNY_SESSION_PER_HOST`, default `true`).
+- `search_limit` (`ZNUNY_SEARCH_LIMIT`; per connection or under `http`) and `ZnunySearchLimitExceededException`. Znuny cuts a search without a limit off at 500 tickets and does not say so. With a search limit, `ids()`, `get()`, `paginate()` and `lazy()` without `limit()` return every match up to that number and throw if more tickets match. It is off by default and will be on in 0.3.0; until then a search that returns exactly 500 tickets is logged as a warning.
+- `session.per_host` (`ZNUNY_SESSION_PER_HOST`, default `true`), see Fixed.
 - `verify_ssl` accepts the path of a CA bundle.
-- `ZnunyClient::sessionId()` is public, for session operations such as `SessionGet` and `SessionDelete`.
+- `customers()->tickets($id, limit: 25)`.
+- `ZnunyClient::sessionId()` is public.
 - README: troubleshooting section.
 
 ### Fixed
 
-- Searches without `limit()` were cut off at 500 tickets without notice, because Znuny applies its `SearchLimit` when the request has no limit. `ids()`, `get()`, `paginate()` and `lazy()` now return every match up to `search_limit` and throw if more tickets match.
 - Hosts that share a cache store but reach Znuny from different IP addresses invalidated each other's session with every request, because Znuny binds a session to the address that created it. Each host now keeps its own session.
 - `withArticle()` and `addArticle()` failed without a `contentType`, which Znuny requires. Articles are now sent as plain text by default.
-- `findMany()` sent one request per ticket when Znuny rejected a batch because of a single missing ticket. It now halves the batch until the ticket is isolated.
+- `findMany()` sent one request per ticket when Znuny rejected a batch because of a single missing ticket. It now halves the batch and fetches ticket by ticket only once eight or fewer are left.
+- Nested config keys that were added after the config file was published (`http.search_limit`, `session.per_host`) had no effect, and neither had their environment variables. The `http` and `session` blocks are now merged with the package defaults.
 
 ### Security
 
-- `verify_ssl` values that were not booleans, such as a CA bundle path, a typo or an empty environment variable, switched certificate verification off. They now raise a `ZnunyConfigurationException`; an empty value leaves verification on.
+- `verify_ssl` values that are not booleans switched certificate verification off, for example a typo or an empty environment variable. An empty value now leaves verification on, and any other value that is not the path of an existing CA bundle raises a `ZnunyConfigurationException`.
 
 ## [0.2.1] - 2026-11-06
 

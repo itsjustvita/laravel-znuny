@@ -2,27 +2,39 @@
 
 ## 0.2.1 → 0.2.2
 
-### Searches are complete or fail
+Nothing has to be changed. Two things are worth doing, and two behaviours changed.
 
-Znuny cuts a `TicketSearch` off at 500 tickets (its `SearchLimit`) unless the request carries a limit, and does not say so. Until 0.2.1, `ids()`, `get()`, `paginate()` and `lazy()` without `limit()` therefore returned at most 500 tickets.
+### Worth doing: set a search limit
 
-They now return every matching ticket up to the new `search_limit` (10 000 by default) and throw a `ZnunySearchLimitExceededException` if more match. What this means for you:
+Znuny cuts a `TicketSearch` without a limit off at its `SearchLimit`, 500 tickets by default, and does not say so. `ids()`, `get()`, `paginate()` and `lazy()` without `limit()` therefore return at most that many tickets.
 
-- Searches that match between 501 and 10 000 tickets now return all of them, which also means more `TicketGet` requests for `get()` and `lazy()`.
-- If you want only the first tickets, say so with `limit()`, for example `->limit(500)`.
-- Raise the limit with `ZNUNY_SEARCH_LIMIT` or the connection's `search_limit`. `'search_limit' => null` restores the old behaviour.
+```dotenv
+ZNUNY_SEARCH_LIMIT=500
+```
 
-### One session per host
+With a search limit, such a search returns every matching ticket up to that number and throws a `ZnunySearchLimitExceededException` if more match. See "Incomplete results" in the README before you raise it far beyond 500: `get()` loads every ticket with its articles into memory.
 
-Znuny binds a session to the IP address that created it. The package now caches one session per host name, so hosts that share a cache store no longer invalidate each other's session. After the update every host logs in once; there is nothing to do. `ZNUNY_SESSION_PER_HOST=false` shares one session between all hosts as before.
+- 0.2.2 leaves the limit off, so nothing changes until you set it. It only logs a warning when a search returns exactly 500 tickets. 0.3.0 will switch the limit on.
+- The package's limit replaces Znuny's `SearchLimit`. If an administrator raised that setting, use at least the same value.
+- With a limit set, every `TicketSearch` without `limit()` carries a `Limit` parameter. Adjust `Http::fake()` expectations in your tests if they compare the whole request.
 
-### `verify_ssl`
+### Worth doing: check `ZNUNY_VERIFY_SSL`
 
 A value that is neither a boolean nor the path of an existing CA bundle now raises a `ZnunyConfigurationException`. Until 0.2.1 such a value switched certificate verification off, and so did an empty `ZNUNY_VERIFY_SSL=`. An empty value now leaves verification on; set `ZNUNY_VERIFY_SSL=false` if you really want it off.
 
-### Articles
+### Changed: one session per host
+
+Znuny binds a session to the IP address that created it. The package now caches one session per host name, so hosts that share a cache store no longer invalidate each other's session. After the update every host logs in once.
+
+Hosts with short-lived names, such as autoscaled containers or job pods, log in once each. If they all reach Znuny from the same address, `ZNUNY_SESSION_PER_HOST=false` shares one session between all hosts as before.
+
+### Changed: articles default to plain text
 
 Articles without `contentType` (or `mimeType` and `charset`) are sent as `text/plain; charset=utf8`. Znuny rejected them before, so no working code changes.
+
+### Published config files
+
+`ZNUNY_SEARCH_LIMIT` and `ZNUNY_SESSION_PER_HOST` also work with a config file that was published before 0.2.2; you do not have to add the new keys `http.search_limit` and `session.per_host` to it.
 
 ## 0.2.0 → 0.2.1
 
