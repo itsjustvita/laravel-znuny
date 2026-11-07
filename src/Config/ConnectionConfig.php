@@ -57,7 +57,7 @@ final readonly class ConnectionConfig
         public int $retryDelay,
         public int $batchSize,
         public string $timezone = 'UTC',
-        public ?int $searchLimit = null,
+        public ?int $searchLimit = 500,
     ) {}
 
     /**
@@ -95,9 +95,11 @@ final readonly class ConnectionConfig
             retryDelay: max(10, (int) ($config['retry_delay'] ?? $http['retry_delay'] ?? 100)),
             batchSize: max(1, (int) ($config['batch_size'] ?? $http['batch_size'] ?? 50)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
-            searchLimit: self::searchLimit($name, array_key_exists('search_limit', $config)
-                ? $config['search_limit']
-                : $http['search_limit'] ?? null),
+            searchLimit: self::searchLimit($name, match (true) {
+                array_key_exists('search_limit', $config) => $config['search_limit'],
+                array_key_exists('search_limit', $http) => $http['search_limit'],
+                default => 500,
+            }),
         );
     }
 

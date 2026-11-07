@@ -4,10 +4,32 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-07
+
+Convenience features and an API cleanup. Four breaking changes, each of which fails loudly; see [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- Search: every builder method can be called on `Znuny::tickets()` directly; named filters `whereTicketNumber()`, `whereTitle()`, `whereType()`, `whereTypeId()`, `whereStateId()`, `wherePriorityId()`, `whereOwnerId()`, `whereResponsibleId()`, `whereCustomerUser()`, `whereLock()`, `whereService()`, `whereSla()`, `whereClosedAfter()`/`Before()`, `wherePendingAfter()`/`Before()`, `whereFullText()`, `includeArchived()`, `onlyArchived()`; `count()`.
+- `tickets()->findByNumber()`: an exact lookup by the ticket number customers see, safe for numbers they enter.
+- Raw `TicketGet` parameters: `find(..., options: [...])`, `findMany(..., options: [...])` and `withOptions()` for searches.
+- Ticket actions: `lock()`, `unlock()`, `assign()`, `move()`, `setPending()`.
+- A `pendingTime` in `create()` and `update()` can be a `DateTimeInterface`; it is converted to Znuny's time zone. `Ticket::$pendingUntil`.
+- `Attachment::fromUploadedFile()` and `Attachment::fromStorage()`.
+- `Znuny::fake()` for application tests: responses per operation, `Znuny::fakeTickets()`, `Znuny::sequence()`, `assertCalled()`, `assertCalledTimes()`, `assertNotCalled()`, `assertNothingCalled()` and `recorded()`.
+- `php artisan znuny:webservice`: generates the Znuny web service definition for a connection's routes, optionally with a webhook requester. The integration setup uses it, so CI imports generated definitions into every supported Znuny version.
+
 ### Changed
 
+- **Breaking:** the search limit is on by default (500): a search without `limit()` that matches more tickets throws a `ZnunySearchLimitExceededException` instead of returning Znuny's first 500. `'search_limit' => null` restores the old behaviour. A config file published with 0.2.2 keeps the limit off until one line is changed, see UPGRADE.md.
+- **Breaking:** dates on `Ticket`, `Article` and `HistoryEntry` are `CarbonImmutable`.
+- **Breaking:** `Ticket::$customerUserID` is renamed to `$customerUserId`; the old name works with a deprecation notice until 0.4.0.
 - The integration suite runs in CI against Znuny 6.5, 7.0, 7.1, 7.2 and 7.3, and against a Znuny that does not run on UTC.
 - PHPDoc array types throughout the package, which passes PHPStan at level 8 now. Applications that use static analysis get more precise types.
+
+### Removed
+
+- **Breaking:** `ZnunyClient::request()`, deprecated since 0.2.0; use `call()`.
 
 ## [0.2.2] - 2026-11-06
 
@@ -115,7 +137,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.2...v0.2.0

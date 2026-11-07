@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -12,6 +14,7 @@ use ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Znuny;
 
 final class TicketResourceTest extends TestCase
@@ -299,6 +302,195 @@ final class TicketResourceTest extends TestCase
         $this->assertCount(0, Znuny::tickets()->findMany(range(1, 50)));
         // Halving alone would need 99 requests; one per ticket needed 51.
         $this->assertSame(65, $ticketGets);
+    }
+
+    public function test_builder_methods_can_be_called_on_the_resource(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['3']]),
+        ]);
+
+        $this->assertSame(['3'], Znuny::tickets()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids()->all());
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['DynamicField_OrderId'] === ['Like' => 'ORD-*']);
+    }
+
+    public function test_an_unknown_method_names_the_resource(): void
+    {
+        $this->expectException(\BadMethodCallException::class);
+        $this->expectExceptionMessage('TicketResource::whereNope()');
+
+        Znuny::tickets()->whereNope('x');
+    }
+
+    public function test_find_by_number_searches_the_exact_number_and_loads_the_ticket(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
+            '*TicketGet/42' => Http::response(['Ticket' => [['TicketNumber' => '2026110610000017'] + $this->ticket('42')]]),
+        ]);
+
+        $this->assertSame('42', Znuny::tickets()->findByNumber('2026110610000017', withArticles: true)->id);
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketNumber'] === '2026110610000017'
+            && $r['Limit'] === 1);
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/TicketGet/42') && $r['AllArticles'] === 1);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function wildcardNumbers(): array
+    {
+        // Znuny ignores an empty number and would return any ticket.
+        return ['star' => ['*'], 'prefix with star' => ['2026*'], 'percent' => ['%'], 'percent inside' => ['2026%17'], 'empty' => ['']];
+    }
+
+    /**
+     * Znuny's search treats "*" (and the database "%") as wildcards. An exact lookup with a
+     * number a customer entered must not return somebody else's ticket.
+     */
+    #[DataProvider('wildcardNumbers')]
+    public function test_find_by_number_does_not_treat_wildcards_as_a_match(string $number): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
+            '*TicketGet/42' => Http::response(['Ticket' => [['TicketNumber' => '2026110610000017'] + $this->ticket('42')]]),
+        ]);
+
+        try {
+            Znuny::tickets()->findByNumber($number);
+            $this->fail('Expected a TicketNotFoundException');
+        } catch (TicketNotFoundException) {
+            $this->addToAssertionCount(1);
+        }
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketGet'));
+    }
+
+    public function test_find_by_number_only_returns_a_ticket_with_exactly_that_number(): void
+    {
+        // A database pattern character such as "_" can still make Znuny match another number.
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
+            '*TicketGet/42' => Http::response(['Ticket' => [['TicketNumber' => '2026110610000017'] + $this->ticket('42')]]),
+        ]);
+
+        $this->expectException(TicketNotFoundException::class);
+
+        Znuny::tickets()->findByNumber('2026110610000_17');
+    }
+
+    public function test_find_by_number_without_a_match_throws_ticket_not_found(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        try {
+            Znuny::tickets()->findByNumber('404');
+            $this->fail('Expected a TicketNotFoundException');
+        } catch (TicketNotFoundException $e) {
+            $this->assertStringContainsString('number [404]', $e->getMessage());
+            $this->assertSame('TicketSearch', $e->getOperation());
+            $this->assertSame('default', $e->getConnection());
+        }
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketGet'));
+    }
+
+    public function test_find_and_find_many_pass_raw_ticket_get_options(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketGet*' => Http::response(['Ticket' => [$this->ticket('42')]]),
+        ]);
+
+        Znuny::tickets()->find('42', withDynamicFields: true, options: ['Extended' => 1, 'DynamicFields' => 0]);
+        Znuny::tickets()->findMany(['42'], options: ['ArticleLimit' => 2]);
+
+        // Options override the flags of the named parameters.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet')
+            && ($r['Extended'] ?? null) === 1 && ($r['DynamicFields'] ?? null) === 0);
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet') && ($r['ArticleLimit'] ?? null) === 2);
+    }
+
+    /**
+     * The Ticket hashes of all TicketUpdate requests sent so far.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function ticketUpdates(): array
+    {
+        return Http::recorded(fn (Request $r) => str_contains($r->url(), 'TicketUpdate'))
+            ->map(fn (array $pair): array => $pair[0]['Ticket'])
+            ->values()
+            ->all();
+    }
+
+    public function test_ticket_actions_send_ticket_updates(): void
+    {
+        Event::fake([ZnunyTicketUpdated::class]);
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '1', 'TicketNumber' => '1']),
+        ]);
+
+        Znuny::tickets()->lock('1');
+        Znuny::tickets()->unlock('1');
+        Znuny::tickets()->assign('1', 'agent');
+        Znuny::tickets()->move('1', 'Second Level');
+        Znuny::tickets()->setPending('1', new DateTimeImmutable('2026-07-01 12:30:00', new DateTimeZone('UTC')));
+        Znuny::tickets()->setPending('1', new DateTimeImmutable('2026-07-02 08:00:00', new DateTimeZone('UTC')), 'pending auto close+');
+
+        $this->assertSame([
+            ['Lock' => 'lock'],
+            ['Lock' => 'unlock'],
+            ['Owner' => 'agent'],
+            ['Queue' => 'Second Level'],
+            ['State' => 'pending reminder', 'PendingTime' => ['Year' => 2026, 'Month' => 7, 'Day' => 1, 'Hour' => 12, 'Minute' => 30]],
+            ['State' => 'pending auto close+', 'PendingTime' => ['Year' => 2026, 'Month' => 7, 'Day' => 2, 'Hour' => 8, 'Minute' => 0]],
+        ], $this->ticketUpdates());
+
+        Event::assertDispatchedTimes(ZnunyTicketUpdated::class, 6);
+    }
+
+    public function test_ids_and_names_are_told_apart_by_type(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '1', 'TicketNumber' => '1']),
+        ]);
+
+        Znuny::tickets()->assign('1', 3);
+        Znuny::tickets()->assign('1', '3');
+        Znuny::tickets()->move('1', 7);
+        Znuny::tickets()->move('1', '7');
+
+        $this->assertSame([['OwnerID' => 3], ['Owner' => '3'], ['QueueID' => 7], ['Queue' => '7']], $this->ticketUpdates());
+    }
+
+    public function test_a_pending_date_on_update_uses_the_connection_time_zone(): void
+    {
+        config(['znuny.timezone' => 'Europe/Berlin']);
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '1', 'TicketNumber' => '1']),
+        ]);
+
+        Znuny::tickets()->update('1', ['state' => 'pending reminder', 'pendingTime' => new DateTimeImmutable('2026-01-15 08:00:00', new DateTimeZone('UTC'))]);
+
+        $this->assertSame(
+            [['State' => 'pending reminder', 'PendingTime' => ['Year' => 2026, 'Month' => 1, 'Day' => 15, 'Hour' => 9, 'Minute' => 0]]],
+            $this->ticketUpdates(),
+        );
     }
 
     public function test_find_many_without_ids_sends_nothing(): void

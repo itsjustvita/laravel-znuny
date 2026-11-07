@@ -133,6 +133,24 @@ final class TicketCreateBuilderTest extends TestCase
         });
     }
 
+    public function test_a_pending_date_on_create_uses_the_connection_time_zone(): void
+    {
+        config(['znuny.timezone' => 'Europe/Berlin']);
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketCreate*' => Http::response(['TicketID' => '99', 'TicketNumber' => '1']),
+            '*TicketGet*' => Http::response(['Ticket' => [['TicketID' => '99', 'Title' => 't']]]),
+        ]);
+
+        Znuny::tickets()->create(['title' => 't', 'queue' => 'Q', 'state' => 'pending reminder', 'priority' => '3 normal',
+            'customerUser' => 'c@example.com', 'pendingTime' => new \DateTimeImmutable('2026-07-01 08:00:00', new \DateTimeZone('UTC'))])
+            ->withArticle(['subject' => 's', 'body' => 'b'])
+            ->save();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'TicketCreate')
+            && $request['Ticket']['PendingTime'] === ['Year' => 2026, 'Month' => 7, 'Day' => 1, 'Hour' => 10, 'Minute' => 0]);
+    }
+
     public function test_save_sends_attachments(): void
     {
         Http::fake([

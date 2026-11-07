@@ -64,7 +64,8 @@ final class CustomerResourceTest extends TestCase
 
         $this->assertCount(1, $tickets);
         $this->assertSame('5', $tickets->first()->id);
-        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && ! isset($r['Limit']));
+        // The default search limit of 500 applies: one more is asked for to notice a cut-off.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && ($r['Limit'] ?? null) === 501);
 
         Znuny::customers()->tickets('12345', limit: 25);
 

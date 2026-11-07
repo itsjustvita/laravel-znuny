@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Integration;
 
+use Carbon\CarbonImmutable;
 use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -104,7 +105,7 @@ final class ZnunyIntegrationTest extends TestCase
         return getenv('ZNUNY_INTEGRATION_CUSTOMER_USER') ?: 'jane';
     }
 
-    private function newTicket(ZnunyManager $znuny, string $title, string $senderType = 'agent', array $ticket = []): TicketCreateBuilder
+    private function newTicket(ZnunyManager $znuny, string $title, string $senderType = 'agent', array $ticket = [], array $article = []): TicketCreateBuilder
     {
         return $znuny->tickets()->create(array_merge([
             'title' => $title,
@@ -112,14 +113,14 @@ final class ZnunyIntegrationTest extends TestCase
             'state' => 'new',
             'priority' => '3 normal',
             'customerUser' => $this->customerUser(),
-        ], $ticket))->withArticle([
+        ], $ticket))->withArticle(array_merge([
             'subject' => $title,
             'body' => 'Created by the laravel-znuny integration suite.',
             'contentType' => 'text/plain; charset=utf8',
             'communicationChannel' => 'Internal',
             'senderType' => $senderType,
             'isVisibleForCustomer' => true,
-        ]);
+        ], $article));
     }
 
     private function createTicket(ZnunyManager $znuny, string $title, array $attachments = []): Ticket
@@ -299,6 +300,74 @@ final class ZnunyIntegrationTest extends TestCase
         $this->expectException($exception);
 
         $this->newTicket($this->znuny(), 'Invalid '.uniqid(), ticket: $ticket)->withDynamicFields($dynamicFields)->save();
+    }
+
+    #[DataProvider('webServices')]
+    public function test_named_filters_find_tickets(string $urlVariable, string $routes): void
+    {
+        $znuny = $this->znuny([], $urlVariable, $routes);
+        $title = 'Filters '.uniqid();
+        $word = 'Quokka'.uniqid();
+        $ticket = $this->newTicket($znuny, $title, article: ['body' => "A {$word} sat on the printer."])->save();
+
+        $this->assertSame([$ticket->id], $znuny->tickets()->whereTicketNumber($ticket->ticketNumber)->ids()->all());
+        $this->assertSame([$ticket->id], $znuny->tickets()->whereTitle($title)->ids()->all());
+        $this->assertSame([$ticket->id], $znuny->tickets()->whereCustomerUser($this->customerUser())->whereTitle($title)->ids()->all());
+        $this->assertSame([$ticket->id], $znuny->tickets()->whereFullText($word)->ids()->all());
+        $this->assertSame(1, $znuny->tickets()->whereLock('unlock')->whereTitle($title)->count());
+
+        $znuny->tickets()->update($ticket->id, ['lock' => 'lock']);
+
+        $this->assertSame(1, $znuny->tickets()->whereLock('lock')->whereTitle($title)->count());
+        $this->assertSame(0, $znuny->tickets()->whereLock('unlock')->whereTitle($title)->count());
+    }
+
+    public function test_ticket_actions(): void
+    {
+        $znuny = $this->znuny();
+        $ticket = $this->createTicket($znuny, 'Actions '.uniqid());
+        $find = fn () => $znuny->tickets()->find($ticket->id);
+
+        $znuny->tickets()->lock($ticket->id);
+        $this->assertSame('lock', $find()->lock);
+
+        $znuny->tickets()->unlock($ticket->id);
+        $this->assertSame('unlock', $find()->lock);
+
+        $znuny->tickets()->assign($ticket->id, 'root@localhost');
+        $this->assertSame('root@localhost', $find()->owner);
+
+        $znuny->tickets()->move($ticket->id, 'Misc');
+        $this->assertSame('Misc', $find()->queue);
+
+        // Minute 0 on purpose, and a time zone that is neither UTC nor Znuny's.
+        $until = CarbonImmutable::now('Asia/Tokyo')->addDays(3)->setTime(14, 0);
+        $znuny->tickets()->setPending($ticket->id, $until);
+
+        $pending = $find();
+        $this->assertSame('pending reminder', $pending->state);
+        $this->assertSame($until->getTimestamp(), $pending->pendingUntil?->getTimestamp());
+
+        $znuny->tickets()->update($ticket->id, ['state' => 'open']);
+        $this->assertNull($find()->pendingUntil);
+    }
+
+    public function test_find_by_number(): void
+    {
+        $znuny = $this->znuny();
+        $ticket = $this->createTicket($znuny, 'By number '.uniqid());
+
+        $this->assertSame($ticket->id, $znuny->tickets()->findByNumber($ticket->ticketNumber)->id);
+
+        // Znuny's search would match these; the exact lookup must not.
+        foreach (['0', '*', substr($ticket->ticketNumber, 0, -1).'_', ''] as $number) {
+            try {
+                $znuny->tickets()->findByNumber($number);
+                $this->fail("findByNumber('{$number}') returned a ticket");
+            } catch (TicketNotFoundException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     public function test_find_many_skips_unknown_ids(): void
@@ -493,8 +562,9 @@ final class ZnunyIntegrationTest extends TestCase
             @unlink($capture);
         }
 
+        // The generated requester posts every event to /znuny/webhooks; the name comes from the payload.
         $this->assertSame('TicketCreate', $received['event']);
-        $this->assertSame(['event' => 'TicketCreate'], $received['parameters']);
+        $this->assertSame([], $received['parameters']);
         $this->assertSame($ticket->title, $received['ticket']['Title']);
         $this->assertSame($this->customerUser(), $received['ticket']['CustomerUser']);
         $this->assertSame($ticket->created->getTimestamp(), $received['createdTimestamp']);

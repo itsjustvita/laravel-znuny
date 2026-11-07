@@ -29,6 +29,9 @@ class TicketBuilder
 
     protected bool $withAttachments = false;
 
+    /** @var array<string, mixed> raw TicketGet parameters for get(), paginate() and lazy() */
+    protected array $options = [];
+
     public function __construct(
         protected readonly ZnunyClient $client,
         protected readonly TicketResource $resource,
@@ -63,6 +66,19 @@ class TicketBuilder
     public function withoutDynamicFields(): self
     {
         return $this->withDynamicFields(false);
+    }
+
+    /**
+     * Raw TicketGet parameters for get(), paginate() and lazy(), e.g. ['ArticleLimit' => 5].
+     * Later calls override earlier keys.
+     *
+     * @param  array<string, mixed>  $options
+     */
+    public function withOptions(array $options): self
+    {
+        $this->options = array_merge($this->options, $options);
+
+        return $this;
     }
 
     /**
@@ -104,7 +120,128 @@ class TicketBuilder
      */
     public function whereQueueId(string|int|array $ids): self
     {
-        return $this->where('QueueIDs', array_map('strval', (array) $ids));
+        return $this->where('QueueIDs', self::idList($ids));
+    }
+
+    /**
+     * Znuny's ticket number search; "*" is a wildcard.
+     *
+     * @param  string|list<string>  $numbers
+     */
+    public function whereTicketNumber(string|array $numbers): self
+    {
+        return $this->where('TicketNumber', (array) $numbers);
+    }
+
+    /**
+     * Znuny's title search; "*" is a wildcard.
+     *
+     * @param  string|list<string>  $titles
+     */
+    public function whereTitle(string|array $titles): self
+    {
+        return $this->where('Title', (array) $titles);
+    }
+
+    /**
+     * @param  string|list<string>  $types
+     */
+    public function whereType(string|array $types): self
+    {
+        return $this->where('Types', (array) $types);
+    }
+
+    /**
+     * @param  string|int|list<string|int>  $ids
+     */
+    public function whereTypeId(string|int|array $ids): self
+    {
+        return $this->where('TypeIDs', self::idList($ids));
+    }
+
+    /**
+     * @param  string|int|list<string|int>  $ids
+     */
+    public function whereStateId(string|int|array $ids): self
+    {
+        return $this->where('StateIDs', self::idList($ids));
+    }
+
+    /**
+     * @param  string|int|list<string|int>  $ids
+     */
+    public function wherePriorityId(string|int|array $ids): self
+    {
+        return $this->where('PriorityIDs', self::idList($ids));
+    }
+
+    /**
+     * @param  string|int|list<string|int>  $ids
+     */
+    public function whereOwnerId(string|int|array $ids): self
+    {
+        return $this->where('OwnerIDs', self::idList($ids));
+    }
+
+    /**
+     * @param  string|int|list<string|int>  $ids
+     */
+    public function whereResponsibleId(string|int|array $ids): self
+    {
+        return $this->where('ResponsibleIDs', self::idList($ids));
+    }
+
+    /**
+     * @param  string|list<string>  $logins
+     */
+    public function whereCustomerUser(string|array $logins): self
+    {
+        return $this->where('CustomerUserLogin', (array) $logins);
+    }
+
+    /**
+     * @param  string|list<string>  $locks  "lock" or "unlock"
+     */
+    public function whereLock(string|array $locks): self
+    {
+        return $this->where('Locks', (array) $locks);
+    }
+
+    /**
+     * @param  string|list<string>  $services
+     */
+    public function whereService(string|array $services): self
+    {
+        return $this->where('Services', (array) $services);
+    }
+
+    /**
+     * @param  string|list<string>  $slas
+     */
+    public function whereSla(string|array $slas): self
+    {
+        return $this->where('SLAs', (array) $slas);
+    }
+
+    /**
+     * Searches subject, body, From, To and Cc of the articles.
+     */
+    public function whereFullText(string $text): self
+    {
+        return $this->where('Fulltext', $text);
+    }
+
+    /**
+     * Include archived tickets (only relevant when Znuny's archive system is on).
+     */
+    public function includeArchived(): self
+    {
+        return $this->where('SearchInArchive', 'AllTickets');
+    }
+
+    public function onlyArchived(): self
+    {
+        return $this->where('SearchInArchive', 'ArchivedTickets');
     }
 
     /**
@@ -128,6 +265,26 @@ class TicketBuilder
     public function whereCreatedBefore(DateTimeInterface $date): self
     {
         return $this->where('TicketCreateTimeOlderDate', $this->znunyTime($date));
+    }
+
+    public function whereClosedAfter(DateTimeInterface $date): self
+    {
+        return $this->where('TicketCloseTimeNewerDate', $this->znunyTime($date));
+    }
+
+    public function whereClosedBefore(DateTimeInterface $date): self
+    {
+        return $this->where('TicketCloseTimeOlderDate', $this->znunyTime($date));
+    }
+
+    public function wherePendingAfter(DateTimeInterface $date): self
+    {
+        return $this->where('TicketPendingTimeNewerDate', $this->znunyTime($date));
+    }
+
+    public function wherePendingBefore(DateTimeInterface $date): self
+    {
+        return $this->where('TicketPendingTimeOlderDate', $this->znunyTime($date));
     }
 
     /**
@@ -241,6 +398,14 @@ class TicketBuilder
         return collect($ids)->values();
     }
 
+    /**
+     * The number of matching tickets; the search limit applies as for ids().
+     */
+    public function count(): int
+    {
+        return $this->ids()->count();
+    }
+
     /** @return Collection<int, Ticket> */
     public function get(): Collection
     {
@@ -299,6 +464,17 @@ class TicketBuilder
      */
     protected function fetch(array $ids): Collection
     {
-        return $this->resource->findMany($ids, $this->withArticles, $this->withDynamicFields, $this->withAttachments);
+        return $this->resource->findMany($ids, $this->withArticles, $this->withDynamicFields, $this->withAttachments, $this->options);
+    }
+
+    /**
+     * IDs as strings, the way Znuny returns them.
+     *
+     * @param  string|int|list<string|int>  $ids
+     * @return list<string>
+     */
+    private static function idList(string|int|array $ids): array
+    {
+        return array_map('strval', (array) $ids);
     }
 }

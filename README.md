@@ -59,13 +59,19 @@ The command checks the login, the routes and the [time zone](#time-zone) setting
 
 ## Setting up the web service in Znuny
 
-1. In Znuny open **Admin → Web Services → Add Web Service**.
-   - Znuny 6.5.11+ and 7.1.3+ list `GenericTicketConnectorREST` under **Ready2Adopt Web Services**. Import it there; the default route preset matches it.
-   - Older versions (Znuny 6.0, 6.5.0–6.5.10, 7.0, 7.1.0–7.1.2, OTRS 6) do not ship it. Use **Import web service** with [`development/webservices/GenericTicketConnectorREST.yml`](https://github.com/znuny/Znuny/blob/rel-7_3_7/development/webservices/GenericTicketConnectorREST.yml) from the Znuny repository and set `'routes' => 'generic-ticket-connector-classic'`.
+1. Get the web service definition:
+   - Znuny 6.5.11+ and 7.1.3+ list `GenericTicketConnectorREST` under **Admin → Web Services → Add Web Service → Ready2Adopt Web Services**. Import it there; the default route preset matches it.
+   - For every other version, for other routes and for webhooks, generate the definition from your connection:
+
+     ```bash
+     php artisan znuny:webservice --output=znuny-webservice.yml
+     ```
+
+     and import it under **Admin → Web Services → Add Web Service → Import web service**, or on the Znuny server with `bin/otrs.Console.pl Admin::WebService::Add --name GenericTicketConnectorREST --source-path znuny-webservice.yml`. CI imports generated definitions into Znuny 6.5, 7.0, 7.1, 7.2 and 7.3.
 2. Keep the name `GenericTicketConnectorREST` or choose your own. The base URL is `https://<host>/otrs/nph-genericinterface.pl/Webservice/<name>`; use your installation's script alias if it is not `/otrs/`.
 3. Create an agent for the API and give it permissions on the queues it needs.
 
-Web services that were set up from the older example earlier (they search with `GET /Ticket`) also need `'routes' => 'generic-ticket-connector-classic'`. `php artisan znuny:test-connection` tells you whether the routes match.
+Web services that were set up from the older example in `development/webservices/` (they search with `GET /Ticket`) need `'routes' => 'generic-ticket-connector-classic'`. `php artisan znuny:test-connection` tells you whether the routes match.
 
 ## Configuration
 
@@ -200,17 +206,28 @@ $articleId = Znuny::tickets()->addArticle('12345', [
 ]);
 
 Znuny::tickets()->close('12345');                  // state "closed successful"
+Znuny::tickets()->lock('12345');                   // and unlock()
+Znuny::tickets()->assign('12345', 'agent-login');  // an int is an agent ID
+Znuny::tickets()->move('12345', 'Second Level');   // an int is a queue ID
+Znuny::tickets()->setPending('12345', now()->addDays(3));                         // "pending reminder"
+Znuny::tickets()->setPending('12345', now()->addWeek(), 'pending auto close+');
+
+$ticket  = Znuny::tickets()->findByNumber('2026110610000017');   // the number customers see
 $history = Znuny::tickets()->history('12345');     // Collection<HistoryEntry>
 ```
 
+A `pendingTime` in `create()` and `update()` can be any `DateTimeInterface`; it is converted to Znuny's [time zone](#time-zone) and read to the minute. `$ticket->pendingUntil` is the pending time while the ticket is in a pending state, `null` otherwise. `findByNumber()` matches the exact number only: wildcards never match, so a number a customer enters returns that ticket or none. Whether the ticket belongs to that customer is still for your application to check.
+
 Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …). Any other key is passed to Znuny unchanged, so `'HistoryComment' => '…'` works too. Articles are sent as `text/plain; charset=utf8` unless you pass a `contentType` (or `mimeType` and `charset`).
 
-`Ticket`, `Article` and the other DTOs expose typed properties plus every raw field Znuny returned:
+`Ticket`, `Article` and the other DTOs expose typed properties plus every raw field Znuny returned. Dates are `CarbonImmutable`.
 
 ```php
 $ticket->owner;                                    // typed property
 $ticket->attribute('EscalationTime');              // raw field
 ```
+
+Raw `TicketGet` parameters can be passed to `find()` and `findMany()`, for example `find('12345', options: ['Extended' => 1, 'ArticleLimit' => 5])`.
 
 `attribute()` supports dot notation for nested data. `TicketGet` returns flat ticket fields, but webhook payloads include, for example, the customer user's data: `$event->ticket()->attribute('CustomerUser.UserEmail')`.
 
@@ -228,19 +245,35 @@ $tickets = Znuny::tickets()
     ->limit(50)
     ->get();                                       // Collection<Ticket>
 
-$page = Znuny::tickets()->where('CustomerID', '12345')->paginate(perPage: 25, page: 1);
-$ids  = Znuny::tickets()->query()->whereStateType('open')->ids();
+$page  = Znuny::tickets()->whereCustomerUser('jane')->paginate(perPage: 25, page: 1);
+$count = Znuny::tickets()->whereLock('lock')->whereOwnerId(3)->count();
+$ids   = Znuny::tickets()->whereFullText('printer')->ids();
 
 foreach (Znuny::tickets()->whereQueue('Support')->lazy(chunkSize: 100) as $ticket) {
     // processes tickets chunk by chunk
 }
 
 // Any TicketSearch parameter:
-Znuny::tickets()->where('OwnerIDs', [3, 4])->ids();
+Znuny::tickets()->where('CreatedUserIDs', [3, 4])->ids();
 
 // Dynamic field conditions (the default preset searches via POST; for the classic preset see Routes):
-Znuny::tickets()->query()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids();
+Znuny::tickets()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids();
 ```
+
+| Filters | Znuny parameter |
+|---|---|
+| `whereTicketNumber()`, `whereTitle()` (`*` is a wildcard) | `TicketNumber`, `Title` |
+| `whereState()`, `whereStateId()`, `whereStateType()` | `States`, `StateIDs`, `StateType` |
+| `whereQueue()`, `whereQueueId()` | `Queues`, `QueueIDs` |
+| `wherePriority()`, `wherePriorityId()`, `whereType()`, `whereTypeId()` | `Priorities`, `PriorityIDs`, `Types`, `TypeIDs` |
+| `whereOwnerId()`, `whereResponsibleId()`, `whereLock()` | `OwnerIDs`, `ResponsibleIDs`, `Locks` |
+| `whereCustomerId()`, `whereCustomerUser()` | `CustomerID`, `CustomerUserLogin` |
+| `whereService()`, `whereSla()` | `Services`, `SLAs` |
+| `whereFullText()` | `Fulltext` (subject, body, From, To, Cc of the articles) |
+| `whereDynamicField()` | `DynamicField_<Name>` |
+| `includeArchived()`, `onlyArchived()` | `SearchInArchive` |
+
+Filters with a plural Znuny parameter take a value or a list. All of them, and every other search method, can be called on `Znuny::tickets()` directly or on `Znuny::tickets()->query()`.
 
 Date filters accept any `DateTimeInterface` and convert it to Znuny's [time zone](#time-zone); the dates of the returned tickets, articles and history entries are read in it as well.
 
@@ -250,22 +283,22 @@ Date filters accept any `DateTimeInterface` and convert it to Znuny's [time zone
 | `whereLastChangedAfter()`, `whereLastChangedBefore()` | the time of the last change (`$ticket->changed`) |
 | `whereChangedAfter()` | the ticket history: any entry after the date |
 | `whereChangedBefore()` | same as `whereLastChangedBefore()` |
+| `whereClosedAfter()`, `whereClosedBefore()` | the close time |
+| `wherePendingAfter()`, `wherePendingBefore()` | the pending time |
 
-`get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page.
+`get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that, and `withOptions(['ArticleLimit' => 5])` for other `TicketGet` parameters. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page.
 
 ### Incomplete results
 
-Znuny cuts a search without a limit off at its `SearchLimit`, 500 tickets by default, and does not say so. `ids()`, `get()`, `paginate()` and `lazy()` then look complete but are not. Set a search limit to make such searches fail instead:
+Znuny cuts a search without a limit off at its `SearchLimit`, 500 tickets by default, and does not say so. The package therefore sends its own `search_limit` (500 by default): a search without `limit()` returns every matching ticket up to that number and throws a `ZnunySearchLimitExceededException` if more match. Then narrow the search down, call `limit()` to accept only the first tickets, or raise the limit:
 
 ```dotenv
-ZNUNY_SEARCH_LIMIT=500
+ZNUNY_SEARCH_LIMIT=5000
 ```
 
-With it, a search without `limit()` returns every matching ticket up to that number and throws a `ZnunySearchLimitExceededException` if more match. Then narrow the search down, call `limit()` to accept only the first tickets, or raise the limit; a connection can have its own `search_limit`. The package's limit replaces Znuny's `SearchLimit`, so use at least that value if an administrator raised it.
+A connection can have its own `search_limit`. The package's limit replaces Znuny's `SearchLimit`, so use at least that value if an administrator raised it. `get()` holds every ticket with its articles in memory; for more than a few hundred tickets use `lazy()` or `paginate()`.
 
-`get()` holds every ticket with its articles in memory. For more than a few hundred tickets use `lazy()` or `paginate()`.
-
-Without a search limit the package only writes a warning to its log when a search returns exactly 500 tickets. The limit will be on by default in 0.3.0.
+`ZNUNY_SEARCH_LIMIT=null` switches the check off, as in 0.2. Then a search that returns exactly 500 tickets is logged as a warning, because Znuny probably cut it off.
 
 ## Attachments
 
@@ -274,6 +307,8 @@ use ItsJustVita\LaravelZnuny\Data\Attachment;
 
 Attachment::fromPath('/path/to/file.pdf');                 // filename and MIME type detected
 Attachment::fromContent('report.csv', $csv, 'text/csv');
+Attachment::fromUploadedFile($request->file('photo'));    // MIME type detected from the content
+Attachment::fromStorage('tickets/photo.jpg', disk: 's3');
 
 Znuny::tickets()->addArticle('12345', $article, attachments: [
     Attachment::fromContent('log.txt', $log, 'text/plain'),
@@ -347,7 +382,13 @@ The package can receive Znuny's outgoing events and dispatch them as Laravel eve
 
    This registers `POST /znuny/webhooks/{event?}` (see `webhooks.route_prefix`) with the `api` middleware group and the `znuny.webhook` authentication middleware.
 
-2. In Znuny create a web service (or extend one) with a **requester**:
+2. In Znuny create a web service with a **requester**. The easiest way is to generate it together with the provider routes and import it (see [Setting up the web service](#setting-up-the-web-service-in-znuny)):
+
+   ```bash
+   php artisan znuny:webservice --webhooks=TicketCreate,ArticleCreate --webhook-url=https://your-app.example.com --output=znuny-webservice.yml
+   ```
+
+   The file contains `CHANGE-ME` where the secret belongs; `--with-token` writes it instead. Webhooks are delivered by the Znuny daemon; `--sync` sends them during the triggering request. To set the requester up by hand:
    - network transport `HTTP::REST` with the endpoint `https://your-app.example.com/znuny/webhooks`;
    - an invoker of type `Ticket::Generic`, triggered by the events you need (for example `TicketCreate`, `ArticleCreate`, `TicketStateUpdate`);
    - a controller mapping for the invoker, e.g. `POST` to `/TicketCreate` (the last path segment becomes the event name);
@@ -446,6 +487,7 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 | `znuny:routes [connection]` | Prints the effective route map |
 | `znuny:cache-clear [connection] [--resource=queues] [--all]` | Clears cached lookups |
 | `znuny:generate-fields [--output=path]` | Generates a typed dynamic field helper from the config |
+| `znuny:webservice [connection] [--routes=preset] [--webhooks=events] [--webhook-url=url] [--with-token] [--sync] [--output=path]` | Generates the Znuny web service definition for the connection's routes, optionally with a webhook requester |
 
 ## Troubleshooting
 
@@ -455,13 +497,39 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 | `ZnunyRouteNotFoundException` | The routes of the connection do not match the web service. `php artisan znuny:routes` prints the routes the package uses; pick the matching preset or map the routes. See [Routes](#routes). |
 | `ZnunyConnectionException` with "Empty reply from server" | The web service named in `base_url` does not exist in Znuny. |
 | `ZnunyAccessDeniedException` for a ticket that does not exist | Znuny checks permissions before existence, so a missing ticket is reported as access denied. |
-| A search returns exactly 500 tickets | Znuny cut the result off. Set `ZNUNY_SEARCH_LIMIT` to get an exception instead. See [Incomplete results](#incomplete-results). |
+| A search returns exactly 500 tickets although `search_limit` is off | Znuny cut the result off. Remove `ZNUNY_SEARCH_LIMIT=null` to get an exception instead. See [Incomplete results](#incomplete-results). |
 | `ZnunySearchLimitExceededException` | A search without `limit()` matches more than `search_limit` tickets. Narrow it down, call `limit()`, or raise `ZNUNY_SEARCH_LIMIT`. See [Incomplete results](#incomplete-results). |
 | `ZnunySessionRefreshed` fires on almost every request | Requests reach Znuny from changing IP addresses, and Znuny deletes a session that another address uses. See [Authentication](#authentication). |
 
 ## Testing your application
 
-The package uses Laravel's HTTP client, so `Http::fake()` works:
+`Znuny::fake()` answers Znuny operations from fixed responses, so your tests need no Znuny and no knowledge of its REST routes. Resources, search builders and DTOs run as in production.
+
+```php
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
+use ItsJustVita\LaravelZnuny\Facades\Znuny;
+
+Znuny::fake([
+    'TicketSearch' => ['TicketID' => ['42']],
+    'TicketGet'    => Znuny::fakeTickets(['TicketID' => '42', 'Title' => 'Printer on fire']),
+    'TicketCreate' => fn (array $payload) => ['TicketID' => '43', 'TicketNumber' => '2026110643'],
+    'TicketUpdate' => new ZnunyAccessDeniedException('TicketUpdate: no permission'),
+    'TicketHistoryGet' => Znuny::sequence(['TicketHistory' => []], ['TicketHistory' => []]),
+]);
+
+// ... run your code ...
+
+Znuny::assertCalled('TicketCreate', fn (array $payload) => $payload['Ticket']['Queue'] === 'Support');
+Znuny::assertCalledTimes('TicketGet', 1);
+Znuny::assertNotCalled('TicketUpdate');
+```
+
+- `fakeTickets()` builds a `TicketGet` response from complete default tickets; pass only the fields that matter.
+- A response can be an array, a closure that receives the payload and the connection name, an exception to throw, or a `Znuny::sequence()` that answers one call after the other. `'*'` answers every operation without its own response.
+- An operation without a response throws a `StrayZnunyCallException`, so a forgotten fake shows up in the test.
+- The fake replaces `ZnunyManager` in the container as well, needs no configured connection and keeps the configured time zone, search limit and batch size. `Znuny::recorded()` returns all calls with their connection and payload.
+
+The package uses Laravel's HTTP client, so `Http::fake()` works too, if you want to test at the HTTP level:
 
 ```php
 Http::fake([

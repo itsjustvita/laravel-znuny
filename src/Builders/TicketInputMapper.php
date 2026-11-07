@@ -2,6 +2,9 @@
 
 namespace ItsJustVita\LaravelZnuny\Builders;
 
+use DateTimeImmutable;
+use DateTimeInterface;
+use DateTimeZone;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Data\Attachment;
 
@@ -59,12 +62,30 @@ class TicketInputMapper
     ];
 
     /**
+     * A DateTimeInterface as pending time becomes the date parts Znuny reads in its
+     * OTRSTimeZone; seconds are dropped. Arrays such as ['Diff' => 60] pass through.
+     *
      * @param  array<string, mixed>  $input
+     * @param  string  $timezone  Znuny's OTRSTimeZone
      * @return array<string, mixed>
      */
-    public static function mapTicket(array $input): array
+    public static function mapTicket(array $input, string $timezone = 'UTC'): array
     {
-        return self::map($input, self::TICKET_KEYS);
+        $ticket = self::map($input, self::TICKET_KEYS);
+
+        if (($ticket['PendingTime'] ?? null) instanceof DateTimeInterface) {
+            $local = DateTimeImmutable::createFromInterface($ticket['PendingTime'])->setTimezone(new DateTimeZone($timezone));
+
+            $ticket['PendingTime'] = [
+                'Year' => (int) $local->format('Y'),
+                'Month' => (int) $local->format('n'),
+                'Day' => (int) $local->format('j'),
+                'Hour' => (int) $local->format('G'),
+                'Minute' => (int) $local->format('i'),
+            ];
+        }
+
+        return $ticket;
     }
 
     /**

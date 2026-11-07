@@ -9,6 +9,7 @@ use ItsJustVita\LaravelZnuny\Commands\CacheClearCommand;
 use ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand;
 use ItsJustVita\LaravelZnuny\Commands\RoutesCommand;
 use ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand;
+use ItsJustVita\LaravelZnuny\Commands\WebServiceCommand;
 use ItsJustVita\LaravelZnuny\Webhooks\AuthenticateWebhook;
 use ItsJustVita\LaravelZnuny\Webhooks\WebhookController;
 
@@ -70,6 +71,7 @@ class ZnunyServiceProvider extends ServiceProvider
                 RoutesCommand::class,
                 CacheClearCommand::class,
                 GenerateDynamicFieldsCommand::class,
+                WebServiceCommand::class,
             ]);
         }
 

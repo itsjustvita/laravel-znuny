@@ -108,16 +108,16 @@ return [
     | established.
     |
     | search_limit: the most tickets a search without limit() may match. Znuny cuts a
-    | search off at its SearchLimit (500 by default) without saying so. With a search_limit
-    | the package asks for that many tickets and throws a ZnunySearchLimitExceededException
-    | when more match. Without it (null) no limit is sent and Znuny's cut-off applies.
+    | search off at its SearchLimit (500 by default) without saying so; the package asks
+    | for search_limit tickets and throws a ZnunySearchLimitExceededException when more
+    | match. null sends no limit and accepts Znuny's cut-off, as 0.2 did by default.
     */
 
     'http' => [
         'retries' => 3,
         'retry_delay' => 100,
         'batch_size' => 50,
-        'search_limit' => env('ZNUNY_SEARCH_LIMIT'),
+        'search_limit' => env('ZNUNY_SEARCH_LIMIT', 500),
     ],
 
     /*

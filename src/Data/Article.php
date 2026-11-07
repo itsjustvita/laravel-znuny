@@ -2,7 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
 
@@ -22,7 +22,7 @@ final readonly class Article
         public ?string $communicationChannel,
         public ?string $senderType,
         public ?string $from,
-        public ?Carbon $created,
+        public ?CarbonImmutable $created,
         public ?string $to = null,
         public ?string $cc = null,
         public ?string $bcc = null,

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Znuny;
 
 final class TicketBuilderTest extends TestCase
@@ -89,8 +90,27 @@ final class TicketBuilderTest extends TestCase
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] !== 4);
     }
 
+    public function test_by_default_a_search_matching_more_than_500_tickets_fails(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => array_map('strval', range(1, 501))]),
+        ]);
+
+        try {
+            Znuny::tickets()->whereState('open')->ids();
+            $this->fail('Expected a ZnunySearchLimitExceededException');
+        } catch (ZnunySearchLimitExceededException $e) {
+            $this->assertStringContainsString('more than 500 tickets', $e->getMessage());
+        }
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 501);
+    }
+
     public function test_a_result_of_exactly_500_tickets_is_logged_as_a_likely_cut_off(): void
     {
+        config(['znuny.connections.default.search_limit' => null]);
+
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::sequence()
@@ -200,6 +220,98 @@ final class TicketBuilderTest extends TestCase
         }
 
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketGet'));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: list<mixed>, 2: string, 3: mixed}>
+     */
+    public static function filters(): array
+    {
+        return [
+            'ticket number' => ['whereTicketNumber', ['2026110610000017'], 'TicketNumber', ['2026110610000017']],
+            'titles' => ['whereTitle', [['Printer*', 'Scanner*']], 'Title', ['Printer*', 'Scanner*']],
+            'type' => ['whereType', ['Incident'], 'Types', ['Incident']],
+            'type IDs' => ['whereTypeId', [[3, 4]], 'TypeIDs', ['3', '4']],
+            'state ID' => ['whereStateId', [2], 'StateIDs', ['2']],
+            'priority ID' => ['wherePriorityId', [3], 'PriorityIDs', ['3']],
+            'owner IDs' => ['whereOwnerId', [[1, 2]], 'OwnerIDs', ['1', '2']],
+            'responsible ID' => ['whereResponsibleId', [5], 'ResponsibleIDs', ['5']],
+            'customer user' => ['whereCustomerUser', ['jane'], 'CustomerUserLogin', ['jane']],
+            'lock' => ['whereLock', ['lock'], 'Locks', ['lock']],
+            'service' => ['whereService', ['Email'], 'Services', ['Email']],
+            'SLA' => ['whereSla', ['Gold'], 'SLAs', ['Gold']],
+            'full text' => ['whereFullText', ['printer'], 'Fulltext', 'printer'],
+            'with archived tickets' => ['includeArchived', [], 'SearchInArchive', 'AllTickets'],
+            'only archived tickets' => ['onlyArchived', [], 'SearchInArchive', 'ArchivedTickets'],
+        ];
+    }
+
+    #[DataProvider('filters')]
+    public function test_filters_map_to_ticket_search_parameters(string $method, array $arguments, string $parameter, mixed $value): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::tickets()->query()->{$method}(...$arguments)->ids();
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r[$parameter] === $value);
+    }
+
+    public function test_close_and_pending_filters_are_sent_in_the_znuny_time_zone(): void
+    {
+        config(['znuny.timezone' => 'Europe/Berlin']);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        $utc = new DateTimeZone('UTC');
+
+        Znuny::tickets()->query()
+            ->whereClosedAfter(new DateTimeImmutable('2026-07-01 08:00:00', $utc))
+            ->whereClosedBefore(new DateTimeImmutable('2026-07-02 08:00:00', $utc))
+            ->wherePendingAfter(new DateTimeImmutable('2026-07-03 08:00:00', $utc))
+            ->wherePendingBefore(new DateTimeImmutable('2026-07-04 08:00:00', $utc))
+            ->ids();
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketCloseTimeNewerDate'] === '2026-07-01 10:00:00'
+            && $r['TicketCloseTimeOlderDate'] === '2026-07-02 10:00:00'
+            && $r['TicketPendingTimeNewerDate'] === '2026-07-03 10:00:00'
+            && $r['TicketPendingTimeOlderDate'] === '2026-07-04 10:00:00');
+    }
+
+    public function test_count_returns_the_number_of_matching_tickets(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['7', '8', '9']]),
+        ]);
+
+        $this->assertSame(3, Znuny::tickets()->query()->whereState('open')->count());
+    }
+
+    public function test_options_are_added_to_the_ticket_get_requests_of_a_search(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['7']]),
+            '*TicketGet*' => Http::response(['Ticket' => [['TicketID' => '7', 'Title' => 'T']]]),
+        ]);
+
+        Znuny::tickets()->query()
+            ->withOptions(['ArticleLimit' => 5, 'ArticleOrder' => 'ASC'])
+            ->withOptions(['ArticleOrder' => 'DESC'])
+            ->get();
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet')
+            && $r['ArticleLimit'] === 5
+            && $r['ArticleOrder'] === 'DESC'
+            && $r['AllArticles'] === 1
+            && $r['DynamicFields'] === 1);
     }
 
     public function test_where_created_after_translates_to_timestamp(): void

@@ -2,10 +2,14 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Error;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
 
+/**
+ * @property-read string|null $customerUserID deprecated since 0.3.0, use $customerUserId; removed in 0.4.0
+ */
 final readonly class Ticket
 {
     use HasAttributes;
@@ -25,10 +29,10 @@ final readonly class Ticket
         public string $priority,
         public ?string $type,
         public ?string $customerId,
-        public ?string $customerUserID,
+        public ?string $customerUserId,
         public ?string $customerUser,
-        public ?Carbon $created,
-        public ?Carbon $changed,
+        public ?CarbonImmutable $created,
+        public ?CarbonImmutable $changed,
         public Collection $articles,
         public Collection $dynamicFields,
         public ?string $stateId = null,
@@ -45,6 +49,7 @@ final readonly class Ticket
         public ?string $sla = null,
         public ?string $slaId = null,
         public array $attributes = [],
+        public ?CarbonImmutable $pendingUntil = null,
     ) {}
 
     /**
@@ -77,7 +82,7 @@ final readonly class Ticket
             priority: (string) ($data['Priority'] ?? ''),
             type: $data['Type'] ?? null,
             customerId: $data['CustomerID'] ?? null,
-            customerUserID: $data['CustomerUserID'] ?? null,
+            customerUserId: $data['CustomerUserID'] ?? null,
             customerUser: is_string($customerUser) ? $customerUser : ($data['CustomerUserID'] ?? null),
             created: self::optionalDate($data['Created'] ?? null, $timezone),
             changed: self::optionalDate($data['Changed'] ?? null, $timezone),
@@ -97,7 +102,47 @@ final readonly class Ticket
             sla: self::optionalString($data['SLA'] ?? null),
             slaId: self::optionalString($data['SLAID'] ?? null),
             attributes: array_diff_key($data, ['Article' => true, 'Articles' => true]),
+            pendingUntil: self::pendingUntil($data, $timezone),
         );
+    }
+
+    /**
+     * RealTillTimeNotUsed is a Unix time, so it does not depend on Znuny's time zone. Znuny
+     * keeps it after a ticket leaves its pending state, so it counts only while it is pending.
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    private static function pendingUntil(array $data, string $timezone): ?CarbonImmutable
+    {
+        $until = $data['RealTillTimeNotUsed'] ?? null;
+
+        if (! is_numeric($until) || (int) $until <= 0 || ! str_starts_with((string) ($data['StateType'] ?? ''), 'pending')) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestamp((int) $until, $timezone);
+    }
+
+    /**
+     * Keeps the 0.2 property name $customerUserID working until 0.4.0.
+     */
+    public function __get(string $name): mixed
+    {
+        if ($name === 'customerUserID') {
+            trigger_error('Ticket::$customerUserID is deprecated, use $customerUserId.', E_USER_DEPRECATED);
+
+            return $this->customerUserId;
+        }
+
+        throw new Error(sprintf('Undefined property: %s::$%s', self::class, $name));
+    }
+
+    /**
+     * isset(), ?? and data_get() on the 0.2 name behave as on a real property.
+     */
+    public function __isset(string $name): bool
+    {
+        return $name === 'customerUserID' && $this->customerUserId !== null;
     }
 
     /**
@@ -128,10 +173,11 @@ final readonly class Ticket
             'SLA' => $this->sla,
             'SLAID' => $this->slaId,
             'CustomerID' => $this->customerId,
-            'CustomerUserID' => $this->customerUserID,
+            'CustomerUserID' => $this->customerUserId,
             'CustomerUser' => $this->customerUser,
             'Created' => $this->created?->format('Y-m-d H:i:s'),
             'Changed' => $this->changed?->format('Y-m-d H:i:s'),
+            'RealTillTimeNotUsed' => $this->pendingUntil?->getTimestamp() ?? 0,
             'Article' => $this->articles->map(fn (Article $article): array => $article->toArray())->all(),
             'DynamicField' => $this->dynamicFields->map(fn (DynamicField $field): array => $field->toArray())->all(),
         ];
