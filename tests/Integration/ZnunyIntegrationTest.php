@@ -359,9 +359,15 @@ final class ZnunyIntegrationTest extends TestCase
 
         $this->assertSame($ticket->id, $znuny->tickets()->findByNumber($ticket->ticketNumber)->id);
 
-        $this->expectException(TicketNotFoundException::class);
-
-        $znuny->tickets()->findByNumber('0');
+        // Znuny's search would match these; the exact lookup must not.
+        foreach (['0', '*', substr($ticket->ticketNumber, 0, -1).'_', ''] as $number) {
+            try {
+                $znuny->tickets()->findByNumber($number);
+                $this->fail("findByNumber('{$number}') returned a ticket");
+            } catch (TicketNotFoundException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 
     public function test_find_many_skips_unknown_ids(): void

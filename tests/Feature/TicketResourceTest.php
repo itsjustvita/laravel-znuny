@@ -14,6 +14,7 @@ use ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Znuny;
 
 final class TicketResourceTest extends TestCase
@@ -329,7 +330,7 @@ final class TicketResourceTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
-            '*TicketGet/42' => Http::response(['Ticket' => [$this->ticket('42')]]),
+            '*TicketGet/42' => Http::response(['Ticket' => [['TicketNumber' => '2026110610000017'] + $this->ticket('42')]]),
         ]);
 
         $this->assertSame('42', Znuny::tickets()->findByNumber('2026110610000017', withArticles: true)->id);
@@ -338,6 +339,52 @@ final class TicketResourceTest extends TestCase
             && $r['TicketNumber'] === '2026110610000017'
             && $r['Limit'] === 1);
         Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/TicketGet/42') && $r['AllArticles'] === 1);
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function wildcardNumbers(): array
+    {
+        // Znuny ignores an empty number and would return any ticket.
+        return ['star' => ['*'], 'prefix with star' => ['2026*'], 'percent' => ['%'], 'percent inside' => ['2026%17'], 'empty' => ['']];
+    }
+
+    /**
+     * Znuny's search treats "*" (and the database "%") as wildcards. An exact lookup with a
+     * number a customer entered must not return somebody else's ticket.
+     */
+    #[DataProvider('wildcardNumbers')]
+    public function test_find_by_number_does_not_treat_wildcards_as_a_match(string $number): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
+            '*TicketGet/42' => Http::response(['Ticket' => [['TicketNumber' => '2026110610000017'] + $this->ticket('42')]]),
+        ]);
+
+        try {
+            Znuny::tickets()->findByNumber($number);
+            $this->fail('Expected a TicketNotFoundException');
+        } catch (TicketNotFoundException) {
+            $this->addToAssertionCount(1);
+        }
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketGet'));
+    }
+
+    public function test_find_by_number_only_returns_a_ticket_with_exactly_that_number(): void
+    {
+        // A database pattern character such as "_" can still make Znuny match another number.
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
+            '*TicketGet/42' => Http::response(['Ticket' => [['TicketNumber' => '2026110610000017'] + $this->ticket('42')]]),
+        ]);
+
+        $this->expectException(TicketNotFoundException::class);
+
+        Znuny::tickets()->findByNumber('2026110610000_17');
     }
 
     public function test_find_by_number_without_a_match_throws_ticket_not_found(): void

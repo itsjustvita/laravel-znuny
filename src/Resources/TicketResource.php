@@ -92,16 +92,30 @@ class TicketResource extends Resource
     public function findByNumber(string $ticketNumber, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false, array $options = []): Ticket
     {
         $payload = ['TicketNumber' => $ticketNumber, 'Limit' => 1];
+        $notFound = fn (): TicketNotFoundException => (new TicketNotFoundException("Znuny has no ticket with the number [{$ticketNumber}] that this user can read."))
+            ->setOperation('TicketSearch')
+            ->setConnection($this->client->connection())
+            ->setRequestPayload($payload);
+
+        // Znuny's search treats "*" and the database's "%" as wildcards and ignores an empty
+        // number. A number that customers entered must never return somebody else's ticket.
+        if ($ticketNumber === '' || strpbrk($ticketNumber, '*%') !== false) {
+            throw $notFound();
+        }
+
         $ids = (array) ($this->client->call('TicketSearch', $payload)['TicketID'] ?? []);
 
         if ($ids === []) {
-            throw (new TicketNotFoundException("Znuny has no ticket with the number [{$ticketNumber}] that this user can read."))
-                ->setOperation('TicketSearch')
-                ->setConnection($this->client->connection())
-                ->setRequestPayload($payload);
+            throw $notFound();
         }
 
-        return $this->find((string) reset($ids), $withArticles, $withDynamicFields, $withAttachments, $options);
+        $ticket = $this->find((string) reset($ids), $withArticles, $withDynamicFields, $withAttachments, $options);
+
+        if ($ticket->ticketNumber !== $ticketNumber) {
+            throw $notFound();
+        }
+
+        return $ticket;
     }
 
     /**
