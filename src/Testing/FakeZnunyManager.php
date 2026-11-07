@@ -99,7 +99,8 @@ class FakeZnunyManager extends ZnunyManager
 
     /**
      * The connection's configuration as far as it exists, so its time zone, search limit and
-     * batch size apply, completed with placeholders for what tests usually leave out.
+     * batch size apply as on a real connection, completed with placeholders for the base URL
+     * and credentials that tests usually leave out.
      *
      * @return array<string, mixed>
      */
@@ -107,7 +108,16 @@ class FakeZnunyManager extends ZnunyManager
     {
         $config = $this->runtimeConfig ?? (array) $this->config("znuny.connections.{$connection}", []);
 
-        return array_merge(self::FAKE_CONNECTION, array_filter($config, fn (mixed $value): bool => $value !== null && $value !== ''));
+        // Other keys keep their value even when it is null or blank: a search_limit of null switches the limit off.
+        foreach (self::FAKE_CONNECTION as $key => $placeholder) {
+            $value = $config[$key] ?? null;
+
+            if ($value === null || (is_string($value) && trim($value) === '')) {
+                $config[$key] = $placeholder;
+            }
+        }
+
+        return $config;
     }
 
     /**
