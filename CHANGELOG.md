@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-07
+
 Convenience features and an API cleanup. Four breaking changes, each of which fails loudly; see [UPGRADE.md](UPGRADE.md).
 
 ### Added
@@ -135,7 +137,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.1.2...v0.2.0
