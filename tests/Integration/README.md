@@ -18,8 +18,8 @@ The setup creates:
 
 - the agent `api-agent` (password `api-secret`) and the customer user `jane` (password `jane-secret`, customer `acme`);
 - the ticket dynamic fields `OrderId` (text) and `Tags` (multiselect with `alpha`, `beta`, `gamma`);
-- the web services `GenericTicketConnectorREST` (the Ready2Adopt example; versions that do not ship it get the file of a newer release), `GenericTicketConnectorRESTClassic` (the example from `development/webservices/`, downloaded from GitHub for the image's version) and `OperationNameREST` (routes named after the operations, as the `operation-name` preset expects);
-- the web service `LaravelWebhook`. Its `Ticket::Generic` invoker posts every `TicketCreate` event to `http://host.docker.internal:8099/znuny/webhooks/TicketCreate` with the header `X-Znuny-Token: integration-token`.
+- the web services `GenericTicketConnectorREST` (the Ready2Adopt example; versions that do not ship it get the file of a newer release) and `GenericTicketConnectorRESTClassic` (the example from `development/webservices/`, downloaded from GitHub for the image's version);
+- two web services generated with `php artisan znuny:webservice`, which the suite thereby tests too: `OperationNameREST` (routes named after the operations, as the `operation-name` preset expects) and `LaravelWebhook`, whose `Ticket::Generic` invoker posts every `TicketCreate` event to `http://host.docker.internal:8099/znuny/webhooks` with the header `X-Znuny-Token: integration-token`.
 
 ## Run the suite
 

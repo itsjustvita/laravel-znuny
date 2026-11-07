@@ -562,8 +562,9 @@ final class ZnunyIntegrationTest extends TestCase
             @unlink($capture);
         }
 
+        // The generated requester posts every event to /znuny/webhooks; the name comes from the payload.
         $this->assertSame('TicketCreate', $received['event']);
-        $this->assertSame(['event' => 'TicketCreate'], $received['parameters']);
+        $this->assertSame([], $received['parameters']);
         $this->assertSame($ticket->title, $received['ticket']['Title']);
         $this->assertSame($this->customerUser(), $received['ticket']['CustomerUser']);
         $this->assertSame($ticket->created->getTimestamp(), $received['createdTimestamp']);
