@@ -52,6 +52,7 @@ class WebServiceCommand extends Command
 
         $webhooks = $this->option('webhooks');
         $events = is_string($webhooks) ? array_values(array_filter(array_map('trim', explode(',', $webhooks)))) : [];
+        $endpoint = null;
 
         if ($events !== []) {
             $url = (string) ($this->option('webhook-url') ?: config('app.url'));
@@ -62,13 +63,21 @@ class WebServiceCommand extends Command
                 return self::FAILURE;
             }
 
+            $prefix = (string) config('znuny.webhooks.route_prefix', 'znuny/webhooks');
+            $endpoint = rtrim($url, '/').'/'.trim($prefix, '/');
+            $host = strtolower(trim((string) parse_url($url, PHP_URL_HOST), '[]'));
+
+            if (self::isOwnMachine($host)) {
+                $comments[] = "# The webhook host {$host} points to the machine Znuny runs on. Unless this application runs there too, pass --webhook-url with an address Znuny can reach.";
+            }
+
             $auth = (array) config('znuny.webhooks.auth', []);
             $withSecrets = (bool) $this->option('with-token');
 
             $definition = $definition->withWebhooks(
                 $events,
                 $url,
-                (string) config('znuny.webhooks.route_prefix', 'znuny/webhooks'),
+                $prefix,
                 $auth,
                 $withSecrets,
                 (bool) $this->option('sync'),
@@ -106,10 +115,28 @@ class WebServiceCommand extends Command
         $this->line('Import it in Znuny under Admin → Web Services → Add Web Service → Import web service, or on the Znuny server with:');
         $this->line("  bin/otrs.Console.pl Admin::WebService::Add --name <name> --source-path {$output}");
 
+        if ($endpoint !== null) {
+            $this->line("Znuny will send webhooks to [{$endpoint}].");
+        }
+
         foreach (array_slice($comments, 1) as $comment) {
             $this->warn(ltrim($comment, '# '));
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Whether a host means the machine Znuny runs on, as seen from Znuny: localhost,
+     * *.localhost and the loopback and unspecified addresses.
+     */
+    private static function isOwnMachine(string $host): bool
+    {
+        if ($host === 'localhost' || str_ends_with($host, '.localhost')) {
+            return true;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_IP) !== false
+            && (str_starts_with($host, '127.') || in_array($host, ['::1', '0.0.0.0'], true));
     }
 }

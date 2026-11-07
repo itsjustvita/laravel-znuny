@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
 use Illuminate\Support\Facades\Artisan;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
 final class WebServiceCommandTest extends TestCase
@@ -70,6 +71,45 @@ final class WebServiceCommandTest extends TestCase
 
         $this->assertSame(['X-Znuny-Token' => 'CHANGE-ME'], SymfonyYaml::parse($output)['Requester']['Transport']['Config']['AdditionalHeaders']);
         $this->assertMatchesRegularExpression('/^# .*CHANGE-ME/m', $output);
+    }
+
+    /**
+     * @return array<string, array{string, bool}>
+     */
+    public static function webhookUrls(): array
+    {
+        return [
+            'localhost' => ['http://localhost', true],
+            'localhost with a port' => ['http://localhost:8000/', true],
+            'a .localhost name' => ['http://app.localhost', true],
+            'IPv4 loopback' => ['http://127.0.0.1:8000', true],
+            'IPv6 loopback' => ['http://[::1]:8000', true],
+            'all interfaces' => ['http://0.0.0.0', true],
+            'a public name' => ['https://app.example.com', false],
+            'a name that starts with 127' => ['https://127.example.com', false],
+            'the Docker host' => ['http://host.docker.internal:8099', false],
+        ];
+    }
+
+    #[DataProvider('webhookUrls')]
+    public function test_a_webhook_host_on_znunys_own_machine_is_flagged(string $url, bool $flagged): void
+    {
+        Artisan::call('znuny:webservice', ['--routes' => 'generic-ticket-connector', '--webhooks' => 'TicketCreate', '--webhook-url' => $url]);
+
+        $this->assertSame($flagged, preg_match('/^# The webhook host .* points to the machine Znuny runs on\..*--webhook-url/m', Artisan::output()) === 1);
+    }
+
+    public function test_the_file_summary_names_the_webhook_url(): void
+    {
+        $file = (string) tempnam(sys_get_temp_dir(), 'znuny-webservice-');
+
+        try {
+            Artisan::call('znuny:webservice', ['--routes' => 'generic-ticket-connector', '--webhooks' => 'TicketCreate', '--webhook-url' => 'https://app.example.com/', '--output' => $file]);
+
+            $this->assertStringContainsString('Znuny will send webhooks to [https://app.example.com/znuny/webhooks].', Artisan::output());
+        } finally {
+            @unlink($file);
+        }
     }
 
     public function test_webhooks_need_a_url(): void
