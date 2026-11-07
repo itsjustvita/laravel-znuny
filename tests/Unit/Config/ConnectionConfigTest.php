@@ -51,6 +51,21 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(10, $config->batchSize);
     }
 
+    public function test_blank_numbers_count_as_not_set(): void
+    {
+        // An empty variable in .env, e.g. ZNUNY_TIMEOUT=, arrives as a blank string; a timeout of 0 would wait forever.
+        $config = $this->make(
+            ['timeout' => '', 'connect_timeout' => ' ', 'retries' => '', 'retry_delay' => '', 'batch_size' => ''],
+            ['retries' => 5, 'retry_delay' => '', 'batch_size' => ''],
+        );
+
+        $this->assertSame(30, $config->timeout);
+        $this->assertSame(3, $config->connectTimeout);
+        $this->assertSame(5, $config->retries);
+        $this->assertSame(100, $config->retryDelay);
+        $this->assertSame(50, $config->batchSize);
+    }
+
     public function test_the_search_limit_comes_from_the_connection_then_the_http_config(): void
     {
         $this->assertSame(200, $this->make(['search_limit' => '200'], ['search_limit' => 5000])->searchLimit);

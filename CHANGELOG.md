@@ -6,10 +6,11 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [0.3.1] - 2026-11-07
 
-Four small fixes from the review of 0.3.0.
+Small fixes: a blank timeout no longer waits forever, plus four fixes from the review of 0.3.0.
 
 ### Fixed
 
+- A blank timeout setting, such as `ZNUNY_TIMEOUT=` in `.env`, no longer means a timeout of 0, which waits forever. Blank numbers in the connection and `http` settings count as not set, so the defaults apply (30 seconds, 3 seconds to connect).
 - `Znuny::fake()` applies a connection's settings as a real connection does. It used to drop null and blank values, so `'search_limit' => null` did not switch the limit off and faked searches with more than 500 tickets threw.
 - `znuny:webservice` refuses text that is not valid UTF-8 and names the value, instead of writing an empty or broken value into the definition.
 - `znuny:webservice --output` names the URL Znuny will send webhooks to, and the command warns when the webhook host is the machine Znuny runs on, such as `localhost` from a default `APP_URL`.
