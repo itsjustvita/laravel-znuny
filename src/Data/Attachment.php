@@ -2,8 +2,12 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
+use Illuminate\Container\Container;
+use Illuminate\Contracts\Filesystem\Factory as FilesystemFactory;
+use Illuminate\Http\UploadedFile;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
+use Throwable;
 
 final readonly class Attachment
 {
@@ -45,6 +49,56 @@ final readonly class Attachment
             filename: $filename ?? basename($path),
             content: (string) file_get_contents($path),
             contentType: $contentType ?? ($detected ?: 'application/octet-stream'),
+        );
+    }
+
+    /**
+     * An upload from a request, e.g. $request->file('photo'). The content type is detected
+     * from the content, not taken from the browser.
+     */
+    public static function fromUploadedFile(UploadedFile $file, ?string $filename = null): self
+    {
+        $name = $filename ?? $file->getClientOriginalName();
+
+        try {
+            $content = $file->get();
+        } catch (Throwable) {
+            $content = false;
+        }
+
+        if (! is_string($content)) {
+            throw new InvalidArgumentException("The uploaded file [{$name}] could not be read.");
+        }
+
+        return self::fromContent(
+            filename: $name,
+            content: $content,
+            contentType: $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream'),
+        );
+    }
+
+    /**
+     * A file on one of the application's filesystem disks.
+     *
+     * @param  string|null  $disk  the disk name; null means the default disk
+     */
+    public static function fromStorage(string $path, ?string $disk = null, ?string $filename = null): self
+    {
+        $storage = Container::getInstance()->make(FilesystemFactory::class)->disk($disk);
+        $content = $storage->exists($path) ? $storage->get($path) : null;
+
+        if (! is_string($content)) {
+            $name = $disk ?? (string) Container::getInstance()->make('config')->get('filesystems.default', 'default');
+
+            throw new InvalidArgumentException("Attachment file [{$path}] does not exist on disk [{$name}].");
+        }
+
+        $contentType = method_exists($storage, 'mimeType') ? $storage->mimeType($path) : false;
+
+        return self::fromContent(
+            filename: $filename ?? basename($path),
+            content: $content,
+            contentType: is_string($contentType) && $contentType !== '' ? $contentType : 'application/octet-stream',
         );
     }
 
