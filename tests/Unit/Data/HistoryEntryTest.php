@@ -48,7 +48,7 @@ final class HistoryEntryTest extends TestCase
         $entry = HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'CreateTime' => '2026-07-01 08:00:00']);
 
         $this->assertInstanceOf(CarbonImmutable::class, $entry->createTime);
-        $entry->createTime->addDay();
+        $this->assertSame('2026-07-02 08:00:00', $entry->createTime->addDay()->format('Y-m-d H:i:s'));
 
         $this->assertSame('2026-07-01 08:00:00', $entry->createTime->format('Y-m-d H:i:s'));
     }

@@ -44,7 +44,7 @@ final class ArticleTest extends TestCase
         $article = Article::fromZnunyResponse(['ArticleID' => '5', 'CreateTime' => '2026-07-01 08:00:00']);
 
         $this->assertInstanceOf(CarbonImmutable::class, $article->created);
-        $article->created->addDay();
+        $this->assertSame('2026-07-02 08:00:00', $article->created->addDay()->format('Y-m-d H:i:s'));
 
         $this->assertSame('2026-07-01 08:00:00', $article->created->format('Y-m-d H:i:s'));
     }

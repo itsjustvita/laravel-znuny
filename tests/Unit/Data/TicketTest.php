@@ -74,8 +74,8 @@ final class TicketTest extends TestCase
         $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'Created' => '2026-07-01 08:00:00', 'Changed' => '2026-07-01 09:00:00']);
 
         $this->assertInstanceOf(CarbonImmutable::class, $ticket->created);
-        $ticket->created->addDay();
-        $ticket->changed?->addDay();
+        $this->assertSame('2026-07-02 08:00:00', $ticket->created->addDay()->format('Y-m-d H:i:s'));
+        $this->assertNotNull($ticket->changed?->addDay());
 
         $this->assertSame('2026-07-01 08:00:00', $ticket->created->format('Y-m-d H:i:s'));
         $this->assertSame('2026-07-01 09:00:00', $ticket->changed?->format('Y-m-d H:i:s'));
