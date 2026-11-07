@@ -2,7 +2,7 @@
 
 ## 0.2.x → 0.3.0
 
-0.3.0 adds a lot (see the CHANGELOG) and makes four breaking changes. Each of them fails loudly rather than changing results silently.
+0.3.0 adds a lot (see the CHANGELOG) and makes four breaking changes. Each of them fails loudly rather than changing results silently. Nothing has to change in Znuny.
 
 ### Searches fail instead of returning a partial result (high impact)
 

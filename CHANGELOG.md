@@ -4,6 +4,19 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+Convenience features and an API cleanup. Four breaking changes, each of which fails loudly; see [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- Search: every builder method can be called on `Znuny::tickets()` directly; named filters `whereTicketNumber()`, `whereTitle()`, `whereType()`, `whereTypeId()`, `whereStateId()`, `wherePriorityId()`, `whereOwnerId()`, `whereResponsibleId()`, `whereCustomerUser()`, `whereLock()`, `whereService()`, `whereSla()`, `whereClosedAfter()`/`Before()`, `wherePendingAfter()`/`Before()`, `whereFullText()`, `includeArchived()`, `onlyArchived()`; `count()`.
+- `tickets()->findByNumber()`: an exact lookup by the ticket number customers see, safe for numbers they enter.
+- Raw `TicketGet` parameters: `find(..., options: [...])`, `findMany(..., options: [...])` and `withOptions()` for searches.
+- Ticket actions: `lock()`, `unlock()`, `assign()`, `move()`, `setPending()`.
+- A `pendingTime` in `create()` and `update()` can be a `DateTimeInterface`; it is converted to Znuny's time zone. `Ticket::$pendingUntil`.
+- `Attachment::fromUploadedFile()` and `Attachment::fromStorage()`.
+- `Znuny::fake()` for application tests: responses per operation, `Znuny::fakeTickets()`, `Znuny::sequence()`, `assertCalled()`, `assertCalledTimes()`, `assertNotCalled()`, `assertNothingCalled()` and `recorded()`.
+- `php artisan znuny:webservice`: generates the Znuny web service definition for a connection's routes, optionally with a webhook requester. The integration setup uses it, so CI imports generated definitions into every supported Znuny version.
+
 ### Changed
 
 - **Breaking:** the search limit is on by default (500): a search without `limit()` that matches more tickets throws a `ZnunySearchLimitExceededException` instead of returning Znuny's first 500. `'search_limit' => null` restores the old behaviour.
