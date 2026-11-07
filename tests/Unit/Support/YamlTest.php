@@ -2,8 +2,10 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Support;
 
+use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Support\Yaml;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\Yaml\Yaml as SymfonyYaml;
 
 final class YamlTest extends TestCase
@@ -34,6 +36,32 @@ final class YamlTest extends TestCase
 
         // An empty mapping parses back as an empty array.
         $this->assertSame($data, SymfonyYaml::parse(Yaml::dump($data)));
+    }
+
+    /**
+     * @return array<string, array{array<array-key, mixed>, string}>
+     */
+    public static function textThatIsNotUtf8(): array
+    {
+        return [
+            'a value' => [['Requester' => ['Password' => "secret\xE4"]], 'the value of [Requester.Password]'],
+            'a value with a line break' => [['Requester' => ['Password' => "secret\xE4\n"]], 'the value of [Requester.Password]'],
+            'a list item' => [['Events' => ['TicketCreate', "Ticket\xE4"]], 'the value of [Events.1]'],
+            'a key' => [['Requester' => ["Pass\xE4word" => 'x']], 'a key under [Requester]'],
+            'a top-level key' => [["Requester\xE4" => 'x'], 'a top-level key'],
+        ];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    #[DataProvider('textThatIsNotUtf8')]
+    public function test_text_that_is_not_valid_utf8_is_refused(array $data, string $what): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage("Cannot write {$what} as YAML, because it is not valid UTF-8.");
+
+        Yaml::dump($data);
     }
 
     public function test_other_scalars_are_written_as_the_strings_znuny_expects(): void

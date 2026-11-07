@@ -79,4 +79,12 @@ final class WebServiceCommandTest extends TestCase
         $this->assertSame(1, Artisan::call('znuny:webservice', ['--routes' => 'generic-ticket-connector', '--webhooks' => 'TicketCreate']));
         $this->assertStringContainsString('--webhook-url', Artisan::output());
     }
+
+    public function test_a_value_that_is_not_valid_utf8_fails_with_its_name(): void
+    {
+        config(['app.url' => 'https://app.example.com', 'znuny.webhooks.auth.token' => "secret\xE4"]);
+
+        $this->assertSame(1, Artisan::call('znuny:webservice', ['--routes' => 'generic-ticket-connector', '--webhooks' => 'TicketCreate', '--with-token' => true]));
+        $this->assertStringContainsString('[Requester.Transport.Config.AdditionalHeaders.X-Znuny-Token]', Artisan::output());
+    }
 }

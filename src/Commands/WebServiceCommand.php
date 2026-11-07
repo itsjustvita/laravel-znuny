@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Commands;
 
 use Illuminate\Console\Command;
+use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Support\Yaml;
@@ -78,7 +79,15 @@ class WebServiceCommand extends Command
             }
         }
 
-        $yaml = implode("\n", $comments)."\n".Yaml::dump($definition->toArray());
+        try {
+            $yaml = implode("\n", $comments)."\n".Yaml::dump($definition->toArray());
+        } catch (InvalidArgumentException $e) {
+            $this->error($e->getMessage());
+            $this->line('Check the encoding of the setting it comes from, for example in your .env file.');
+
+            return self::FAILURE;
+        }
+
         $output = $this->option('output');
 
         if (! is_string($output) || $output === '') {
