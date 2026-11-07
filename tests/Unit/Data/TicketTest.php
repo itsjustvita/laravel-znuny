@@ -2,7 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Data;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Article;
 use ItsJustVita\LaravelZnuny\Data\DynamicField;
@@ -37,7 +37,7 @@ final class TicketTest extends TestCase
         $this->assertInstanceOf(DynamicField::class, $ticket->dynamicFields->first());
         $this->assertSame('OrderId', $ticket->dynamicFields->first()->name);
 
-        $this->assertInstanceOf(Carbon::class, $ticket->created);
+        $this->assertInstanceOf(CarbonImmutable::class, $ticket->created);
         $this->assertSame('2026-04-08 10:00:00', $ticket->created->format('Y-m-d H:i:s'));
     }
 
@@ -67,6 +67,54 @@ final class TicketTest extends TestCase
         $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $berlin->created->getTimestamp());
         $this->assertSame(strtotime('2026-07-01 06:00:05 UTC'), $berlin->articles->first()->created->getTimestamp());
         $this->assertSame('2026-07-01 08:00:00', $berlin->toArray()['Created']);
+    }
+
+    public function test_dates_are_immutable(): void
+    {
+        $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'Created' => '2026-07-01 08:00:00', 'Changed' => '2026-07-01 09:00:00']);
+
+        $this->assertInstanceOf(CarbonImmutable::class, $ticket->created);
+        $ticket->created->addDay();
+        $ticket->changed?->addDay();
+
+        $this->assertSame('2026-07-01 08:00:00', $ticket->created->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-07-01 09:00:00', $ticket->changed?->format('Y-m-d H:i:s'));
+    }
+
+    public function test_the_customer_user_id_is_camel_case(): void
+    {
+        $this->assertSame('jane', Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane'])->customerUserId);
+    }
+
+    public function test_the_old_customer_user_id_name_still_works_but_is_deprecated(): void
+    {
+        $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane']);
+        $deprecations = [];
+
+        set_error_handler(function (int $level, string $message) use (&$deprecations): bool {
+            $deprecations[] = $message;
+
+            return true;
+        }, E_USER_DEPRECATED);
+
+        try {
+            $this->assertSame('jane', $ticket->customerUserID);
+        } finally {
+            restore_error_handler();
+        }
+
+        $this->assertCount(1, $deprecations);
+        $this->assertStringContainsString('customerUserId', $deprecations[0]);
+    }
+
+    public function test_other_undefined_properties_still_fail(): void
+    {
+        $ticket = Ticket::fromZnunyResponse(['TicketID' => '1']);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Undefined property');
+
+        $ticket->customerUserIdentifier;
     }
 
     public function test_empty_dates_are_null(): void

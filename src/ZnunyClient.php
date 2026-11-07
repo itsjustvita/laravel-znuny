@@ -105,17 +105,6 @@ class ZnunyClient
     }
 
     /**
-     * @deprecated since 0.2.0, use call()
-     *
-     * @param  array<string, mixed>  $payload
-     * @return array<array-key, mixed>
-     */
-    public function request(string $operation, array $payload = []): array
-    {
-        return $this->call($operation, $payload);
-    }
-
-    /**
      * Check the credentials: a fresh SessionCreate in session mode, a minimal
      * TicketSearch in credentials mode.
      */

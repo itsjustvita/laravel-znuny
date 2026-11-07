@@ -6,8 +6,15 @@ All notable changes to this project are documented in this file. The format is b
 
 ### Changed
 
+- **Breaking:** the search limit is on by default (500): a search without `limit()` that matches more tickets throws a `ZnunySearchLimitExceededException` instead of returning Znuny's first 500. `'search_limit' => null` restores the old behaviour.
+- **Breaking:** dates on `Ticket`, `Article` and `HistoryEntry` are `CarbonImmutable`.
+- **Breaking:** `Ticket::$customerUserID` is renamed to `$customerUserId`; the old name works with a deprecation notice until 0.4.0.
 - The integration suite runs in CI against Znuny 6.5, 7.0, 7.1, 7.2 and 7.3, and against a Znuny that does not run on UTC.
 - PHPDoc array types throughout the package, which passes PHPStan at level 8 now. Applications that use static analysis get more precise types.
+
+### Removed
+
+- **Breaking:** `ZnunyClient::request()`, deprecated since 0.2.0; use `call()`.
 
 ## [0.2.2] - 2026-11-06
 

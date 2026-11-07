@@ -89,8 +89,27 @@ final class TicketBuilderTest extends TestCase
         Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] !== 4);
     }
 
+    public function test_by_default_a_search_matching_more_than_500_tickets_fails(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => array_map('strval', range(1, 501))]),
+        ]);
+
+        try {
+            Znuny::tickets()->whereState('open')->ids();
+            $this->fail('Expected a ZnunySearchLimitExceededException');
+        } catch (ZnunySearchLimitExceededException $e) {
+            $this->assertStringContainsString('more than 500 tickets', $e->getMessage());
+        }
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch') && $r['Limit'] === 501);
+    }
+
     public function test_a_result_of_exactly_500_tickets_is_logged_as_a_likely_cut_off(): void
     {
+        config(['znuny.connections.default.search_limit' => null]);
+
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch*' => Http::sequence()

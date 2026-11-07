@@ -2,7 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Data;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
 
 final readonly class HistoryEntry
@@ -15,7 +15,7 @@ final readonly class HistoryEntry
     public function __construct(
         public string $historyType,
         public string $name,
-        public ?Carbon $createTime,
+        public ?CarbonImmutable $createTime,
         public ?string $createBy,
         public ?string $articleId,
         public array $attributes = [],

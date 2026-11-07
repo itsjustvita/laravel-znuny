@@ -2,7 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Data\Concerns;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Arr;
 
 trait HasAttributes
@@ -29,10 +29,10 @@ trait HasAttributes
     /**
      * Znuny returns dates as "Y-m-d H:i:s" in its OTRSTimeZone, not in the app's time zone.
      */
-    protected static function optionalDate(mixed $value, string $timezone): ?Carbon
+    protected static function optionalDate(mixed $value, string $timezone): ?CarbonImmutable
     {
         $value = self::optionalString($value);
 
-        return $value === null ? null : Carbon::parse($value, $timezone);
+        return $value === null ? null : CarbonImmutable::parse($value, $timezone);
     }
 }

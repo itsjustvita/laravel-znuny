@@ -257,13 +257,6 @@ final class ZnunyClientTransportTest extends TestCase
             && $r['UserLogin'] === 'agent');
     }
 
-    public function test_request_is_a_deprecated_alias_of_call(): void
-    {
-        Http::fake(['*' => Http::response(['TicketID' => ['1']])]);
-
-        $this->assertSame(['TicketID' => ['1']], $this->client(['auth' => 'credentials'])->request('TicketSearch'));
-    }
-
     public function test_session_ids_are_redacted_in_response_events(): void
     {
         Event::fake([ZnunyResponseReceived::class]);

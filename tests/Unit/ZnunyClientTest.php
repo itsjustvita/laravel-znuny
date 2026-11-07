@@ -49,7 +49,7 @@ final class ZnunyClientTest extends TestCase
         Http::fake(['*' => $sequence]);
 
         $client = $this->makeClient();
-        $result = $client->request('TicketGet', ['TicketID' => '42']);
+        $result = $client->call('TicketGet', ['TicketID' => '42']);
 
         $this->assertSame('42', $result['Ticket'][0]['TicketID']);
         Http::assertSentCount(2);
@@ -65,8 +65,8 @@ final class ZnunyClientTest extends TestCase
         Http::fake(['*' => $sequence]);
 
         $client = $this->makeClient();
-        $client->request('TicketGet', ['TicketID' => '1']);
-        $client->request('TicketGet', ['TicketID' => '2']);
+        $client->call('TicketGet', ['TicketID' => '1']);
+        $client->call('TicketGet', ['TicketID' => '2']);
 
         // SessionCreate (1) + 2 TicketGet calls = 3 total.
         Http::assertSentCount(3);
@@ -83,7 +83,7 @@ final class ZnunyClientTest extends TestCase
         $client = $this->makeClient();
 
         $this->expectException(TicketNotFoundException::class);
-        $client->request('TicketGet', ['TicketID' => '9999']);
+        $client->call('TicketGet', ['TicketID' => '9999']);
     }
 
     public function test_it_maps_session_create_auth_fail_to_authentication_exception(): void
@@ -95,7 +95,7 @@ final class ZnunyClientTest extends TestCase
         $client = $this->makeClient();
 
         $this->expectException(ZnunyAuthenticationException::class);
-        $client->request('TicketGet', ['TicketID' => '1']);
+        $client->call('TicketGet', ['TicketID' => '1']);
     }
 
     public function test_it_retries_transient_5xx_at_the_http_layer(): void
@@ -109,7 +109,7 @@ final class ZnunyClientTest extends TestCase
 
         $client = $this->makeClient(['retries' => 2, 'retry_delay' => 10]);
 
-        $result = $client->request('TicketGet', ['TicketID' => '42']);
+        $result = $client->call('TicketGet', ['TicketID' => '42']);
 
         $this->assertSame('42', $result['Ticket'][0]['TicketID']);
         Http::assertSentCount(3); // SessionCreate + TicketGet(503) + TicketGet(200)
@@ -132,7 +132,7 @@ final class ZnunyClientTest extends TestCase
             'retry_delay' => 10,  // per-connection override: 10ms
         ]);
 
-        $result = $client->request('TicketGet', ['TicketID' => '1']);
+        $result = $client->call('TicketGet', ['TicketID' => '1']);
 
         $this->assertSame('1', $result['Ticket'][0]['TicketID']);
         Http::assertSentCount(3); // SessionCreate + TicketGet(503) + TicketGet(200) — succeeded on first retry
@@ -147,7 +147,7 @@ final class ZnunyClientTest extends TestCase
         $client = $this->makeClient();
 
         try {
-            $client->request('TicketGet', ['TicketID' => '1']);
+            $client->call('TicketGet', ['TicketID' => '1']);
             $this->fail('Expected ZnunyConnectionException');
         } catch (ZnunyConnectionException $e) {
             $this->assertSame('SessionCreate', $e->getOperation()); // the first call is SessionCreate
@@ -168,7 +168,7 @@ final class ZnunyClientTest extends TestCase
         Http::fake(['*' => $sequence]);
 
         $client = $this->makeClient();
-        $result = $client->request('TicketGet', ['TicketID' => '42']);
+        $result = $client->call('TicketGet', ['TicketID' => '42']);
 
         $this->assertSame(['TicketID' => '42'], $result['Ticket'][0]);
         Http::assertSentCount(4);
@@ -193,7 +193,7 @@ final class ZnunyClientTest extends TestCase
         $client = $this->makeClient();
 
         $this->expectException(ZnunySessionExpiredException::class);
-        $client->request('TicketGet', ['TicketID' => '42']);
+        $client->call('TicketGet', ['TicketID' => '42']);
     }
 
     public function test_it_honors_disabled_auto_retry(): void
@@ -209,6 +209,6 @@ final class ZnunyClientTest extends TestCase
         $client = $this->makeClient();
 
         $this->expectException(ZnunySessionExpiredException::class);
-        $client->request('TicketGet', ['TicketID' => '42']);
+        $client->call('TicketGet', ['TicketID' => '42']);
     }
 }

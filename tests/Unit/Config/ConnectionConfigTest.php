@@ -36,7 +36,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(3, $config->retries);
         $this->assertSame(100, $config->retryDelay);
         $this->assertSame(50, $config->batchSize);
-        $this->assertNull($config->searchLimit);
+        $this->assertSame(500, $config->searchLimit);
         $this->assertSame('UTC', $config->timezone);
         $this->assertTrue($config->usesSession());
         $this->assertSame('UserLogin', $config->loginKey());
@@ -58,10 +58,11 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(5000, $this->make([], ['search_limit' => ' 5000 '])->searchLimit);
     }
 
-    public function test_the_search_limit_is_off_unless_set(): void
+    public function test_the_search_limit_is_500_unless_switched_off(): void
     {
+        $this->assertSame(500, $this->make()->searchLimit);
+
         // Off: no limit is sent and Znuny cuts the result off at its own SearchLimit.
-        $this->assertNull($this->make()->searchLimit);
         $this->assertNull($this->make(['search_limit' => null], ['search_limit' => 5000])->searchLimit);
         $this->assertNull($this->make([], ['search_limit' => null])->searchLimit);
         $this->assertNull($this->make(['search_limit' => ''])->searchLimit);
@@ -270,7 +271,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame('UTC', $config['timezone']);
         $this->assertArrayNotHasKey('timezone', $config['connections']['default']);
         $this->assertSame(50, $config['http']['batch_size']);
-        $this->assertNull($config['http']['search_limit']);
+        $this->assertSame(500, $config['http']['search_limit']);
         $this->assertTrue($config['session']['per_host']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);

@@ -29,8 +29,7 @@ final class PublishedConfigTest extends TestCase
     {
         $this->registerWithConfigPublishedBefore();
 
-        $this->assertArrayHasKey('search_limit', config('znuny.http'));
-        $this->assertNull(config('znuny.http.search_limit'));
+        $this->assertSame(500, config('znuny.http.search_limit'));
         $this->assertTrue(config('znuny.session.per_host'));
     }
 

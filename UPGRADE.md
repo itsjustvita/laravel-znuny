@@ -1,5 +1,35 @@
 # Upgrade guide
 
+## 0.2.x → 0.3.0
+
+0.3.0 adds a lot (see the CHANGELOG) and makes four breaking changes. Each of them fails loudly rather than changing results silently.
+
+### Searches fail instead of returning a partial result (high impact)
+
+The search limit introduced as an option in 0.2.2 is on by default, with the value 500. Znuny itself cuts a search without a limit off at 500 tickets, so no search loads more than before; the difference is that a search without `limit()` that matches more than 500 tickets now throws a `ZnunySearchLimitExceededException` instead of returning the first 500.
+
+What to do where it happens:
+
+- Narrow the search down, or call `limit(500)` if the first tickets are enough.
+- Raise the limit with `ZNUNY_SEARCH_LIMIT` or the connection's `search_limit`, and use `lazy()` or `paginate()` instead of `get()` for large results: `get()` holds every ticket with its articles in memory.
+- `'search_limit' => null` (or `ZNUNY_SEARCH_LIMIT=null`) restores the behaviour of 0.2.
+- Every `TicketSearch` without `limit()` carries `Limit: 501` now. Adjust `Http::fake()` expectations in your tests if they compare the whole request.
+
+### Dates are immutable
+
+`$ticket->created`, `$ticket->changed`, `$article->created` and `$entry->createTime` are `Carbon\CarbonImmutable` instead of `Carbon\Carbon`.
+
+- Type hints on `Carbon` fail with a `TypeError`; use `CarbonInterface` or `CarbonImmutable`.
+- Methods such as `addDay()` or `setTimezone()` return a new instance and leave the DTO unchanged. Code that relied on mutating the DTO's date must use the returned value.
+
+### `$ticket->customerUserID` is now `$ticket->customerUserId`
+
+The property follows the naming of all other properties. The old name still works until 0.4.0 and triggers a deprecation notice (`E_USER_DEPRECATED`, which Laravel writes to the deprecations log channel). Code that constructs `Ticket` objects with the named argument `customerUserID:` must use `customerUserId:`. The input key `customerUserID` of `create()` and `update()` keeps working, as does the key `CustomerUserID` of `toArray()`.
+
+### `ZnunyClient::request()` is removed
+
+It was a deprecated alias of `call()` since 0.2.0. Use `call()`.
+
 ## 0.2.1 → 0.2.2
 
 Nothing has to be changed. Two things are worth doing, and two behaviours changed.

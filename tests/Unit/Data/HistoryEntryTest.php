@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Data;
 
+use Carbon\CarbonImmutable;
 use ItsJustVita\LaravelZnuny\Data\HistoryEntry;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 
@@ -40,6 +41,16 @@ final class HistoryEntryTest extends TestCase
         $this->assertSame(strtotime('2026-07-01 08:00:00 UTC'), $utc->createTime->getTimestamp());
         $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $berlin->createTime->getTimestamp());
         $this->assertSame('2026-07-01 08:00:00', $berlin->toArray()['CreateTime']);
+    }
+
+    public function test_the_create_time_is_immutable(): void
+    {
+        $entry = HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'CreateTime' => '2026-07-01 08:00:00']);
+
+        $this->assertInstanceOf(CarbonImmutable::class, $entry->createTime);
+        $entry->createTime->addDay();
+
+        $this->assertSame('2026-07-01 08:00:00', $entry->createTime->format('Y-m-d H:i:s'));
     }
 
     public function test_article_id_zero_means_no_article(): void
