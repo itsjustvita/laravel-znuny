@@ -525,6 +525,7 @@ Znuny::assertNotCalled('TicketUpdate');
 ```
 
 - `fakeTickets()` builds a `TicketGet` response from complete default tickets; pass only the fields that matter.
+- `findByNumber()` returns a ticket only if its number is exactly the one asked for, so give the faked ticket that number: `Znuny::fakeTickets(['TicketID' => '42', 'TicketNumber' => '2026110610000042'])`.
 - A response can be an array, a closure that receives the payload and the connection name, an exception to throw, or a `Znuny::sequence()` that answers one call after the other. `'*'` answers every operation without its own response.
 - An operation without a response throws a `StrayZnunyCallException`, so a forgotten fake shows up in the test.
 - The fake replaces `ZnunyManager` in the container as well, needs no configured connection and keeps the configured time zone, search limit and batch size. `Znuny::recorded()` returns all calls with their connection and payload.

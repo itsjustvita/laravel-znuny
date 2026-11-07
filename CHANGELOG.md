@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-11-07
+
+Small fixes: a blank timeout no longer waits forever, plus four fixes from the review of 0.3.0.
+
+### Fixed
+
+- A blank timeout setting, such as `ZNUNY_TIMEOUT=` in `.env`, no longer means a timeout of 0, which waits forever. Blank numbers in the connection and `http` settings count as not set, so the defaults apply (30 seconds, 3 seconds to connect).
+- `Znuny::fake()` applies a connection's settings as a real connection does. It used to drop null and blank values, so `'search_limit' => null` did not switch the limit off and faked searches with more than 500 tickets threw.
+- `znuny:webservice` refuses text that is not valid UTF-8 and names the value, instead of writing an empty or broken value into the definition.
+- `znuny:webservice --output` names the URL Znuny will send webhooks to, and the command warns when the webhook host is the machine Znuny runs on, such as `localhost` from a default `APP_URL`.
+- The README says that `findByNumber()` against `Znuny::fake()` needs the faked ticket's exact ticket number.
+
 ## [0.3.0] - 2026-11-07
 
 Convenience features and an API cleanup. Four breaking changes, each of which fails loudly; see [UPGRADE.md](UPGRADE.md).
@@ -137,7 +149,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.0...v0.2.1

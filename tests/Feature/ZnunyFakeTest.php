@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent;
 use ItsJustVita\LaravelZnuny\Events\ZnunyTicketCreated;
+use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 use ItsJustVita\LaravelZnuny\Testing\FakeZnunyManager;
 use ItsJustVita\LaravelZnuny\Testing\StrayZnunyCallException;
@@ -177,6 +178,32 @@ final class ZnunyFakeTest extends TestCase
         Znuny::fake(['TicketGet' => Znuny::fakeTickets(['TicketID' => '1', 'Created' => '2026-07-01 08:00:00'])]);
 
         $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), Znuny::tickets()->find('1')->created?->getTimestamp());
+    }
+
+    public function test_find_by_number_needs_the_faked_tickets_exact_number(): void
+    {
+        Znuny::fake([
+            'TicketSearch' => ['TicketID' => ['42']],
+            'TicketGet' => Znuny::fakeTickets(['TicketID' => '42', 'TicketNumber' => '2026110610000042']),
+        ]);
+
+        $this->assertSame('42', Znuny::tickets()->findByNumber('2026110610000042')->id);
+
+        $this->expectException(TicketNotFoundException::class);
+
+        Znuny::tickets()->findByNumber('2026110610000043');
+    }
+
+    public function test_a_search_limit_switched_off_stays_off(): void
+    {
+        config(['znuny.connections.default.search_limit' => null]);
+        Znuny::fake(['TicketSearch' => ['TicketID' => array_map('strval', range(1, 600))]]);
+
+        $runtime = Znuny::build(['base_url' => 'https://runtime.test/ws', 'username' => 'r', 'password' => 'r', 'search_limit' => '']);
+
+        $this->assertCount(600, Znuny::tickets()->query()->ids());
+        $this->assertCount(600, $runtime->tickets()->query()->ids());
+        Znuny::assertNotCalled('TicketSearch', fn (array $payload) => array_key_exists('Limit', $payload));
     }
 
     public function test_nothing_is_sent_over_http(): void
