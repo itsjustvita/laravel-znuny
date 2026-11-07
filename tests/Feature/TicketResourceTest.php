@@ -301,6 +301,78 @@ final class TicketResourceTest extends TestCase
         $this->assertSame(65, $ticketGets);
     }
 
+    public function test_builder_methods_can_be_called_on_the_resource(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['3']]),
+        ]);
+
+        $this->assertSame(['3'], Znuny::tickets()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids()->all());
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['DynamicField_OrderId'] === ['Like' => 'ORD-*']);
+    }
+
+    public function test_an_unknown_method_names_the_resource(): void
+    {
+        $this->expectException(\BadMethodCallException::class);
+        $this->expectExceptionMessage('TicketResource::whereNope()');
+
+        Znuny::tickets()->whereNope('x');
+    }
+
+    public function test_find_by_number_searches_the_exact_number_and_loads_the_ticket(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['42']]),
+            '*TicketGet/42' => Http::response(['Ticket' => [$this->ticket('42')]]),
+        ]);
+
+        $this->assertSame('42', Znuny::tickets()->findByNumber('2026110610000017', withArticles: true)->id);
+
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketSearch')
+            && $r['TicketNumber'] === '2026110610000017'
+            && $r['Limit'] === 1);
+        Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/TicketGet/42') && $r['AllArticles'] === 1);
+    }
+
+    public function test_find_by_number_without_a_match_throws_ticket_not_found(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        try {
+            Znuny::tickets()->findByNumber('404');
+            $this->fail('Expected a TicketNotFoundException');
+        } catch (TicketNotFoundException $e) {
+            $this->assertStringContainsString('number [404]', $e->getMessage());
+            $this->assertSame('TicketSearch', $e->getOperation());
+            $this->assertSame('default', $e->getConnection());
+        }
+
+        Http::assertNotSent(fn (Request $r) => str_contains($r->url(), 'TicketGet'));
+    }
+
+    public function test_find_and_find_many_pass_raw_ticket_get_options(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketGet*' => Http::response(['Ticket' => [$this->ticket('42')]]),
+        ]);
+
+        Znuny::tickets()->find('42', withDynamicFields: true, options: ['Extended' => 1, 'DynamicFields' => 0]);
+        Znuny::tickets()->findMany(['42'], options: ['ArticleLimit' => 2]);
+
+        // Options override the flags of the named parameters.
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet')
+            && ($r['Extended'] ?? null) === 1 && ($r['DynamicFields'] ?? null) === 0);
+        Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet') && ($r['ArticleLimit'] ?? null) === 2);
+    }
+
     public function test_find_many_without_ids_sends_nothing(): void
     {
         Http::fake();

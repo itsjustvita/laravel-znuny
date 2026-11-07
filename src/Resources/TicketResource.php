@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Resources;
 
+use BadMethodCallException;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Builders\TicketBuilder;
@@ -16,6 +17,9 @@ use ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 
+/**
+ * @mixin TicketBuilder
+ */
 class TicketResource extends Resource
 {
     /** A rejected batch of up to this many tickets is fetched ticket by ticket. */
@@ -33,9 +37,12 @@ class TicketResource extends Resource
         );
     }
 
-    public function find(string $ticketId, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false): Ticket
+    /**
+     * @param  array<string, mixed>  $options  raw TicketGet parameters, e.g. ['Extended' => 1]; they override the flags
+     */
+    public function find(string $ticketId, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false, array $options = []): Ticket
     {
-        $payload = ['TicketID' => $ticketId] + self::fetchOptions($withArticles, $withDynamicFields, $withAttachments);
+        $payload = ['TicketID' => $ticketId] + array_merge(self::fetchOptions($withArticles, $withDynamicFields, $withAttachments), $options);
         $data = $this->client->call('TicketGet', $payload)['Ticket'][0] ?? null;
 
         if (! is_array($data)) {
@@ -53,12 +60,13 @@ class TicketResource extends Resource
      * $ticketIds; tickets Znuny does not return or denies access to are skipped.
      *
      * @param  array<int, string|int>  $ticketIds
+     * @param  array<string, mixed>  $options  raw TicketGet parameters; they override the flags
      * @return Collection<int, Ticket>
      */
-    public function findMany(array $ticketIds, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false): Collection
+    public function findMany(array $ticketIds, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false, array $options = []): Collection
     {
         $ids = array_values(array_unique(array_map('strval', $ticketIds)));
-        $options = self::fetchOptions($withArticles, $withDynamicFields, $withAttachments);
+        $options = array_merge(self::fetchOptions($withArticles, $withDynamicFields, $withAttachments), $options);
         $found = [];
 
         foreach (array_chunk($ids, $this->client->settings()->batchSize) as $chunk) {
@@ -71,6 +79,28 @@ class TicketResource extends Resource
             ->filter(fn (string $id): bool => isset($found[$id]))
             ->map(fn (string $id): Ticket => $found[$id])
             ->values();
+    }
+
+    /**
+     * Find a ticket by its number, the way customers and e-mail subjects refer to it.
+     *
+     * @param  array<string, mixed>  $options  raw TicketGet parameters
+     *
+     * @throws TicketNotFoundException when no ticket with this number exists or the user cannot read it
+     */
+    public function findByNumber(string $ticketNumber, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false, array $options = []): Ticket
+    {
+        $payload = ['TicketNumber' => $ticketNumber, 'Limit' => 1];
+        $ids = (array) ($this->client->call('TicketSearch', $payload)['TicketID'] ?? []);
+
+        if ($ids === []) {
+            throw (new TicketNotFoundException("Znuny has no ticket with the number [{$ticketNumber}] that this user can read."))
+                ->setOperation('TicketSearch')
+                ->setConnection($this->client->connection())
+                ->setRequestPayload($payload);
+        }
+
+        return $this->find((string) reset($ids), $withArticles, $withDynamicFields, $withAttachments, $options);
     }
 
     /**
@@ -155,6 +185,22 @@ class TicketResource extends Resource
     public function query(): TicketBuilder
     {
         return new TicketBuilder($this->client, $this);
+    }
+
+    /**
+     * Search methods can be called on the resource directly: Znuny::tickets()->whereTitle(...).
+     *
+     * @param  array<int|string, mixed>  $arguments
+     */
+    public function __call(string $method, array $arguments): mixed
+    {
+        $builder = $this->query();
+
+        if (! is_callable([$builder, $method])) {
+            throw new BadMethodCallException(sprintf('Method %s::%s() does not exist.', static::class, $method));
+        }
+
+        return $builder->{$method}(...$arguments);
     }
 
     public function where(string $field, mixed $value): TicketBuilder
