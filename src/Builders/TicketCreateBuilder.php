@@ -70,7 +70,7 @@ class TicketCreateBuilder
         }
 
         $payload = [
-            'Ticket' => TicketInputMapper::mapTicket($this->ticket),
+            'Ticket' => TicketInputMapper::mapTicket($this->ticket, $this->client->settings()->timezone),
             'Article' => TicketInputMapper::mapArticle($this->article),
         ];
 

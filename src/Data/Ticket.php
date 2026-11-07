@@ -49,6 +49,7 @@ final readonly class Ticket
         public ?string $sla = null,
         public ?string $slaId = null,
         public array $attributes = [],
+        public ?CarbonImmutable $pendingUntil = null,
     ) {}
 
     /**
@@ -101,7 +102,25 @@ final readonly class Ticket
             sla: self::optionalString($data['SLA'] ?? null),
             slaId: self::optionalString($data['SLAID'] ?? null),
             attributes: array_diff_key($data, ['Article' => true, 'Articles' => true]),
+            pendingUntil: self::pendingUntil($data, $timezone),
         );
+    }
+
+    /**
+     * RealTillTimeNotUsed is a Unix time, so it does not depend on Znuny's time zone. Znuny
+     * keeps it after a ticket leaves its pending state, so it counts only while it is pending.
+     *
+     * @param  array<array-key, mixed>  $data
+     */
+    private static function pendingUntil(array $data, string $timezone): ?CarbonImmutable
+    {
+        $until = $data['RealTillTimeNotUsed'] ?? null;
+
+        if (! is_numeric($until) || (int) $until <= 0 || ! str_starts_with((string) ($data['StateType'] ?? ''), 'pending')) {
+            return null;
+        }
+
+        return CarbonImmutable::createFromTimestamp((int) $until, $timezone);
     }
 
     /**
@@ -150,6 +169,7 @@ final readonly class Ticket
             'CustomerUser' => $this->customerUser,
             'Created' => $this->created?->format('Y-m-d H:i:s'),
             'Changed' => $this->changed?->format('Y-m-d H:i:s'),
+            'RealTillTimeNotUsed' => $this->pendingUntil?->getTimestamp() ?? 0,
             'Article' => $this->articles->map(fn (Article $article): array => $article->toArray())->all(),
             'DynamicField' => $this->dynamicFields->map(fn (DynamicField $field): array => $field->toArray())->all(),
         ];

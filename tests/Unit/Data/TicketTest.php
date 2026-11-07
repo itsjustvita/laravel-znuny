@@ -117,6 +117,22 @@ final class TicketTest extends TestCase
         $ticket->customerUserIdentifier;
     }
 
+    public function test_pending_until_is_read_for_pending_tickets_only(): void
+    {
+        $pending = Ticket::fromZnunyResponse(['TicketID' => '1', 'StateType' => 'pending reminder', 'RealTillTimeNotUsed' => '1782908400'], 'Europe/Berlin');
+
+        $this->assertSame(1782908400, $pending->pendingUntil?->getTimestamp());
+        $this->assertSame('Europe/Berlin', $pending->pendingUntil->getTimezone()->getName());
+        $this->assertSame(1782908400, $pending->toArray()['RealTillTimeNotUsed']);
+
+        $open = Ticket::fromZnunyResponse(['TicketID' => '1', 'StateType' => 'open', 'RealTillTimeNotUsed' => '1782908400']);
+        $this->assertNull($open->pendingUntil);
+        $this->assertSame(0, $open->toArray()['RealTillTimeNotUsed']);
+
+        $this->assertNull(Ticket::fromZnunyResponse(['TicketID' => '1', 'StateType' => 'pending auto', 'RealTillTimeNotUsed' => '0'])->pendingUntil);
+        $this->assertNull(Ticket::fromZnunyResponse(['TicketID' => '1', 'StateType' => 'pending auto'])->pendingUntil);
+    }
+
     public function test_empty_dates_are_null(): void
     {
         $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'Created' => '', 'Changed' => '']);

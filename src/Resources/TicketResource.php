@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Resources;
 
 use BadMethodCallException;
+use DateTimeInterface;
 use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Builders\TicketBuilder;
@@ -116,7 +117,7 @@ class TicketResource extends Resource
         $payload = ['TicketID' => $ticketId];
 
         if ($ticket !== []) {
-            $payload['Ticket'] = TicketInputMapper::mapTicket($ticket);
+            $payload['Ticket'] = TicketInputMapper::mapTicket($ticket, $this->client->settings()->timezone);
         }
 
         if ($dynamicFields !== []) {
@@ -167,6 +168,41 @@ class TicketResource extends Resource
     public function close(string $ticketId, string $state = 'closed successful'): void
     {
         $this->update($ticketId, ['state' => $state]);
+    }
+
+    public function lock(string $ticketId): void
+    {
+        $this->update($ticketId, ['lock' => 'lock']);
+    }
+
+    public function unlock(string $ticketId): void
+    {
+        $this->update($ticketId, ['lock' => 'unlock']);
+    }
+
+    /**
+     * @param  string|int  $owner  the agent's login, or an int for the agent's ID
+     */
+    public function assign(string $ticketId, string|int $owner): void
+    {
+        $this->update($ticketId, is_int($owner) ? ['ownerId' => $owner] : ['owner' => $owner]);
+    }
+
+    /**
+     * @param  string|int  $queue  the queue's name, or an int for the queue's ID
+     */
+    public function move(string $ticketId, string|int $queue): void
+    {
+        $this->update($ticketId, is_int($queue) ? ['queueId' => $queue] : ['queue' => $queue]);
+    }
+
+    /**
+     * Set a pending state and its time. Znuny accepts a pending time only together with a
+     * pending state; it is read to the minute in Znuny's time zone.
+     */
+    public function setPending(string $ticketId, DateTimeInterface $until, string $state = 'pending reminder'): void
+    {
+        $this->update($ticketId, ['state' => $state, 'pendingTime' => $until]);
     }
 
     /**

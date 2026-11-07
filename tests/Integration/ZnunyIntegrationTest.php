@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Integration;
 
+use Carbon\CarbonImmutable;
 use Closure;
 use DateTimeImmutable;
 use DateTimeZone;
@@ -319,6 +320,36 @@ final class ZnunyIntegrationTest extends TestCase
 
         $this->assertSame(1, $znuny->tickets()->whereLock('lock')->whereTitle($title)->count());
         $this->assertSame(0, $znuny->tickets()->whereLock('unlock')->whereTitle($title)->count());
+    }
+
+    public function test_ticket_actions(): void
+    {
+        $znuny = $this->znuny();
+        $ticket = $this->createTicket($znuny, 'Actions '.uniqid());
+        $find = fn () => $znuny->tickets()->find($ticket->id);
+
+        $znuny->tickets()->lock($ticket->id);
+        $this->assertSame('lock', $find()->lock);
+
+        $znuny->tickets()->unlock($ticket->id);
+        $this->assertSame('unlock', $find()->lock);
+
+        $znuny->tickets()->assign($ticket->id, 'root@localhost');
+        $this->assertSame('root@localhost', $find()->owner);
+
+        $znuny->tickets()->move($ticket->id, 'Misc');
+        $this->assertSame('Misc', $find()->queue);
+
+        // Minute 0 on purpose, and a time zone that is neither UTC nor Znuny's.
+        $until = CarbonImmutable::now('Asia/Tokyo')->addDays(3)->setTime(14, 0);
+        $znuny->tickets()->setPending($ticket->id, $until);
+
+        $pending = $find();
+        $this->assertSame('pending reminder', $pending->state);
+        $this->assertSame($until->getTimestamp(), $pending->pendingUntil?->getTimestamp());
+
+        $znuny->tickets()->update($ticket->id, ['state' => 'open']);
+        $this->assertNull($find()->pendingUntil);
     }
 
     public function test_find_by_number(): void

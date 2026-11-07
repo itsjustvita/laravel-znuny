@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Builders;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Builders\TicketInputMapper;
 use ItsJustVita\LaravelZnuny\Data\Attachment;
@@ -71,6 +73,28 @@ final class TicketInputMapperTest extends TestCase
         $this->assertSame(
             ['MimeType' => 'text/html', 'Charset' => 'utf8'],
             TicketInputMapper::mapArticle(['mimeType' => 'text/html', 'charset' => 'utf8']),
+        );
+    }
+
+    public function test_a_pending_date_becomes_znunys_date_parts_in_the_znuny_time_zone(): void
+    {
+        $until = new DateTimeImmutable('2026-07-01 12:30:45', new DateTimeZone('UTC'));
+
+        $this->assertSame(
+            ['State' => 'pending reminder', 'PendingTime' => ['Year' => 2026, 'Month' => 7, 'Day' => 1, 'Hour' => 14, 'Minute' => 30]],
+            TicketInputMapper::mapTicket(['state' => 'pending reminder', 'pendingTime' => $until], 'Europe/Berlin'),
+        );
+        $this->assertSame(
+            ['PendingTime' => ['Year' => 2026, 'Month' => 7, 'Day' => 1, 'Hour' => 12, 'Minute' => 30]],
+            TicketInputMapper::mapTicket(['PendingTime' => $until]),
+        );
+    }
+
+    public function test_a_raw_pending_time_passes_through(): void
+    {
+        $this->assertSame(
+            ['PendingTime' => ['Diff' => 60]],
+            TicketInputMapper::mapTicket(['pendingTime' => ['Diff' => 60]], 'Europe/Berlin'),
         );
     }
 

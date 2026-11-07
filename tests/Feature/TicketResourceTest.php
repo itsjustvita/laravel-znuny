@@ -2,6 +2,8 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use DateTimeImmutable;
+use DateTimeZone;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -371,6 +373,77 @@ final class TicketResourceTest extends TestCase
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet')
             && ($r['Extended'] ?? null) === 1 && ($r['DynamicFields'] ?? null) === 0);
         Http::assertSent(fn (Request $r) => str_contains($r->url(), 'TicketGet') && ($r['ArticleLimit'] ?? null) === 2);
+    }
+
+    /**
+     * The Ticket hashes of all TicketUpdate requests sent so far.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function ticketUpdates(): array
+    {
+        return Http::recorded(fn (Request $r) => str_contains($r->url(), 'TicketUpdate'))
+            ->map(fn (array $pair): array => $pair[0]['Ticket'])
+            ->values()
+            ->all();
+    }
+
+    public function test_ticket_actions_send_ticket_updates(): void
+    {
+        Event::fake([ZnunyTicketUpdated::class]);
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '1', 'TicketNumber' => '1']),
+        ]);
+
+        Znuny::tickets()->lock('1');
+        Znuny::tickets()->unlock('1');
+        Znuny::tickets()->assign('1', 'agent');
+        Znuny::tickets()->move('1', 'Second Level');
+        Znuny::tickets()->setPending('1', new DateTimeImmutable('2026-07-01 12:30:00', new DateTimeZone('UTC')));
+        Znuny::tickets()->setPending('1', new DateTimeImmutable('2026-07-02 08:00:00', new DateTimeZone('UTC')), 'pending auto close+');
+
+        $this->assertSame([
+            ['Lock' => 'lock'],
+            ['Lock' => 'unlock'],
+            ['Owner' => 'agent'],
+            ['Queue' => 'Second Level'],
+            ['State' => 'pending reminder', 'PendingTime' => ['Year' => 2026, 'Month' => 7, 'Day' => 1, 'Hour' => 12, 'Minute' => 30]],
+            ['State' => 'pending auto close+', 'PendingTime' => ['Year' => 2026, 'Month' => 7, 'Day' => 2, 'Hour' => 8, 'Minute' => 0]],
+        ], $this->ticketUpdates());
+
+        Event::assertDispatchedTimes(ZnunyTicketUpdated::class, 6);
+    }
+
+    public function test_ids_and_names_are_told_apart_by_type(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '1', 'TicketNumber' => '1']),
+        ]);
+
+        Znuny::tickets()->assign('1', 3);
+        Znuny::tickets()->assign('1', '3');
+        Znuny::tickets()->move('1', 7);
+        Znuny::tickets()->move('1', '7');
+
+        $this->assertSame([['OwnerID' => 3], ['Owner' => '3'], ['QueueID' => 7], ['Queue' => '7']], $this->ticketUpdates());
+    }
+
+    public function test_a_pending_date_on_update_uses_the_connection_time_zone(): void
+    {
+        config(['znuny.timezone' => 'Europe/Berlin']);
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '1', 'TicketNumber' => '1']),
+        ]);
+
+        Znuny::tickets()->update('1', ['state' => 'pending reminder', 'pendingTime' => new DateTimeImmutable('2026-01-15 08:00:00', new DateTimeZone('UTC'))]);
+
+        $this->assertSame(
+            [['State' => 'pending reminder', 'PendingTime' => ['Year' => 2026, 'Month' => 1, 'Day' => 15, 'Hour' => 9, 'Minute' => 0]]],
+            $this->ticketUpdates(),
+        );
     }
 
     public function test_find_many_without_ids_sends_nothing(): void
