@@ -43,6 +43,18 @@ final class PublishedConfigTest extends TestCase
         $this->assertSame('operation-name', config('znuny.connections.default.routes'));
     }
 
+    public function test_a_search_limit_published_as_null_by_0_2_2_stays_off(): void
+    {
+        // A config file published by 0.2.2 contains 'search_limit' => env('ZNUNY_SEARCH_LIMIT'), which is
+        // null without the variable. An explicit null means "off", so the 0.3 default does not apply;
+        // UPGRADE.md tells those users to change the line.
+        config(['znuny.http' => ['retries' => 3, 'retry_delay' => 100, 'batch_size' => 50, 'search_limit' => null]]);
+
+        (new ZnunyServiceProvider($this->app))->register();
+
+        $this->assertNull(Znuny::client()->settings()->searchLimit);
+    }
+
     public function test_their_environment_variables_work_without_republishing(): void
     {
         $_SERVER['ZNUNY_SEARCH_LIMIT'] = '750';

@@ -107,6 +107,25 @@ final class TicketTest extends TestCase
         $this->assertStringContainsString('customerUserId', $deprecations[0]);
     }
 
+    public function test_the_old_customer_user_id_name_works_with_isset_and_null_coalescing(): void
+    {
+        $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane']);
+        $withoutCustomer = Ticket::fromZnunyResponse(['TicketID' => '2']);
+
+        set_error_handler(fn (): bool => true, E_USER_DEPRECATED);
+
+        try {
+            // 0.2 code such as $ticket->customerUserID ?? 'unknown' must keep its result.
+            $this->assertTrue(isset($ticket->customerUserID));
+            $this->assertSame('jane', $ticket->customerUserID ?? 'unknown');
+            $this->assertSame(['jane', null], collect([$ticket, $withoutCustomer])->pluck('customerUserID')->all());
+            $this->assertFalse(isset($withoutCustomer->customerUserID));
+            $this->assertSame('unknown', $withoutCustomer->customerUserID ?? 'unknown');
+        } finally {
+            restore_error_handler();
+        }
+    }
+
     public function test_other_undefined_properties_still_fail(): void
     {
         $ticket = Ticket::fromZnunyResponse(['TicketID' => '1']);

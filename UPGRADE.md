@@ -13,6 +13,7 @@ What to do where it happens:
 - Narrow the search down, or call `limit(500)` if the first tickets are enough.
 - Raise the limit with `ZNUNY_SEARCH_LIMIT` or the connection's `search_limit`, and use `lazy()` or `paginate()` instead of `get()` for large results: `get()` holds every ticket with its articles in memory.
 - `'search_limit' => null` (or `ZNUNY_SEARCH_LIMIT=null`) restores the behaviour of 0.2.
+- **If you published `config/znuny.php` with 0.2.2**, it contains `'search_limit' => env('ZNUNY_SEARCH_LIMIT'),`. Without the variable that is `null`, which keeps the limit off. Change the line to `'search_limit' => env('ZNUNY_SEARCH_LIMIT', 500),` to get the new default. Config files published with 0.2.1 or earlier, or not published at all, get it automatically.
 - Every `TicketSearch` without `limit()` carries `Limit: 501` now. Adjust `Http::fake()` expectations in your tests if they compare the whole request.
 
 ### Dates are immutable

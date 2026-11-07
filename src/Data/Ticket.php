@@ -138,6 +138,14 @@ final readonly class Ticket
     }
 
     /**
+     * isset(), ?? and data_get() on the 0.2 name behave as on a real property.
+     */
+    public function __isset(string $name): bool
+    {
+        return $name === 'customerUserID' && $this->customerUserId !== null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(): array
