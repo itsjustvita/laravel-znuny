@@ -15,6 +15,7 @@ use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\Resources\TypeResource;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 
 class ZnunyManager
 {
@@ -210,7 +211,7 @@ class ZnunyManager
             cache: $cache,
             prefix: (string) $this->config('znuny.cache.prefix', 'znuny:lookup:'),
             ttls: (array) $this->config('znuny.cache.ttl', []),
-            enabled: (bool) $this->config('znuny.cache.enabled', true),
+            enabled: Setting::boolean(true, $this->config('znuny.cache.enabled')),
         );
     }
 
@@ -224,15 +225,13 @@ class ZnunyManager
         // that share a cache store but reach Znuny from different addresses would invalidate
         // each other's session with every request, so each host keeps its own. Only an
         // explicit "false", "off", "no" or 0 switches that off.
-        $perHost = $this->config('znuny.session.per_host');
-
-        if ($perHost === null || $perHost === '' || (filter_var($perHost, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? true)) {
+        if (Setting::boolean(true, $this->config('znuny.session.per_host'))) {
             $prefix .= substr(hash('sha256', (string) gethostname()), 0, 12).':';
         }
 
         return new SessionManager(
             store: new SessionStore($cache, $prefix),
-            ttl: (int) $this->config('znuny.session.ttl', 21600),
+            ttl: Setting::integer('The Znuny configuration', 'session.ttl', 21600, $this->config('znuny.session.ttl')),
         );
     }
 }

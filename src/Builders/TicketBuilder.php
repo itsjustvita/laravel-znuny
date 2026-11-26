@@ -7,6 +7,7 @@ use DateTimeInterface;
 use DateTimeZone;
 use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
@@ -321,12 +322,17 @@ class TicketBuilder
 
     /**
      * A dynamic field condition, e.g. whereDynamicField('OrderId', 'ORD-*', 'Like').
-     * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals.
+     * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals, Empty.
+     * Several calls for one field add up, e.g. GreaterThanEquals and SmallerThan for a range;
+     * Znuny combines them with AND. The same operator again replaces its value.
      * Needs a TicketSearch route with a request body, e.g. 'POST /TicketSearch'.
      */
     public function whereDynamicField(string $name, mixed $value, string $operator = 'Equals'): self
     {
-        return $this->where('DynamicField_'.$name, [$operator => $value]);
+        $field = 'DynamicField_'.$name;
+        $conditions = is_array($this->params[$field] ?? null) ? $this->params[$field] : [];
+
+        return $this->where($field, [...$conditions, $operator => $value]);
     }
 
     /**
@@ -415,26 +421,23 @@ class TicketBuilder
     }
 
     /**
-     * Fetches all matching IDs, then loads only the tickets of the requested page.
+     * Fetches all matching IDs, then loads only the tickets of the requested page. A page
+     * below 1 is the first page. The paginator's links point to the current URL.
      *
      * @return LengthAwarePaginator<int, Ticket>
      */
     public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
     {
+        $page = max(1, $page);
         $ids = $this->ids();
-        $total = $ids->count();
-
-        if ($total === 0) {
-            return new LengthAwarePaginator([], 0, $perPage, $page);
-        }
-
         $pageIds = $ids->slice(($page - 1) * $perPage, $perPage)->values()->all();
 
         return new LengthAwarePaginator(
-            items: $this->fetch($pageIds)->all(),
-            total: $total,
+            items: $pageIds === [] ? [] : $this->fetch($pageIds)->all(),
+            total: $ids->count(),
             perPage: $perPage,
             currentPage: $page,
+            options: ['path' => Paginator::resolveCurrentPath()],
         );
     }
 

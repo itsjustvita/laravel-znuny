@@ -13,14 +13,8 @@ class StateResource extends Resource
     /** @return Collection<int, State> */
     public function all(): Collection
     {
-        return $this->remember('states', function () {
-            $response = $this->client->call('StateList');
-
-            $rows = $response['State'] ?? [];
-
-            return collect(is_array($rows) ? $rows : [])
-                ->map(fn (array $row) => State::fromZnunyResponse($row))
-                ->values();
-        });
+        return collect($this->rows('states', 'StateList', 'State'))
+            ->map(fn (array $row): State => State::fromZnunyResponse($row))
+            ->values();
     }
 }

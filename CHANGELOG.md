@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-11-26
+
+Fixes from a review of the whole package. The first one matters for every Laravel 13 application that uses the lookup helpers.
+
+### Fixed
+
+- The cached lookups (`queues()`, `states()`, `priorities()`, `types()`) failed with a `TypeError` on every cache hit in Laravel 13 applications, which by default read no objects back from the cache (`cache.serializable_classes`). The lists are now cached as plain rows. Entries cached by an earlier release are replaced on first use.
+- `create()->save()` no longer fails after Znuny created the ticket. When the new ticket cannot be read back, for example because the user may create tickets in a queue but not read them, `save()` returns it with its ID, its number and the attributes that were sent, logs a warning and fires `ZnunyTicketCreated`. It used to throw, which made applications create the ticket again.
+- Several `whereDynamicField()` conditions on one field are all sent, as Znuny combines them with AND. The second call used to replace the first, so a range lost its lower bound.
+- A blank session lifetime, such as `ZNUNY_SESSION_TTL=` in `.env`, no longer means 0, which made every request log in again. A blank `ZNUNY_CACHE_ENABLED=` no longer switches the lookup cache off, and the cache switch reads `"false"`, `"off"` and `"no"` as off.
+- Number settings that are no numbers (`timeout`, `connect_timeout`, `retries`, `retry_delay`, `batch_size`, `session.ttl`) are rejected with a `ZnunyConfigurationException`. They used to become 0, which for a timeout means waiting forever.
+- `paginate()` treats a page below 1 as the first page instead of returning tickets from the end of the result, and the paginator's links point to the current URL instead of `/`.
+- An expired session that the package replaces is no longer logged as an error and no longer fires `ZnunyRequestFailed`. Znuny drops a session after two hours without a request, so this happened regularly. It is logged as information, and `ZnunySessionRefreshed` still fires.
+- The README, the config file and `znuny:cache-clear` no longer say that customer users are cached. `customers()->find()` always asked Znuny; the unused `cache.ttl.customers` setting is gone from the config file.
+
 ## [0.3.1] - 2026-11-07
 
 Small fixes: a blank timeout no longer waits forever, plus four fixes from the review of 0.3.0.
@@ -149,7 +164,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.1...v0.2.2

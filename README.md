@@ -218,6 +218,8 @@ $history = Znuny::tickets()->history('12345');     // Collection<HistoryEntry>
 
 A `pendingTime` in `create()` and `update()` can be any `DateTimeInterface`; it is converted to Znuny's [time zone](#time-zone) and read to the minute. `$ticket->pendingUntil` is the pending time while the ticket is in a pending state, `null` otherwise. `findByNumber()` matches the exact number only: wildcards never match, so a number a customer enters returns that ticket or none. Whether the ticket belongs to that customer is still for your application to check.
 
+`save()` reads the new ticket back from Znuny. If that fails, for example because the user may create tickets in a queue but not read them, the ticket still exists: `save()` returns it with its ID, its number and the attributes you sent (without articles and dates) and logs a warning, so that your application does not create it again.
+
 Input keys are camelCase (`queueId`, `customerUser`, `isVisibleForCustomer`, …). Any other key is passed to Znuny unchanged, so `'HistoryComment' => '…'` works too. Articles are sent as `text/plain; charset=utf8` unless you pass a `contentType` (or `mimeType` and `charset`).
 
 `Ticket`, `Article` and the other DTOs expose typed properties plus every raw field Znuny returned. Dates are `CarbonImmutable`.
@@ -258,6 +260,12 @@ Znuny::tickets()->where('CreatedUserIDs', [3, 4])->ids();
 
 // Dynamic field conditions (the default preset searches via POST; for the classic preset see Routes):
 Znuny::tickets()->whereDynamicField('OrderId', 'ORD-*', 'Like')->ids();
+
+// Several conditions on one field are combined with AND, e.g. for a range:
+Znuny::tickets()
+    ->whereDynamicField('DueDate', '2026-01-01 00:00:00', 'GreaterThanEquals')
+    ->whereDynamicField('DueDate', '2026-02-01 00:00:00', 'SmallerThan')
+    ->ids();
 ```
 
 | Filters | Znuny parameter |
@@ -286,7 +294,7 @@ Date filters accept any `DateTimeInterface` and convert it to Znuny's [time zone
 | `whereClosedAfter()`, `whereClosedBefore()` | the close time |
 | `wherePendingAfter()`, `wherePendingBefore()` | the pending time |
 
-`get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that, and `withOptions(['ArticleLimit' => 5])` for other `TicketGet` parameters. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page.
+`get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that, and `withOptions(['ArticleLimit' => 5])` for other `TicketGet` parameters. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page; its links point to the current URL, so pass the page of the request, e.g. `paginate(25, (int) $request->query('page', 1))`.
 
 ### Incomplete results
 
@@ -336,7 +344,7 @@ $result = Znuny::connection('tenant-a')->call('ConfigItemSearch', ['ConfigItem' 
 
 ## Lookups (custom operations)
 
-Znuny has no operations for listing queues, states, priorities, types or customer users. If your web service exposes such custom operations, these helpers use them and cache the results (see `cache.ttl`):
+Znuny has no operations for listing queues, states, priorities, types or customer users. If your web service exposes such custom operations, these helpers use them. The lists (`all()`, `findByName()`) are cached, see `cache.ttl`; `queues()->find()` and `customers()->find()` ask Znuny every time:
 
 | Method | Operation | Expected response |
 |---|---|---|
@@ -425,7 +433,7 @@ Route::post('tenants/{tenant}/znuny', WebhookController::class)->middleware('znu
 |---|---|
 | `ZnunyRequestSent` | before every HTTP call (`connection`, `operation`, `method`, `path`, redacted `payload`) |
 | `ZnunyResponseReceived` | after a successful response (`responseTimeMs`, `status`, `response`) |
-| `ZnunyRequestFailed` | when a call fails (`exception`) |
+| `ZnunyRequestFailed` | when a call fails (`exception`); not for an expired session that is replaced |
 | `ZnunySessionRefreshed` | after an expired session was replaced |
 | `ZnunyTicketCreated` | after `create()->save()` |
 | `ZnunyTicketUpdated` | after `update()` (`changes`, `dynamicFields`) |
@@ -450,7 +458,7 @@ The package logs to the channel named in `znuny.logging.channel` (`ZNUNY_LOG_CHA
 ],
 ```
 
-`znuny.logging.log_requests` (info), `log_responses` (debug, with status and duration; attachment contents are shortened) and `log_errors` (error) control what is written. Set `ZNUNY_LOGGING_ENABLED=false` to turn logging off.
+`znuny.logging.log_requests` (info), `log_responses` (debug, with status and duration; attachment contents are shortened) and `log_errors` (error) control what is written. An expired session that is replaced is information, not an error. Set `ZNUNY_LOGGING_ENABLED=false` to turn logging off.
 
 ## Exceptions
 

@@ -9,7 +9,7 @@ class CacheClearCommand extends Command
 {
     protected $signature = 'znuny:cache-clear
         {connection? : The connection whose cache should be cleared (defaults to default connection)}
-        {--resource= : Optional resource name (queues, states, priorities, types, customers)}
+        {--resource= : Optional resource name (queues, states, priorities, types)}
         {--all : Clear cache for every configured connection}';
 
     protected $description = 'Clear Znuny lookup caches';
