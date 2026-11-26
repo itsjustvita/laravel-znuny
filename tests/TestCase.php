@@ -30,7 +30,11 @@ abstract class TestCase extends BaseTestCase
 
     protected function defineEnvironment($app): void
     {
+        // Like a new Laravel 13 application: the store serializes its values and reads no
+        // objects back (cache.serializable_classes), so nothing the package caches may be an object.
         $app['config']->set('cache.default', 'array');
+        $app['config']->set('cache.stores.array', ['driver' => 'array', 'serialize' => true]);
+        $app['config']->set('cache.serializable_classes', false);
 
         // Most feature tests describe v0.1-style operation-name routes (POST /<Operation>).
         // The stock GenericTicketConnectorREST routes are covered by GenericTicketConnectorTest

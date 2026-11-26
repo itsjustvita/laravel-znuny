@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use Znuny;
@@ -21,6 +22,44 @@ final class CachedLookupTest extends TestCase
         Znuny::queues()->all();
 
         Http::assertSentCount(2); // 1 SessionCreate + 1 QueueList (second call cached)
+    }
+
+    public function test_cached_lookups_are_read_back_as_the_same_objects(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*QueueList*' => Http::response(['Queue' => [['QueueID' => '1', 'Name' => 'Support', 'GroupID' => '1', 'ValidID' => '1', 'Comment' => 'First level']]]),
+            '*StateList*' => Http::response(['State' => [['StateID' => '4', 'Name' => 'open', 'TypeName' => 'open', 'ValidID' => '1']]]),
+            '*PriorityList*' => Http::response(['Priority' => [['PriorityID' => '3', 'Name' => '3 normal', 'ValidID' => '1']]]),
+            '*TypeList*' => Http::response(['Type' => [['TypeID' => '2', 'Name' => 'Incident', 'ValidID' => '1']]]),
+        ]);
+
+        foreach (['queues', 'states', 'priorities', 'types'] as $resource) {
+            $fresh = Znuny::{$resource}()->all();
+            $cached = Znuny::{$resource}()->all();
+
+            $this->assertEquals($fresh, $cached, $resource);
+            $this->assertCount(1, $cached, $resource);
+        }
+
+        $this->assertSame('First level', Znuny::queues()->findByName('Support')->comment);
+        Http::assertSentCount(5); // SessionCreate and one request per list
+    }
+
+    public function test_an_entry_cached_by_an_earlier_release_is_replaced(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*QueueList*' => Http::response(['Queue' => [['QueueID' => '1', 'Name' => 'Support']]]),
+        ]);
+
+        // Up to 0.3.1 the lists were cached as collections of objects.
+        Cache::put('znuny:lookup:'.Znuny::client()->identityKey().':queues', collect([new \stdClass]), 3600);
+
+        $this->assertSame(['Support'], Znuny::queues()->all()->pluck('name')->all());
+        $this->assertSame(['Support'], Znuny::queues()->all()->pluck('name')->all());
+
+        $this->assertCount(1, collect(Http::recorded())->filter(fn (array $pair) => str_contains($pair[0]->url(), 'QueueList')));
     }
 
     public function test_flush_invalidates_cache(): void

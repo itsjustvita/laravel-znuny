@@ -14,15 +14,9 @@ class QueueResource extends Resource
     /** @return Collection<int, Queue> */
     public function all(): Collection
     {
-        return $this->remember('queues', function () {
-            $response = $this->client->call('QueueList');
-
-            $rows = $response['Queue'] ?? [];
-
-            return collect(is_array($rows) ? $rows : [])
-                ->map(fn (array $row) => Queue::fromZnunyResponse($row))
-                ->values();
-        });
+        return collect($this->rows('queues', 'QueueList', 'Queue'))
+            ->map(fn (array $row): Queue => Queue::fromZnunyResponse($row))
+            ->values();
     }
 
     public function find(string $queueId): Queue

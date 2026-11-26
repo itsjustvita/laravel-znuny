@@ -13,14 +13,8 @@ class TypeResource extends Resource
     /** @return Collection<int, Type> */
     public function all(): Collection
     {
-        return $this->remember('types', function () {
-            $response = $this->client->call('TypeList');
-
-            $rows = $response['Type'] ?? [];
-
-            return collect(is_array($rows) ? $rows : [])
-                ->map(fn (array $row) => Type::fromZnunyResponse($row))
-                ->values();
-        });
+        return collect($this->rows('types', 'TypeList', 'Type'))
+            ->map(fn (array $row): Type => Type::fromZnunyResponse($row))
+            ->values();
     }
 }
