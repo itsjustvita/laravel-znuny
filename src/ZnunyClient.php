@@ -92,16 +92,20 @@ class ZnunyClient
         }
 
         $sessionId = $this->sessionId();
-        $this->replacesExpiredSession = (bool) config('znuny.session.auto_retry_on_expired', true);
+        $retry = (bool) config('znuny.session.auto_retry_on_expired', true);
+
+        // A listener of the request events may call Znuny itself, so the outer value is put back.
+        $outer = $this->replacesExpiredSession;
+        $this->replacesExpiredSession = $retry;
 
         try {
             return $this->send($operation, $payload, ['SessionID' => $sessionId]);
         } catch (ZnunySessionExpiredException $e) {
-            if (! $this->replacesExpiredSession) {
+            if (! $retry) {
                 throw $e;
             }
         } finally {
-            $this->replacesExpiredSession = false;
+            $this->replacesExpiredSession = $outer;
         }
 
         $this->sessionManager->invalidate($this->identityKey());

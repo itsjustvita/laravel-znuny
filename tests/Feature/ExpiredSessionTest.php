@@ -6,6 +6,7 @@ use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed;
+use ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent;
 use ItsJustVita\LaravelZnuny\Events\ZnunySessionRefreshed;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySessionExpiredException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
@@ -47,6 +48,7 @@ final class ExpiredSessionTest extends TestCase
 
         Http::fake([
             '*SessionCreate' => Http::sequence()->push(['SessionID' => 'OLD'])->push(['SessionID' => 'NEW']),
+            '*TicketGet/1' => Http::response(['Ticket' => [['TicketID' => '1']]]),
             '*TicketSearch' => Http::sequence(array_map(
                 fn (string|array $search): array => $search === 'expired' ? $expired : $search,
                 $searches,
@@ -78,6 +80,25 @@ final class ExpiredSessionTest extends TestCase
 
         $this->assertSame([], $this->logged('error'));
         $this->assertContains('Znuny session expired, logging in again', $this->logged('info'));
+        $this->assertSame([ZnunySessionRefreshed::class], $this->eventClasses());
+    }
+
+    public function test_a_call_made_by_a_listener_does_not_keep_the_expired_session_from_being_replaced(): void
+    {
+        $this->fakeZnuny(['expired', ['TicketID' => ['7']]]);
+
+        $nested = false;
+        Event::listen(function (ZnunyRequestSent $event) use (&$nested): void {
+            if ($event->operation === 'TicketSearch' && ! $nested) {
+                $nested = true;
+                Znuny::call('TicketGet', ['TicketID' => '1']);
+            }
+        });
+
+        $this->assertSame(['TicketID' => ['7']], Znuny::call('TicketSearch'));
+
+        $this->assertTrue($nested);
+        $this->assertSame([], $this->logged('error'));
         $this->assertSame([ZnunySessionRefreshed::class], $this->eventClasses());
     }
 
