@@ -469,6 +469,25 @@ final class TicketBuilderTest extends TestCase
         Http::assertSent(fn (Request $r) => ($r['DynamicField_OrderId'] ?? null) === ['Like' => 'ORD-*']);
     }
 
+    public function test_several_conditions_on_one_dynamic_field_are_all_sent(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        Znuny::tickets()
+            ->whereDynamicField('DueDate', '2026-01-01 00:00:00', 'GreaterThanEquals')
+            ->whereDynamicField('DueDate', '2026-02-01 00:00:00', 'SmallerThan')
+            ->whereDynamicField('OrderId', 'ORD-1')
+            ->whereDynamicField('OrderId', 'ORD-2')
+            ->ids();
+
+        // Znuny combines the operators of a field with AND; the same operator again replaces its value.
+        Http::assertSent(fn (Request $r) => ($r['DynamicField_DueDate'] ?? null) === ['GreaterThanEquals' => '2026-01-01 00:00:00', 'SmallerThan' => '2026-02-01 00:00:00']
+            && ($r['DynamicField_OrderId'] ?? null) === ['Equals' => 'ORD-2']);
+    }
+
     public function test_order_by_accepts_asc_and_desc(): void
     {
         Http::fake([

@@ -321,12 +321,17 @@ class TicketBuilder
 
     /**
      * A dynamic field condition, e.g. whereDynamicField('OrderId', 'ORD-*', 'Like').
-     * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals.
+     * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals, Empty.
+     * Several calls for one field add up, e.g. GreaterThanEquals and SmallerThan for a range;
+     * Znuny combines them with AND. The same operator again replaces its value.
      * Needs a TicketSearch route with a request body, e.g. 'POST /TicketSearch'.
      */
     public function whereDynamicField(string $name, mixed $value, string $operator = 'Equals'): self
     {
-        return $this->where('DynamicField_'.$name, [$operator => $value]);
+        $field = 'DynamicField_'.$name;
+        $conditions = is_array($this->params[$field] ?? null) ? $this->params[$field] : [];
+
+        return $this->where($field, [...$conditions, $operator => $value]);
     }
 
     /**
