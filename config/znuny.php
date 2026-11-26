@@ -71,7 +71,8 @@ return [
     ],
 
     /*
-    | Caching of the lookup resources (queues, states, priorities, types, customers).
+    | Caching of the lookup lists (queues, states, priorities, types). Single lookups such
+    | as customers()->find() always ask Znuny.
     */
 
     'cache' => [
@@ -83,7 +84,6 @@ return [
             'priorities' => 3600,
             'states' => 3600,
             'types' => 3600,
-            'customers' => 600,
         ],
     ],
 

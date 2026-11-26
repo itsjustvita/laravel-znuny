@@ -238,6 +238,10 @@ final class ZnunyIntegrationTest extends TestCase
 
         $this->assertSame([$ticket->id], $znuny->tickets()->query()->whereDynamicField('OrderId', $orderId.'-2')->ids()->all());
         $this->assertSame([$ticket->id], $znuny->tickets()->query()->whereDynamicField('OrderId', $orderId.'*', 'Like')->ids()->all());
+
+        // Several conditions on one field: Znuny combines them with AND.
+        $this->assertSame([$ticket->id], $znuny->tickets()->whereDynamicField('OrderId', $orderId.'*', 'Like')->whereDynamicField('OrderId', $orderId.'-2')->ids()->all());
+        $this->assertSame([], $znuny->tickets()->whereDynamicField('OrderId', 'no-such-order')->whereDynamicField('OrderId', $orderId.'*', 'Like')->ids()->all());
     }
 
     public function test_dates_are_exchanged_in_the_znuny_time_zone(): void
