@@ -6,6 +6,7 @@ use DateTimeZone;
 use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 
 final readonly class ConnectionConfig
 {
@@ -79,6 +80,8 @@ final readonly class ConnectionConfig
             }
         }
 
+        $owner = "Znuny connection [{$name}]";
+
         return new self(
             name: $name,
             baseUrl: rtrim($required['base_url'], '/'),
@@ -89,11 +92,11 @@ final readonly class ConnectionConfig
             userType: self::oneOf($name, 'user_type', $config['user_type'] ?? null, [self::USER_AGENT, self::USER_CUSTOMER]),
             authTransport: self::oneOf($name, 'auth_transport', $config['auth_transport'] ?? null, [self::TRANSPORT_AUTO, self::TRANSPORT_PAYLOAD, self::TRANSPORT_HEADERS]),
             verifySsl: self::verifySsl($name, $config['verify_ssl'] ?? null),
-            timeout: self::integer(30, $config['timeout'] ?? null),
-            connectTimeout: self::integer(3, $config['connect_timeout'] ?? null),
-            retries: max(0, self::integer(3, $config['retries'] ?? null, $http['retries'] ?? null)),
-            retryDelay: max(10, self::integer(100, $config['retry_delay'] ?? null, $http['retry_delay'] ?? null)),
-            batchSize: max(1, self::integer(50, $config['batch_size'] ?? null, $http['batch_size'] ?? null)),
+            timeout: Setting::integer($owner, 'timeout', 30, $config['timeout'] ?? null),
+            connectTimeout: Setting::integer($owner, 'connect_timeout', 3, $config['connect_timeout'] ?? null),
+            retries: max(0, Setting::integer($owner, 'retries', 3, $config['retries'] ?? null, $http['retries'] ?? null)),
+            retryDelay: max(10, Setting::integer($owner, 'retry_delay', 100, $config['retry_delay'] ?? null, $http['retry_delay'] ?? null)),
+            batchSize: max(1, Setting::integer($owner, 'batch_size', 50, $config['batch_size'] ?? null, $http['batch_size'] ?? null)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
             searchLimit: self::searchLimit($name, match (true) {
                 array_key_exists('search_limit', $config) => $config['search_limit'],
@@ -168,21 +171,6 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * The first candidate that is set, as an integer. Null and blank strings count as not set,
-     * like an empty variable in .env; otherwise ZNUNY_TIMEOUT= would mean a timeout of 0.
-     */
-    private static function integer(int $default, mixed ...$candidates): int
-    {
-        foreach ($candidates as $candidate) {
-            if ($candidate !== null && ! (is_string($candidate) && trim($candidate) === '')) {
-                return (int) $candidate;
-            }
-        }
-
-        return $default;
-    }
-
-    /**
      * The most tickets a search without limit() may match. Without it (null or blank) no
      * limit is sent and Znuny cuts the result off at its own SearchLimit.
      *
@@ -190,7 +178,7 @@ final readonly class ConnectionConfig
      */
     private static function searchLimit(string $connection, mixed $value): ?int
     {
-        if ($value === null || (is_string($value) && trim($value) === '')) {
+        if (Setting::isBlank($value)) {
             return null;
         }
 
@@ -216,7 +204,7 @@ final readonly class ConnectionConfig
      */
     private static function verifySsl(string $connection, mixed $value): bool|string
     {
-        if ($value === null || (is_string($value) && trim($value) === '')) {
+        if (Setting::isBlank($value)) {
             return true;
         }
 

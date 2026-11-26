@@ -66,6 +66,42 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(50, $config->batchSize);
     }
 
+    /**
+     * @return array<string, array{0: string, 1: mixed, 2: string}>
+     */
+    public static function noNumbers(): array
+    {
+        return [
+            'a word as timeout' => ['timeout', 'abc', 'abc'],
+            'a unit as connect timeout' => ['connect_timeout', '5s', '5s'],
+            'a word as retries' => ['retries', 'many', 'many'],
+            'a boolean as retry delay' => ['retry_delay', true, 'true'],
+            'a list as batch size' => ['batch_size', [50], 'array'],
+        ];
+    }
+
+    /**
+     * Cast to a number, "abc" would be a timeout of 0, which waits forever.
+     */
+    #[DataProvider('noNumbers')]
+    public function test_number_settings_that_are_no_numbers_are_rejected(string $key, mixed $value, string $shown): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage("Znuny connection [default] has invalid [{$key}] value [{$shown}]. Use a whole number.");
+
+        $this->make([$key => $value]);
+    }
+
+    public function test_numbers_may_be_numeric_strings(): void
+    {
+        $config = $this->make(['timeout' => '45', 'connect_timeout' => ' 5 ', 'retries' => '0'], ['retry_delay' => '250']);
+
+        $this->assertSame(45, $config->timeout);
+        $this->assertSame(5, $config->connectTimeout);
+        $this->assertSame(0, $config->retries);
+        $this->assertSame(250, $config->retryDelay);
+    }
+
     public function test_the_search_limit_comes_from_the_connection_then_the_http_config(): void
     {
         $this->assertSame(200, $this->make(['search_limit' => '200'], ['search_limit' => 5000])->searchLimit);
