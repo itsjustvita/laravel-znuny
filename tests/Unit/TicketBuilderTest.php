@@ -11,6 +11,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -610,6 +611,52 @@ final class TicketBuilderTest extends TestCase
         $this->assertSame(2, $paginator->currentPage());
         $this->assertSame(['4', '5', '6'], collect($paginator->items())->pluck('id')->all());
         Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/TicketGet/4,5,6'));
+    }
+
+    private function fakeFiveTickets(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5']]),
+            '*TicketGet*' => fn (Request $r) => Http::response(['Ticket' => array_map(
+                fn (mixed $id): array => $this->fakeTicket((string) $id),
+                (array) $r['TicketID'],
+            )]),
+        ]);
+    }
+
+    /**
+     * @return array<string, array{0: int}>
+     */
+    public static function pagesBelowOne(): array
+    {
+        return ['zero' => [0], 'negative' => [-1]];
+    }
+
+    #[DataProvider('pagesBelowOne')]
+    public function test_a_page_below_one_is_the_first_page(int $page): void
+    {
+        $this->fakeFiveTickets();
+
+        $paginator = Znuny::tickets()->paginate(perPage: 2, page: $page);
+
+        $this->assertSame(1, $paginator->currentPage());
+        $this->assertSame(['1', '2'], collect($paginator->items())->pluck('id')->all());
+    }
+
+    public function test_pagination_links_point_to_the_current_url(): void
+    {
+        $this->fakeFiveTickets();
+
+        Route::get('/support/tickets', fn (): array => [
+            'next' => Znuny::tickets()->paginate(perPage: 2, page: 2)->nextPageUrl(),
+            'previous' => Znuny::tickets()->paginate(perPage: 2, page: 2)->previousPageUrl(),
+        ]);
+
+        $this->get('https://app.example.com/support/tickets?state=open')->assertExactJson([
+            'next' => 'https://app.example.com/support/tickets?page=3',
+            'previous' => 'https://app.example.com/support/tickets?page=1',
+        ]);
     }
 
     public function test_paginate_empty_result(): void
