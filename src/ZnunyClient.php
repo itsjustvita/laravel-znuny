@@ -43,6 +43,9 @@ class ZnunyClient
 
     protected readonly RequestBuilder $requests;
 
+    /** True while call() sends a request whose expired session it would replace. */
+    private bool $replacesExpiredSession = false;
+
     /**
      * @param  array<string, mixed>  $config  connection config, see config/znuny.php
      */
@@ -88,20 +91,25 @@ class ZnunyClient
             return $this->send($operation, $payload, $this->credentials());
         }
 
+        $sessionId = $this->sessionId();
+        $this->replacesExpiredSession = (bool) config('znuny.session.auto_retry_on_expired', true);
+
         try {
-            return $this->send($operation, $payload, ['SessionID' => $this->sessionId()]);
+            return $this->send($operation, $payload, ['SessionID' => $sessionId]);
         } catch (ZnunySessionExpiredException $e) {
-            if (! config('znuny.session.auto_retry_on_expired', true)) {
+            if (! $this->replacesExpiredSession) {
                 throw $e;
             }
-
-            $this->sessionManager->invalidate($this->identityKey());
-            $sessionId = $this->sessionId();
-
-            event(new ZnunySessionRefreshed(connection: $this->connection));
-
-            return $this->send($operation, $payload, ['SessionID' => $sessionId]);
+        } finally {
+            $this->replacesExpiredSession = false;
         }
+
+        $this->sessionManager->invalidate($this->identityKey());
+        $sessionId = $this->sessionId();
+
+        event(new ZnunySessionRefreshed(connection: $this->connection));
+
+        return $this->send($operation, $payload, ['SessionID' => $sessionId]);
     }
 
     /**
@@ -277,11 +285,23 @@ class ZnunyClient
 
     /**
      * Dispatch the failure event, write the error log and hand the exception back for throwing.
+     * An expired session that call() replaces is no failure: it is only logged as information.
      *
      * @param  array<string, mixed>  $redacted
      */
     protected function failed(string $operation, PreparedRequest $request, array $redacted, ZnunyException $exception): ZnunyException
     {
+        if ($exception instanceof ZnunySessionExpiredException && $this->replacesExpiredSession) {
+            // Znuny drops idle sessions long before the cached session ID runs out. call()
+            // logs in again and repeats the request, so nothing has failed yet.
+            $this->log('info', 'log_requests', 'Znuny session expired, logging in again', [
+                'connection' => $this->connection,
+                'operation' => $operation,
+            ]);
+
+            return $exception;
+        }
+
         event(new ZnunyRequestFailed(
             connection: $this->connection,
             operation: $operation,
