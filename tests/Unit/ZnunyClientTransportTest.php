@@ -72,19 +72,32 @@ final class ZnunyClientTransportTest extends TestCase
         $this->assertSame(7, $options['timeout']);
     }
 
-    public function test_configured_headers_are_sent_but_the_packages_own_headers_win(): void
+    public function test_configured_headers_are_sent_with_every_request(): void
     {
-        Http::fake([self::BASE.'/Ticket/42*' => Http::response(['Ticket' => [['TicketID' => '42']]])]);
+        Http::fake([
+            self::BASE.'/Session' => Http::response(['SessionID' => 'S1']),
+            self::BASE.'/Ticket/Search' => Http::response(['TicketID' => []]),
+            self::BASE.'/Ticket/42*' => Http::response(['Ticket' => [['TicketID' => '42']]]),
+        ]);
 
-        $this->client(['auth' => 'credentials', 'options' => ['headers' => [
-            'X-Api' => '1',
-            'X-OTRS-Header-Password' => 'evil',
-            'x-otrs-header-userlogin' => 'evil',
-        ]]])->call('TicketGet', ['TicketID' => '42']);
+        $client = $this->client(['options' => ['headers' => ['X-Api' => '1']]]);
+        $client->call('TicketSearch', ['Title' => 'x']);
+        $client->call('TicketGet', ['TicketID' => '42']);
 
-        Http::assertSent(fn (Request $r) => $r->header('X-Api') === ['1']
-            && $r->header('X-OTRS-Header-Password') === ['secret']
-            && $r->header('X-OTRS-Header-UserLogin') === ['agent']);
+        // The login and the search carry their authentication in the body, the read in a header.
+        Http::assertSentCount(3);
+        $this->assertSame([['1'], ['1'], ['1']], collect(Http::recorded())->map(fn (array $pair) => $pair[0]->header('X-Api'))->all());
+        Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r->header('X-OTRS-Header-SessionID') === ['S1']);
+    }
+
+    public function test_the_authentication_cannot_be_overridden_by_a_configured_header(): void
+    {
+        // Znuny copies X-OTRS-Header-Password and its siblings into the request, over the
+        // body, so on a POST route such a header would replace the package's authentication.
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('cannot set the header [X-OTRS-Header-Password]');
+
+        $this->client(['options' => ['headers' => ['X-OTRS-Header-Password' => 'evil']]]);
     }
 
     public function test_http_options_do_not_reach_the_packages_logs_events_or_exceptions(): void

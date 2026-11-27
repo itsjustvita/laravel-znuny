@@ -39,7 +39,8 @@ A `DateTimeInterface` as a dynamic field value, on create, update or in `whereDy
 ### Other things you may notice
 
 - Session data in logs and events: values whose key names a secret are redacted, also inside values Znuny returns as JSON.
-- `php artisan znuny:webservice` has a new option `--also`. Without it the generated file is the same as before.
+- `php artisan znuny:webservice` has a new option `--also`. Without it the generated file is the same as before, unless the connection's routes already map `TimeAccountingGet` or `OutOfOffice`: those two were left out as unknown operations and are now generated.
+- Znuny's error messages sometimes repeat the session ID or the password that was sent. Both are replaced with `[REDACTED]` in exception messages, logs and events.
 
 ## 0.2.x → 0.3.0
 

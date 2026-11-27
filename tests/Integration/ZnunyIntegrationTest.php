@@ -307,6 +307,13 @@ final class ZnunyIntegrationTest extends TestCase
 
         $this->assertTrue($dueAt->addDay()->equalTo($updated->dynamicField('DueAt')?->date()));
         $this->assertSame('2033-04-06', $updated->dynamicField('DueOn')?->date()?->format('Y-m-d'));
+
+        // An empty string clears a date field.
+        $znuny->tickets()->update($ticket->id, dynamicFields: ['DueAt' => '', 'DueOn' => '']);
+        $cleared = $znuny->tickets()->find($ticket->id, withDynamicFields: true);
+
+        $this->assertNull($cleared->dynamicField('DueAt')?->date());
+        $this->assertNull($cleared->dynamicField('DueOn')?->date());
     }
 
     #[DataProvider('webServices')]

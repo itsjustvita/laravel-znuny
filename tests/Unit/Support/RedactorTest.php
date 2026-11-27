@@ -69,6 +69,18 @@ final class RedactorTest extends TestCase
         $this->assertStringNotContainsString('secret', (string) json_encode($result));
     }
 
+    public function test_pairs_are_redacted_by_the_same_names_as_keys(): void
+    {
+        $result = Redactor::redact(['SessionData' => [
+            ['Key' => 'SessionID', 'Value' => 'abc'],
+            ['Key' => 'ApiKey', 'Value' => 'abc'],
+            ['Key' => 'Authorization', 'Value' => 'Bearer abc'],
+            ['Key' => 'UserOTP', 'Value' => '123456'],
+        ]]);
+
+        $this->assertSame(['[REDACTED]', '[REDACTED]', '[REDACTED]', '[REDACTED]'], array_column($result['SessionData'], 'Value'));
+    }
+
     public function test_secrets_can_be_dropped_at_any_depth(): void
     {
         $this->assertSame(

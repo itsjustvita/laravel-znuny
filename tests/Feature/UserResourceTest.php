@@ -100,6 +100,12 @@ final class UserResourceTest extends TestCase
             'a blank login' => [[['login' => ' ']], 'entry 1'],
             'a date that is no date' => [[['login' => 'jane.agent', 'from' => '2026-07-01']], 'entry 1'],
             'an entry that is no array' => [['jane.agent'], 'entry 1'],
+            // Znuny drops an end date that comes without a start date.
+            'an end without a start' => [[['login' => 'jane.agent', 'until' => new \DateTimeImmutable('2026-07-14')]], '[from] and [until]'],
+            'a start without an end' => [[['login' => 'jane.agent', 'from' => new \DateTimeImmutable('2026-07-01')]], '[from] and [until]'],
+            'enabled as text' => [[['login' => 'jane.agent', 'enabled' => 'false']], '[enabled]'],
+            // Znuny's mapping reads the entries from CSV lines and drops lines that start with "#".
+            'a line break in the search' => [[['search' => "Miller\n#x"]], 'line break'],
         ];
     }
 

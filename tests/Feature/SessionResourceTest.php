@@ -3,7 +3,11 @@
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
 use Illuminate\Http\Client\Request;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use Znuny;
@@ -145,6 +149,50 @@ final class SessionResourceTest extends TestCase
         Znuny::session()->logout();
 
         $this->assertSame('S2', Znuny::client()->sessionId());
+    }
+
+    public function test_a_session_id_in_znunys_error_message_is_not_published(): void
+    {
+        Http::fake([
+            self::BASE.'/Session' => Http::response(['SessionID' => 'SESSIONabc123def456']),
+            self::BASE.'/Session/*' => Http::response(['Error' => [
+                'ErrorCode' => 'SessionRemove.Fail',
+                'ErrorMessage' => "SessionRemove: Could not remove session with ID 'SESSIONabc123def456'.",
+            ]]),
+        ]);
+
+        $published = [];
+        Event::listen(function (MessageLogged $message) use (&$published): void {
+            $published[] = [$message->message, $message->context];
+        });
+        Event::listen(function (ZnunyRequestFailed $event) use (&$published): void {
+            $published[] = [$event->exception->getMessage(), $event->exception->context(), $event->payload];
+        });
+
+        Znuny::client()->sessionId();
+        Znuny::session()->logout();
+
+        $this->assertNotSame([], $published);
+        $this->assertStringNotContainsString('SESSIONabc123def456', (string) json_encode($published));
+        $this->assertStringContainsString('Could not remove session with ID', (string) json_encode($published));
+    }
+
+    public function test_a_password_in_znunys_error_message_is_not_published(): void
+    {
+        Http::fake([
+            self::BASE.'/Session' => Http::response(['Error' => [
+                'ErrorCode' => 'SessionCreate.AuthFail',
+                'ErrorMessage' => 'SessionCreate: Authorization failing for testuser with testpass!',
+            ]]),
+        ]);
+
+        try {
+            Znuny::client()->sessionId();
+            $this->fail('The login must fail.');
+        } catch (ZnunyAuthenticationException $e) {
+            $this->assertSame('[SessionCreate.AuthFail] SessionCreate: Authorization failing for testuser with [REDACTED]!', $e->getMessage());
+            $this->assertStringNotContainsString('testpass', (string) json_encode($e->context()));
+        }
     }
 
     public function test_a_failed_logout_still_forgets_the_session(): void

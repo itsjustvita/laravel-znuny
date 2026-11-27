@@ -48,17 +48,20 @@ final class Redactor
     }
 
     /**
-     * Whether a name out of Znuny's data, such as a session key, names a secret: it contains
-     * "password", "secret" or "token", or ends with "pw" (UserPw, but not UserLastPwChangeTime).
+     * Whether a name out of Znuny's data, such as a session key, names a secret: it is one of
+     * the sensitive keys, contains "password", "secret" or "token", or ends with "pw" or
+     * "otp" (UserPw, UserOTP, but not UserLastPwChangeTime).
      */
     public static function isSecretName(string $name): bool
     {
-        $name = strtolower($name);
+        $lower = strtolower($name);
 
-        return str_contains($name, 'password')
-            || str_contains($name, 'secret')
-            || str_contains($name, 'token')
-            || str_ends_with($name, 'pw');
+        return self::isSensitive($name)
+            || str_contains($lower, 'password')
+            || str_contains($lower, 'secret')
+            || str_contains($lower, 'token')
+            || str_ends_with($lower, 'pw')
+            || str_ends_with($lower, 'otp');
     }
 
     /**
@@ -72,7 +75,7 @@ final class Redactor
         $result = [];
 
         foreach ($data as $key => $value) {
-            if (is_string($key) && self::namesSecret($key)) {
+            if (is_string($key) && self::isSecretName($key)) {
                 continue;
             }
 
@@ -119,7 +122,7 @@ final class Redactor
     private static function maskSecrets(array $data): array
     {
         foreach ($data as $key => $value) {
-            if (is_string($key) && self::namesSecret($key)) {
+            if (is_string($key) && self::isSecretName($key)) {
                 $data[$key] = self::REDACTED;
             } elseif (is_array($value)) {
                 $data[$key] = self::maskSecrets($value);
@@ -127,11 +130,6 @@ final class Redactor
         }
 
         return $data;
-    }
-
-    private static function namesSecret(string $key): bool
-    {
-        return self::isSensitive($key) || self::isSecretName($key);
     }
 
     /**

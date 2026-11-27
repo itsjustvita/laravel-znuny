@@ -270,10 +270,21 @@ class ZnunyClient
         $json = $this->decode($response);
 
         if ($json === null || $response->failed() || isset($json['Error'])) {
+            // Znuny's error texts can repeat what was sent, such as the session ID in
+            // "Could not remove session with ID '...'". They end up in logs, events and exceptions.
+            $secrets = $this->secretsOf($auth, $payload);
+            $mask = fn (mixed $text): mixed => is_string($text) ? str_replace($secrets, Redactor::REDACTED, $text) : $text;
+
+            if ($json !== null) {
+                array_walk_recursive($json, function (mixed &$value) use ($mask): void {
+                    $value = $mask($value);
+                });
+            }
+
             throw $this->failed($operation, $request, $redacted, $this->exceptionMapper->fromResponse(
                 status: $response->status(),
                 json: $json,
-                rawBody: $response->body(),
+                rawBody: (string) $mask($response->body()),
                 operation: $operation,
                 connection: $this->connection,
                 payload: $data,
@@ -318,6 +329,30 @@ class ZnunyClient
         );
 
         return $client->withBody($body, 'application/json')->send($request->method, $request->url);
+    }
+
+    /**
+     * The session IDs and passwords of a request, as far as they are long enough to be told
+     * from ordinary text.
+     *
+     * @param  array<string, mixed>  ...$sources  the authentication and the payload
+     * @return list<string>
+     */
+    private function secretsOf(array ...$sources): array
+    {
+        $secrets = [];
+
+        foreach ($sources as $source) {
+            foreach (['SessionID', 'Password'] as $key) {
+                $value = $source[$key] ?? null;
+
+                if (is_string($value) && strlen($value) >= 4) {
+                    $secrets[] = $value;
+                }
+            }
+        }
+
+        return array_values(array_unique($secrets));
     }
 
     /**

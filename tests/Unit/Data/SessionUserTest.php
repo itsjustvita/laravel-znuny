@@ -72,7 +72,8 @@ final class SessionUserTest extends TestCase
         ]]);
 
         $this->assertSame(86400, $user->attribute('Config.CacheTTL'));
-        $this->assertSame('{not json', $user->attribute('Broken'));
+        // A value that claims to be JSON and is not cannot be searched for secrets, so it is left out.
+        $this->assertArrayNotHasKey('Broken', $user->attributes);
         $this->assertSame('{"looks":"like json"}', $user->attribute('Plain'));
     }
 
@@ -84,6 +85,8 @@ final class SessionUserTest extends TestCase
             'UserGoogleAuthenticatorSecretKey' => 'ABC',
             'UserToken' => 't',
             'UserLastPwChangeTime' => '1795766307',
+            'SessionID' => 'abc',
+            'UserOTP' => '123456',
         ]));
 
         $this->assertSame(['UserLogin' => 'jane', 'UserLastPwChangeTime' => '1795766307'], $user->attributes);

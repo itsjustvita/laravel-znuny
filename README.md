@@ -129,7 +129,7 @@ A connection can also set `retries`, `retry_delay` (milliseconds), `batch_size` 
 ],
 ```
 
-Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. A configured header never replaces one the package sends itself, such as the authentication.
+Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. The authentication headers (`X-OTRS-Header-UserLogin`, `-CustomerUserLogin`, `-Password`, `-SessionID`) cannot be configured: Znuny reads them over the request the package sends.
 
 ### Routes
 
@@ -392,7 +392,7 @@ $entries->sum('timeUnit');
 $entries->first()->ticketNumber;   // also ticketTitle, queue, customerId, timeUnit, created
 ```
 
-The entries are the time units an agent booked on tickets between two points in time, oldest first; `queue` is the queue the ticket was in at that time. Znuny answers only users with `rw` in the group `timeaccounting_webservice`, otherwise you get a `ZnunyAccessDeniedException`.
+The entries are the time units an agent booked on tickets between two points in time, oldest first; `queue` is the queue the ticket was in at that time. Znuny answers only users with `rw` in the group `timeaccounting_webservice`, otherwise you get a `ZnunyAccessDeniedException`. For a login Znuny does not know it answers like for an agent who booked nothing: the result is empty.
 
 Znuny ships this operation in a web service of its own, **TimeAccountingREST** (Ready2Adopt Web Services), not in `GenericTicketConnectorREST`. Use one of these:
 
@@ -426,7 +426,7 @@ Znuny::users()->outOfOffice([
 ]);
 ```
 
-`from` and `until` are calendar days: the day the date names in its own time zone is sent, without conversion.
+`from` and `until` are calendar days: the day the date names in its own time zone is sent, without conversion. Give both or neither.
 
 - **Znuny reports success even when nothing happened.** An entry that matches no agent, or more than one, is skipped and written to Znuny's log; the response is the same, and no operation reads the setting back for another agent. The methods therefore return nothing. An agent's own session shows the setting once they have logged in again: `Znuny::session()->user()->attribute('OutOfOffice')`.
 - The caller must be an agent with `rw` in the group `admin`, otherwise you get a `ZnunyAccessDeniedException`.
@@ -492,7 +492,7 @@ $ticket->dynamicField('DueAt')?->date();   // CarbonImmutable, or null without a
 $ticket->dynamicField('OrderId')?->value;  // any field by name
 ```
 
-A date is sent as date and time in Znuny's [time zone](#time-zone), which is what a Znuny field of type "Date / Time" takes. A field of type "Date" takes a day only, and the package cannot see a field's type: declare such a field as `'type' => 'date'`, and it is sent as the day the date names. `date()` reads both back in Znuny's time zone.
+A date is sent as date and time in Znuny's [time zone](#time-zone), which is what a Znuny field of type "Date / Time" takes. A field of type "Date" takes a day only, and the package cannot see a field's type: declare such a field as `'type' => 'date'`, and it is sent as the day the date names. `date()` reads both back in Znuny's time zone. An empty string clears a date field: `update($id, dynamicFields: ['DueAt' => ''])`.
 
 ## Webhooks (Znuny to Laravel)
 

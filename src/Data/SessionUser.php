@@ -47,8 +47,12 @@ final readonly class SessionUser
             $value = $row['Value'] ?? null;
 
             if (! empty($row['Serialized']) && is_string($value)) {
-                $decoded = json_decode($value, true);
-                $value = json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
+                $value = json_decode($value, true);
+
+                // What claims to be JSON and is not cannot be searched for secrets.
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    continue;
+                }
             }
 
             // A customer's session holds the customer backend's configuration, passwords included.

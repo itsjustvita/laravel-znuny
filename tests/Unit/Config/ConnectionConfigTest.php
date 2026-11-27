@@ -148,6 +148,11 @@ final class ConnectionConfigTest extends TestCase
             'a string from .env' => ['proxy=http://proxy.internal:3128', 'must be an array of named options'],
             'a list without names' => [['http://proxy.internal:3128'], 'must be an array of named options'],
             'headers that are no array' => [['headers' => 'X-Api: 1'], '[headers] in [options] must be an array'],
+            // Znuny reads these headers into the request, over the body the package sends.
+            'the password header' => [['headers' => ['X-OTRS-Header-Password' => 'x']], 'cannot set the header [X-OTRS-Header-Password]'],
+            'the session header in lower case' => [['headers' => ['x-otrs-header-sessionid' => 'x']], 'cannot set the header [x-otrs-header-sessionid]'],
+            'the login header' => [['headers' => ['X-OTRS-Header-UserLogin' => 'x']], 'cannot set the header [X-OTRS-Header-UserLogin]'],
+            'the customer login header' => [['headers' => ['X-OTRS-Header-CustomerUserLogin' => 'x']], 'cannot set the header [X-OTRS-Header-CustomerUserLogin]'],
         ];
     }
 

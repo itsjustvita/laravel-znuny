@@ -5,6 +5,7 @@ namespace ItsJustVita\LaravelZnuny\Config;
 use DateTimeZone;
 use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
+use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Support\Setting;
 
@@ -248,10 +249,14 @@ final readonly class ConnectionConfig
                     ));
                 }
 
-                if ($key === 'headers' && ! is_array($value)) {
-                    throw new ZnunyConfigurationException(
-                        "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
-                    );
+                if ($key === 'headers') {
+                    if (! is_array($value)) {
+                        throw new ZnunyConfigurationException(
+                            "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
+                        );
+                    }
+
+                    self::refuseAuthenticationHeaders($connection, $value);
                 }
 
                 $options[$key] = $value;
@@ -259,6 +264,26 @@ final readonly class ConnectionConfig
         }
 
         return $options;
+    }
+
+    /**
+     * Znuny copies the X-OTRS-Header-* authentication headers into the request, over its
+     * body. A configured one would therefore replace the authentication the package sends
+     * in the body of POST, PATCH and DELETE requests.
+     *
+     * @param  array<array-key, mixed>  $headers
+     */
+    private static function refuseAuthenticationHeaders(string $connection, array $headers): void
+    {
+        $own = array_map(strtolower(...), array_values(RequestBuilder::AUTH_HEADERS));
+
+        foreach (array_keys($headers) as $header) {
+            if (in_array(strtolower((string) $header), $own, true)) {
+                throw new ZnunyConfigurationException(
+                    "Znuny connection [{$connection}] cannot set the header [{$header}] in [options]: the package sends the authentication itself."
+                );
+            }
+        }
     }
 
     /**

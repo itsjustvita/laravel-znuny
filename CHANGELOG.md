@@ -14,7 +14,7 @@ Every operation Znuny ships now has a typed method, tested against Znuny 6.5 to 
 - `Znuny::users()->setOutOfOffice()`, `clearOutOfOffice()` and `outOfOffice()` (`OutOfOffice`). The request works with Znuny's own `OutOfOffice` web service and with a generated one.
 - `php artisan znuny:webservice --also=TimeAccountingGet --also=OutOfOffice` adds the two operations, which Znuny ships in web services of their own, to the generated web service.
 - Dates in dynamic fields: a `DateTimeInterface` is sent in Znuny's format and time zone on create, update and in `whereDynamicField()`. New validation types `date` and `datetime`; a field declared `date` is sent as a day. `$ticket->dynamicField('Name')` returns a dynamic field by name, `->date()` reads its value as a `CarbonImmutable`.
-- `options` on a connection and under `http`: Guzzle request options for a proxy, a client certificate, extra headers or HTTP authentication (`proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve`, `version`). Other options are rejected, so they cannot weaken certificate verification or the timeouts.
+- `options` on a connection and under `http`: Guzzle request options for a proxy, a client certificate, extra headers or HTTP authentication (`proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve`, `version`). Other options are rejected, so they cannot weaken certificate verification or the timeouts, and so are the `X-OTRS-Header-*` authentication headers, which Znuny would read over the package's own authentication.
 - `Znuny::fakeSessionUser()` builds a `SessionGet` response for tests.
 - A route placeholder such as `:SessionID` is filled from the authentication when the payload has no value for it, so `Znuny::call('SessionGet')` describes the connection's own session.
 - The README lists which Znuny operation each method uses, the web service Znuny ships it in and the permission it needs.
@@ -25,6 +25,7 @@ Every operation Znuny ships now has a typed method, tested against Znuny 6.5 to 
 - **Breaking:** `TimeAccountingGet.NoPermission` and the `OutOfOffice.AuthFail` answers for a user who may not call the operation raise `ZnunyAccessDeniedException`.
 - **Breaking:** a `DateTimeInterface` as dynamic field value is sent as `Y-m-d H:i:s` in Znuny's time zone instead of an ISO 8601 string, which Znuny rejected.
 - `TimeAccountingGet` is repeated after timeouts and server errors, like the other reading operations.
+- A session ID or password that Znuny repeats in an error message is replaced with `[REDACTED]` in exception messages, logs and events.
 - The integration suite sets up Znuny's `TimeAccountingREST` and `OutOfOffice` web services, a generated web service with all ten operations, an administrator and dynamic fields of type Date and Date / Time, and pins what Znuny itself answers for the operations the package wraps.
 
 ### Deprecated

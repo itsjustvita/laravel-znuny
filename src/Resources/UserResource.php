@@ -80,13 +80,29 @@ class UserResource extends Resource
         $users = [];
 
         foreach (self::USER_KEYS as $key => $znunyKey) {
-            if (is_string($entry[$key] ?? null) && trim($entry[$key]) !== '') {
-                $users[$znunyKey] = $entry[$key];
+            if (! is_string($entry[$key] ?? null) || trim($entry[$key]) === '') {
+                continue;
             }
+
+            // Znuny's own web service reads the entries from CSV lines and drops lines that start with "#".
+            if (preg_match('/[\r\n]/', $entry[$key]) === 1) {
+                throw new InvalidArgumentException("The [{$key}] of out-of-office entry {$position} must not contain a line break.");
+            }
+
+            $users[$znunyKey] = $entry[$key];
         }
 
         if (count($users) !== 1) {
             throw new InvalidArgumentException("Out-of-office entry {$position} must name its agent by exactly one of [login], [email] or [search].");
+        }
+
+        // Znuny drops an end date that comes without a start date, and says nothing.
+        if (isset($entry['from']) !== isset($entry['until'])) {
+            throw new InvalidArgumentException("Out-of-office entry {$position} needs both [from] and [until], or neither.");
+        }
+
+        if (array_key_exists('enabled', $entry) && ! is_bool($entry['enabled'])) {
+            throw new InvalidArgumentException("The [enabled] of out-of-office entry {$position} must be true or false.");
         }
 
         $mapped = $users;
