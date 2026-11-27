@@ -15,8 +15,8 @@ final readonly class HistoryEntry
     public function __construct(
         public string $historyType,
         public string $name,
-        public ?CarbonImmutable $createTime,
-        public ?string $createBy,
+        public ?CarbonImmutable $created,
+        public ?string $createdBy,
         public ?string $articleId,
         public array $attributes = [],
     ) {}
@@ -32,11 +32,21 @@ final readonly class HistoryEntry
         return new self(
             historyType: (string) ($data['HistoryType'] ?? ''),
             name: (string) ($data['Name'] ?? ''),
-            createTime: self::optionalDate($data['CreateTime'] ?? null, $timezone),
-            createBy: self::optionalString($data['CreateBy'] ?? null),
+            created: self::optionalDate($data['CreateTime'] ?? null, $timezone),
+            createdBy: self::optionalString($data['CreateBy'] ?? null),
             articleId: $articleId === '0' ? null : $articleId,
             attributes: $data,
         );
+    }
+
+    /**
+     * $createTime and $createBy were renamed in 1.0, to match the other data objects.
+     *
+     * @return array<string, string>
+     */
+    protected static function renamedProperties(): array
+    {
+        return ['createTime' => 'created', 'createBy' => 'createdBy'];
     }
 
     /**
@@ -47,8 +57,8 @@ final readonly class HistoryEntry
         return [
             'HistoryType' => $this->historyType,
             'Name' => $this->name,
-            'CreateTime' => $this->createTime?->format('Y-m-d H:i:s'),
-            'CreateBy' => $this->createBy,
+            'CreateTime' => $this->created?->format('Y-m-d H:i:s'),
+            'CreateBy' => $this->createdBy,
             'ArticleID' => $this->articleId,
         ];
     }

@@ -607,7 +607,7 @@ final class TicketResourceTest extends TestCase
 
         $this->assertSame($expected, Znuny::tickets()->find('42')->created->getTimestamp());
         $this->assertSame($expected, Znuny::tickets()->findMany(['42'])->first()->created->getTimestamp());
-        $this->assertSame($expected, Znuny::tickets()->history('42')->first()->createTime->getTimestamp());
+        $this->assertSame($expected, Znuny::tickets()->history('42')->first()->created->getTimestamp());
     }
 
     public function test_history_returns_entries(): void

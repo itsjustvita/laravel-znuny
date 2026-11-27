@@ -21,8 +21,8 @@ final class HistoryEntryTest extends TestCase
 
         $this->assertSame('AddNote', $entry->historyType);
         $this->assertSame('Added note (Note)', $entry->name);
-        $this->assertSame('2026-10-09 10:00:00', $entry->createTime?->format('Y-m-d H:i:s'));
-        $this->assertSame('1', $entry->createBy);
+        $this->assertSame('2026-10-09 10:00:00', $entry->created?->format('Y-m-d H:i:s'));
+        $this->assertSame('1', $entry->createdBy);
         $this->assertSame('12', $entry->articleId);
         $this->assertSame('4', $entry->attribute('StateID'));
     }
@@ -38,8 +38,8 @@ final class HistoryEntryTest extends TestCase
             date_default_timezone_set('UTC');
         }
 
-        $this->assertSame(strtotime('2026-07-01 08:00:00 UTC'), $utc->createTime->getTimestamp());
-        $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $berlin->createTime->getTimestamp());
+        $this->assertSame(strtotime('2026-07-01 08:00:00 UTC'), $utc->created->getTimestamp());
+        $this->assertSame(strtotime('2026-07-01 06:00:00 UTC'), $berlin->created->getTimestamp());
         $this->assertSame('2026-07-01 08:00:00', $berlin->toArray()['CreateTime']);
     }
 
@@ -47,14 +47,24 @@ final class HistoryEntryTest extends TestCase
     {
         $entry = HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'CreateTime' => '2026-07-01 08:00:00']);
 
-        $this->assertInstanceOf(CarbonImmutable::class, $entry->createTime);
-        $this->assertSame('2026-07-02 08:00:00', $entry->createTime->addDay()->format('Y-m-d H:i:s'));
+        $this->assertInstanceOf(CarbonImmutable::class, $entry->created);
+        $this->assertSame('2026-07-02 08:00:00', $entry->created->addDay()->format('Y-m-d H:i:s'));
 
-        $this->assertSame('2026-07-01 08:00:00', $entry->createTime->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-07-01 08:00:00', $entry->created->format('Y-m-d H:i:s'));
     }
 
     public function test_article_id_zero_means_no_article(): void
     {
         $this->assertNull(HistoryEntry::fromZnunyResponse(['HistoryType' => 'NewTicket', 'ArticleID' => '0'])->articleId);
+    }
+
+    public function test_to_array_keeps_znunys_keys(): void
+    {
+        $entry = HistoryEntry::fromZnunyResponse(['HistoryType' => 'AddNote', 'Name' => 'Added note', 'CreateTime' => '2026-10-09 10:00:00', 'CreateBy' => '1', 'ArticleID' => '12']);
+
+        $this->assertSame(
+            ['HistoryType' => 'AddNote', 'Name' => 'Added note', 'CreateTime' => '2026-10-09 10:00:00', 'CreateBy' => '1', 'ArticleID' => '12'],
+            $entry->toArray(),
+        );
     }
 }

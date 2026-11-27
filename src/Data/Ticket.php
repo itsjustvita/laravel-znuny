@@ -3,7 +3,6 @@
 namespace ItsJustVita\LaravelZnuny\Data;
 
 use Carbon\CarbonImmutable;
-use Error;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
 
@@ -130,25 +129,13 @@ final readonly class Ticket
     }
 
     /**
-     * An undefined property is an error, not a silent null. $customerUserID was renamed to
-     * $customerUserId in 0.3.0 and removed in 0.4.0.
+     * $customerUserID was renamed in 0.3.0 and removed in 0.4.0.
+     *
+     * @return array<string, string>
      */
-    public function __get(string $name): mixed
+    protected static function renamedProperties(): array
     {
-        throw new Error(sprintf(
-            'Undefined property: %s::$%s%s',
-            self::class,
-            $name,
-            $name === 'customerUserID' ? ' (renamed to $customerUserId)' : '',
-        ));
-    }
-
-    /**
-     * Without this, isset() and ?? on an undefined property would call __get() and fail.
-     */
-    public function __isset(string $name): bool
-    {
-        return false;
+        return ['customerUserID' => 'customerUserId'];
     }
 
     /**
