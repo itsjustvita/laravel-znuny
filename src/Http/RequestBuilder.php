@@ -6,6 +6,7 @@ use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\Route;
 use ItsJustVita\LaravelZnuny\Support\Redactor;
+use SensitiveParameter;
 
 /**
  * @internal Not covered by the package's stability promise.
@@ -28,7 +29,7 @@ final class RequestBuilder
      * @param  array<string, mixed>  $payload  operation data
      * @param  array<string, string>  $auth  SessionID, or the login key and Password
      */
-    public function build(string $operation, array $payload, array $auth = []): PreparedRequest
+    public function build(string $operation, array $payload, #[SensitiveParameter] array $auth = []): PreparedRequest
     {
         $route = $this->config->routes->route($operation);
         // A placeholder the payload does not fill is taken from the authentication, so
@@ -73,7 +74,7 @@ final class RequestBuilder
      * @param  array<string, mixed>  $payload  the payload, completed with the authentication
      * @return array{0: string, 1: string, 2: list<string>}
      */
-    private function expandPath(Route $route, string $operation, array $payload): array
+    private function expandPath(Route $route, string $operation, #[SensitiveParameter] array $payload): array
     {
         $used = [];
         $logged = [];

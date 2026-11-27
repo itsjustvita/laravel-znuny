@@ -13,6 +13,7 @@ use ItsJustVita\LaravelZnuny\Resources\UserResource;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
 use ItsJustVita\LaravelZnuny\Support\Setting;
+use SensitiveParameter;
 
 class ZnunyManager
 {
@@ -51,7 +52,7 @@ class ZnunyManager
      *
      * @param  array<string, mixed>  $config
      */
-    public function build(array $config): self
+    public function build(#[SensitiveParameter] array $config): self
     {
         $name = (string) ($config['name'] ?? '');
         unset($config['name']);
@@ -70,10 +71,10 @@ class ZnunyManager
     public function usingCredentials(
         string $baseUrl,
         string $username,
-        string $password,
+        #[SensitiveParameter] string $password,
         bool $verifySSL = true,
         int $timeout = 30,
-        array $options = [],
+        #[SensitiveParameter] array $options = [],
     ): self {
         return $this->build(array_merge([
             'base_url' => $baseUrl,
@@ -162,7 +163,7 @@ class ZnunyManager
     /**
      * @param  array<string, mixed>  $config
      */
-    protected function runtimeName(array $config): string
+    protected function runtimeName(#[SensitiveParameter] array $config): string
     {
         return 'ephemeral_'.md5(implode('|', [
             (string) ($config['base_url'] ?? ''),

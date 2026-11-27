@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Exceptions;
 
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -23,7 +24,7 @@ class ExceptionMapper
         array $body,
         string $operation,
         string $connection,
-        array $payload,
+        #[SensitiveParameter] array $payload,
         bool $sessionAuth = true,
         ?int $httpStatus = null,
     ): ZnunyException {
@@ -49,7 +50,7 @@ class ExceptionMapper
      * @param  array<array-key, mixed>  $body
      * @param  array<string, mixed>  $payload
      */
-    public function fromHttpStatus(int $status, array $body, string $operation, string $connection, array $payload): ZnunyException
+    public function fromHttpStatus(int $status, array $body, string $operation, string $connection, #[SensitiveParameter] array $payload): ZnunyException
     {
         [$code, $message] = $this->errorParts($body);
         $detail = $message !== '' ? $message : (string) ($body['faultstring'] ?? $body['message'] ?? "{$operation} failed");
@@ -77,7 +78,7 @@ class ExceptionMapper
         string $rawBody,
         string $operation,
         string $connection,
-        array $payload,
+        #[SensitiveParameter] array $payload,
         bool $sessionAuth,
         string $method,
         string $path,
@@ -131,7 +132,7 @@ class ExceptionMapper
     /**
      * @param  array<string, mixed>  $payload
      */
-    public function fromTransportError(Throwable $previous, string $operation, string $connection, array $payload): ZnunyConnectionException
+    public function fromTransportError(Throwable $previous, string $operation, string $connection, #[SensitiveParameter] array $payload): ZnunyConnectionException
     {
         $exception = new ZnunyConnectionException($previous->getMessage(), 0, $previous);
         $exception->setOperation($operation);
@@ -249,7 +250,7 @@ class ExceptionMapper
         ZnunyException $exception,
         string $operation,
         string $connection,
-        array $payload,
+        #[SensitiveParameter] array $payload,
         array $body,
         string $code,
         ?int $status,

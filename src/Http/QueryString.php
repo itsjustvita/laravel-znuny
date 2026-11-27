@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Http;
 
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
+use SensitiveParameter;
 
 /**
  * @internal Not covered by the package's stability promise.
@@ -15,7 +16,7 @@ final class QueryString
      *
      * @param  array<array-key, mixed>  $params
      */
-    public static function build(array $params, string $operation = ''): string
+    public static function build(#[SensitiveParameter] array $params, string $operation = ''): string
     {
         $pairs = [];
 

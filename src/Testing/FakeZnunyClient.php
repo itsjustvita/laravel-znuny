@@ -7,6 +7,7 @@ use Illuminate\Cache\Repository;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
+use SensitiveParameter;
 
 /**
  * Answers operations from Znuny::fake() instead of sending HTTP requests. Routing, logins
@@ -21,7 +22,7 @@ class FakeZnunyClient extends ZnunyClient
      */
     public function __construct(
         string $connection,
-        array $config,
+        #[SensitiveParameter] array $config,
         private readonly FakeZnunyState $state,
     ) {
         parent::__construct(
