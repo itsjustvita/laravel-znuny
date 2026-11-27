@@ -38,8 +38,8 @@ Claims about Znuny's behaviour should rest on Znuny's source or on a test agains
 
 - **A test first.** Write the test, watch it fail for the right reason, then make it pass. A bug fix starts with a test that reproduces the bug.
 - **No silent changes.** If behaviour changes, the CHANGELOG says so. A breaking change goes into a major version and into `UPGRADE.md`, with the old and the new behaviour. The README's "Stability" section says what counts as breaking.
-- **New classes are public or internal.** `tests/Unit/PublicApiTest.php` fails for a class that is neither listed there nor marked `@internal`. Prefer `@internal`: a public class is a promise.
-- **Secrets stay out of logs, events and exceptions.** If you add something that carries credentials or session data, add a test that it is redacted.
+- **New classes are public or internal.** `tests/Unit/PublicApiTest.php` fails for a class that is neither listed there nor marked `@internal`. Prefer `@internal`: a public class is a promise. The same test lists the public members of public classes that are `@internal`. Putting the marker on a member that was covered takes it out of the promise, which needs a major version.
+- **Secrets stay out of logs, events and exceptions.** If you add something that carries credentials or session data, add a test that it is redacted. A parameter that carries a password, a session ID, connection settings or a request gets `#[\SensitiveParameter]`, so that it does not show in stack traces; `tests/Feature/SecretsInStackTracesTest.php` checks the traces of the package's failures.
 - **English** in code, comments, commit messages and documentation.
 
 ## Security
