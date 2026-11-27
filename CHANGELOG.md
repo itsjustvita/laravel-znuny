@@ -4,7 +4,9 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
-The first stable release. It removes what 0.4.0 deprecated, corrects the API before it is frozen and says what semantic versioning covers from now on. See [UPGRADE.md](UPGRADE.md).
+## [1.0.0-rc.1] - 2026-11-27
+
+The candidate for the first stable release; 1.0.0 follows with the same content unless the candidate turns something up. It removes what 0.4.0 deprecated, corrects the API before it is frozen and says what semantic versioning covers from now on. See [UPGRADE.md](UPGRADE.md).
 
 ### Added
 
@@ -230,7 +232,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v1.0.0-rc.1...HEAD
+[1.0.0-rc.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.4.0...v1.0.0-rc.1
 [0.4.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...v0.3.1
