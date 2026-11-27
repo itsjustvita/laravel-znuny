@@ -31,6 +31,9 @@ class TicketBuilder
     /** @var array<string, mixed> raw TicketGet parameters for get(), paginate() and lazy() */
     protected array $options = [];
 
+    /**
+     * @internal
+     */
     public function __construct(
         protected readonly ZnunyClient $client,
         protected readonly TicketResource $resource,

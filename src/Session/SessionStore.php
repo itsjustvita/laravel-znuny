@@ -4,6 +4,9 @@ namespace ItsJustVita\LaravelZnuny\Session;
 
 use Illuminate\Contracts\Cache\Repository;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class SessionStore
 {
     public function __construct(

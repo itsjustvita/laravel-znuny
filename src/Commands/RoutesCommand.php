@@ -8,6 +8,9 @@ use ItsJustVita\LaravelZnuny\Routing\Route;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Support\Setting;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class RoutesCommand extends Command
 {
     protected $signature = 'znuny:routes {connection? : Connection name (defaults to the default connection)}';

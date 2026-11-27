@@ -55,6 +55,8 @@ class ZnunyClient
 
     /**
      * @param  array<string, mixed>  $config  connection config, see config/znuny.php
+     *
+     * @internal
      */
     public function __construct(
         protected readonly string $connection,
@@ -148,6 +150,8 @@ class ZnunyClient
 
     /**
      * The session ID that is cached for this connection, if any. Does not log in.
+     *
+     * @internal
      */
     public function cachedSessionId(): ?string
     {
@@ -156,6 +160,8 @@ class ZnunyClient
 
     /**
      * Forget the cached session ID; the next call that needs a session logs in again.
+     *
+     * @internal
      */
     public function forgetSession(): void
     {
@@ -216,6 +222,8 @@ class ZnunyClient
 
     /**
      * Key under which the session and cached lookups of this connection are stored.
+     *
+     * @internal
      */
     public function identityKey(): string
     {
@@ -463,6 +471,8 @@ class ZnunyClient
      * Write a warning to the package's log channel, if error logging is enabled.
      *
      * @param  array<string, mixed>  $context
+     *
+     * @internal
      */
     public function warn(string $message, array $context = []): void
     {

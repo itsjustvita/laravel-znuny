@@ -24,6 +24,9 @@ class ZnunyManager
     /** @var array<string, mixed>|null */
     protected ?array $runtimeConfig = null;
 
+    /**
+     * @internal
+     */
     public function __construct(
         protected readonly Application $app,
     ) {}

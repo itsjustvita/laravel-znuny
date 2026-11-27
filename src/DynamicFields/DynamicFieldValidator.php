@@ -5,6 +5,9 @@ namespace ItsJustVita\LaravelZnuny\DynamicFields;
 use DateTimeInterface;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class DynamicFieldValidator
 {
     /** @var array<string, FieldDefinition> */

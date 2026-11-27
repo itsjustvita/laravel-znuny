@@ -6,6 +6,9 @@ use Carbon\CarbonImmutable;
 use Error;
 use Illuminate\Support\Arr;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 trait HasAttributes
 {
     /**

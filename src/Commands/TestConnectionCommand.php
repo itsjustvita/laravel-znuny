@@ -10,6 +10,9 @@ use ItsJustVita\LaravelZnuny\Support\TimeZoneCheck;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class TestConnectionCommand extends Command
 {
     /**

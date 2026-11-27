@@ -9,6 +9,9 @@ final readonly class Route implements Stringable
 {
     private const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 
+    /**
+     * @internal
+     */
     public function __construct(
         public string $method,
         public string $path,
@@ -17,6 +20,8 @@ final readonly class Route implements Stringable
     /**
      * Parse a definition in Znuny's admin notation, e.g. "GET /Ticket/:TicketID".
      * The method is optional and defaults to POST.
+     *
+     * @internal
      */
     public static function parse(string $definition): self
     {

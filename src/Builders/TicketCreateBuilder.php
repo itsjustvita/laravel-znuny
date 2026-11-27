@@ -25,6 +25,8 @@ class TicketCreateBuilder
 
     /**
      * @param  array<string, mixed>  $ticket
+     *
+     * @internal
      */
     public function __construct(
         protected readonly ZnunyClient $client,

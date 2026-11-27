@@ -7,6 +7,9 @@ use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\Route;
 use ItsJustVita\LaravelZnuny\Support\Redactor;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 final class RequestBuilder
 {
     /** @var array<string, string> */

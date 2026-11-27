@@ -9,6 +9,9 @@ use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Data\Attachment;
 use ItsJustVita\LaravelZnuny\DynamicFields\FieldValue;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class TicketInputMapper
 {
     /** @var array<string, string> */

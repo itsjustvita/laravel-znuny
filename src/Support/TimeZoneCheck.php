@@ -10,6 +10,8 @@ use DateTimeZone;
  *
  * A TicketGet row carries "Created" (wall-clock time in Znuny's OTRSTimeZone) and "Age"
  * (the real number of seconds since then). Together they reveal Znuny's UTC offset.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 final readonly class TimeZoneCheck
 {

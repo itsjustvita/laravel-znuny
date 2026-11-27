@@ -11,6 +11,9 @@ use ItsJustVita\LaravelZnuny\Support\Yaml;
 use ItsJustVita\LaravelZnuny\WebService\WebServiceDefinition;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class WebServiceCommand extends Command
 {
     protected $signature = 'znuny:webservice

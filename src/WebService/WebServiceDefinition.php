@@ -9,6 +9,8 @@ use ItsJustVita\LaravelZnuny\Support\Setting;
 /**
  * A Znuny web service definition that matches the routes of a connection, optionally with a
  * requester that sends ticket events to this application's webhook endpoint.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 final class WebServiceDefinition
 {

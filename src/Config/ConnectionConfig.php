@@ -49,6 +49,8 @@ final readonly class ConnectionConfig
      * @param  int<1, max>  $batchSize
      * @param  int<1, max>|null  $searchLimit
      * @param  array<string, mixed>  $options  Guzzle request options, see HTTP_OPTIONS
+     *
+     * @internal
      */
     public function __construct(
         public string $name,
@@ -74,6 +76,8 @@ final readonly class ConnectionConfig
      * @param  array<string, mixed>  $config  one entry of znuny.connections (or a runtime config)
      * @param  array<string, mixed>  $http  the global znuny.http config used as fallback
      * @param  string|null  $timezone  the global znuny.timezone used as fallback
+     *
+     * @internal
      */
     public static function fromArray(string $name, array $config, array $http = [], ?string $timezone = null): self
     {
@@ -122,6 +126,8 @@ final readonly class ConnectionConfig
      * credentials, so connections that share a name (or a login with another password)
      * never share cached data. $secret (the app key) keeps the credentials from being
      * guessed from the key.
+     *
+     * @internal
      */
     public function identityKey(string $secret = ''): string
     {
@@ -132,6 +138,8 @@ final readonly class ConnectionConfig
 
     /**
      * The request field Znuny expects for the login of this user type.
+     *
+     * @internal
      */
     public function loginKey(): string
     {
@@ -141,6 +149,8 @@ final readonly class ConnectionConfig
     /**
      * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns. The
      * connection's own value wins over the global one; without either it is UTC, Znuny's default.
+     *
+     * @internal
      */
     public static function timezoneFor(string $connection, mixed $own, mixed $global = null): string
     {

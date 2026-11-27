@@ -12,6 +12,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Authenticates requests from a Znuny requester (middleware alias "znuny.webhook").
  * Fails closed: without a configured secret every request is rejected.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 class AuthenticateWebhook
 {

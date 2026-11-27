@@ -4,6 +4,9 @@ namespace ItsJustVita\LaravelZnuny\Exceptions;
 
 use Throwable;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class ExceptionMapper
 {
     private const VALIDATION_SUFFIXES = ['MissingParameter', 'InvalidParameter', 'WrongStructure', 'EmptyRequest'];

@@ -298,6 +298,8 @@ class TicketResource extends Resource
      * TicketGet flags for the requested related data.
      *
      * @return array<string, int>
+     *
+     * @internal
      */
     public static function fetchOptions(bool $withArticles, bool $withDynamicFields, bool $withAttachments): array
     {

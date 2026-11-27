@@ -5,6 +5,8 @@ namespace ItsJustVita\LaravelZnuny\Webhooks;
 /**
  * Reads event name and IDs from webhook payloads. Tolerant because Znuny admins can
  * reshape the payload with mappings.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 final class WebhookPayload
 {
