@@ -102,6 +102,75 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(250, $config->retryDelay);
     }
 
+    public function test_http_options_of_the_connection_replace_the_global_ones_key_by_key(): void
+    {
+        $config = $this->make(
+            ['options' => ['proxy' => 'http://proxy.a:3128']],
+            ['options' => ['proxy' => 'http://proxy.global:3128', 'cert' => '/etc/ssl/client.pem']],
+        );
+
+        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'cert' => '/etc/ssl/client.pem'], $config->options);
+        $this->assertSame([], $this->make()->options);
+        $this->assertSame([], $this->make(['options' => null], ['options' => []])->options);
+    }
+
+    public function test_every_accepted_http_option_is_kept(): void
+    {
+        $options = [
+            'proxy' => 'http://proxy.internal:3128',
+            'cert' => ['/etc/ssl/client.pem', 'passphrase'],
+            'ssl_key' => '/etc/ssl/client.key',
+            'headers' => ['X-Forwarded-Auth' => 'abc'],
+            'auth' => ['user', 'password'],
+            'force_ip_resolve' => 'v4',
+            'version' => '1.1',
+        ];
+
+        $this->assertSame($options, $this->make(['options' => $options])->options);
+        $this->assertSame(array_keys($options), ConnectionConfig::HTTP_OPTIONS);
+    }
+
+    /**
+     * @return array<string, array{0: mixed, 1: string}>
+     */
+    public static function refusedOptions(): array
+    {
+        $accepted = 'Accepted: proxy, cert, ssl_key, headers, auth, force_ip_resolve, version.';
+
+        return [
+            'curl' => [['curl' => [64 => false]], '[curl]. '.$accepted],
+            'stream_context' => [['stream_context' => []], '[stream_context]. '.$accepted],
+            'handler' => [['handler' => 'x'], '[handler]. '.$accepted],
+            'base_uri' => [['base_uri' => 'https://evil.test'], '[base_uri]. '.$accepted],
+            'verify' => [['verify' => false], 'Use [verify_ssl] instead.'],
+            'timeout' => [['timeout' => 0], 'Use [timeout] instead.'],
+            'connect_timeout' => [['connect_timeout' => 0], 'Use [connect_timeout] instead.'],
+            'a string from .env' => ['proxy=http://proxy.internal:3128', 'must be an array of named options'],
+            'a list without names' => [['http://proxy.internal:3128'], 'must be an array of named options'],
+            'headers that are no array' => [['headers' => 'X-Api: 1'], '[headers] in [options] must be an array'],
+        ];
+    }
+
+    /**
+     * Anything else could switch off certificate verification or the timeouts.
+     */
+    #[DataProvider('refusedOptions')]
+    public function test_other_http_options_are_refused(mixed $options, string $hint): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage($hint);
+
+        $this->make(['options' => $options]);
+    }
+
+    public function test_refused_options_are_refused_in_the_global_config_too(): void
+    {
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('Use [verify_ssl] instead.');
+
+        $this->make([], ['options' => ['verify' => false]]);
+    }
+
     public function test_the_search_limit_comes_from_the_connection_then_the_http_config(): void
     {
         $this->assertSame(200, $this->make(['search_limit' => '200'], ['search_limit' => 5000])->searchLimit);

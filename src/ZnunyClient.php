@@ -306,7 +306,7 @@ class ZnunyClient
     protected function dispatch(PreparedRequest $request, string $operation): Response
     {
         $repeatable = $request->method === 'GET' || in_array($operation, self::READ_OPERATIONS, true);
-        $client = $this->httpClient($repeatable)->withHeaders($request->headers);
+        $client = $this->httpClient($repeatable)->withHeaders($this->headersFor($request));
 
         if ($request->body === null) {
             return $client->send('GET', $request->url);
@@ -318,6 +318,27 @@ class ZnunyClient
         );
 
         return $client->withBody($body, 'application/json')->send($request->method, $request->url);
+    }
+
+    /**
+     * The headers configured for the connection, under the request's own: a configured
+     * header never replaces or doubles one the package sets, such as the authentication.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function headersFor(PreparedRequest $request): array
+    {
+        $own = array_change_key_case($request->headers, CASE_LOWER);
+        $configured = $this->settings->options['headers'] ?? [];
+
+        return array_merge(
+            array_filter(
+                is_array($configured) ? $configured : [],
+                fn (int|string $name): bool => ! isset($own[strtolower((string) $name)]),
+                ARRAY_FILTER_USE_KEY,
+            ),
+            $request->headers,
+        );
     }
 
     /** @return array<array-key, mixed>|null */
@@ -416,6 +437,14 @@ class ZnunyClient
                     && $exception->response->serverError()
                     && ! str_contains($exception->response->body(), 'determine Operation');
             });
+        }
+
+        // The connection's own request options (proxy, client certificate, ...). They cannot
+        // name "verify" or a timeout: ConnectionConfig accepts a fixed list only.
+        $options = array_diff_key($this->settings->options, ['headers' => true]);
+
+        if ($options !== []) {
+            $client = $client->withOptions($options);
         }
 
         return $this->settings->verifySsl === true

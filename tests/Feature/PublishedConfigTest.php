@@ -33,6 +33,14 @@ final class PublishedConfigTest extends TestCase
         $this->assertTrue(config('znuny.session.per_host'));
     }
 
+    public function test_http_options_added_in_0_4_are_empty_for_a_config_published_before(): void
+    {
+        $this->registerWithConfigPublishedBefore();
+
+        $this->assertSame([], config('znuny.http.options'));
+        $this->assertSame([], Znuny::client()->settings()->options);
+    }
+
     public function test_values_of_the_published_config_are_kept(): void
     {
         $this->registerWithConfigPublishedBefore();
