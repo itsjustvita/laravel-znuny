@@ -23,9 +23,20 @@ final class WebServiceCommandTest extends TestCase
         $this->assertSame(0, Artisan::call('znuny:webservice'));
         $output = Artisan::output();
 
-        // The test connection uses the operation-name routes; QueueGet is no core operation.
+        // The test connection uses the operation-name routes.
         $this->assertSame('/TicketSearch', $this->routes(SymfonyYaml::parse($output))['TicketSearch']);
-        $this->assertMatchesRegularExpression('/^# .*QueueGet/m', $output);
+        $this->assertStringNotContainsString('Left out', $output);
+    }
+
+    public function test_operations_znuny_does_not_ship_are_left_out_and_named(): void
+    {
+        config(['znuny.connections.default.routes' => ['extends' => 'operation-name', 'QueueGet' => 'POST /QueueGet/:QueueID']]);
+
+        $this->assertSame(0, Artisan::call('znuny:webservice'));
+        $output = Artisan::output();
+
+        $this->assertArrayNotHasKey('QueueGet', $this->routes(SymfonyYaml::parse($output)));
+        $this->assertMatchesRegularExpression('/^# Left out.*QueueGet/m', $output);
     }
 
     public function test_routes_can_be_given_without_a_connection(): void

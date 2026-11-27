@@ -213,8 +213,6 @@ class ExceptionMapper
     {
         return match (true) {
             str_starts_with($operation, 'Ticket') => new TicketNotFoundException($message),
-            str_starts_with($operation, 'Queue') => new QueueNotFoundException($message),
-            str_starts_with($operation, 'Customer') => new CustomerNotFoundException($message),
             default => new ZnunyNotFoundException($message),
         };
     }

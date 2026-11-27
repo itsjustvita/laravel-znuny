@@ -196,34 +196,6 @@ final class CommandsTest extends TestCase
             ->assertExitCode(1);
     }
 
-    public function test_cache_clear_command_flushes_default_connection(): void
-    {
-        Http::fake([
-            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
-            '*QueueList*' => Http::response(['Queue' => [
-                ['QueueID' => '1', 'Name' => 'Support', 'GroupID' => '1', 'ValidID' => '1'],
-            ]]),
-        ]);
-
-        \Znuny::queues()->all();
-        \Znuny::queues()->all();
-        $this->artisan('znuny:cache-clear')->assertExitCode(0);
-        \Znuny::queues()->all();
-
-        // The second call is served from the cache, the third one after clearing it is not.
-        $this->assertCount(2, collect(Http::recorded())->filter(fn (array $pair) => str_contains($pair[0]->url(), 'QueueList')));
-    }
-
-    public function test_cache_clear_all_flag_flushes_every_connection(): void
-    {
-        config()->set('znuny.connections.tenant-a', [
-            'base_url' => 'https://tenant-a.test/otrs/nph-genericinterface.pl/Webservice/test',
-            'username' => 'u', 'password' => 'p', 'verify_ssl' => false, 'timeout' => 5,
-        ]);
-
-        $this->artisan('znuny:cache-clear --all')->assertExitCode(0);
-    }
-
     public function test_generate_fields_writes_helper_class(): void
     {
         $target = storage_path('app/znuny-test/DynamicFields.php');
@@ -321,7 +293,6 @@ final class CommandsTest extends TestCase
             ->expectsTable(['Operation', 'Method', 'Path'], [
                 ['TicketGet', 'POST', '/TicketGet/:TicketID'],
                 ['TicketUpdate', 'POST', '/TicketUpdate/:TicketID'],
-                ['QueueGet', 'POST', '/QueueGet/:QueueID'],
             ])
             ->assertExitCode(0);
     }

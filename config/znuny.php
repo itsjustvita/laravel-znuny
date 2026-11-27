@@ -70,24 +70,6 @@ return [
         'per_host' => env('ZNUNY_SESSION_PER_HOST', true),
     ],
 
-    /*
-    | Caching of the lookup lists (queues, states, priorities, types). Single lookups such
-    | as customers()->find() always ask Znuny. Deprecated since 0.4.0 together with the
-    | lookups, which need operations Znuny does not ship; removed in 1.0.
-    */
-
-    'cache' => [
-        'enabled' => env('ZNUNY_CACHE_ENABLED', true),
-        'store' => env('ZNUNY_CACHE_STORE'),
-        'prefix' => 'znuny:lookup:',
-        'ttl' => [
-            'queues' => 3600,
-            'priorities' => 3600,
-            'states' => 3600,
-            'types' => 3600,
-        ],
-    ],
-
     'logging' => [
         'enabled' => env('ZNUNY_LOGGING_ENABLED', true),
         'channel' => env('ZNUNY_LOG_CHANNEL', 'znuny'),

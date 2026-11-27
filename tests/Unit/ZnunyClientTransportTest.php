@@ -238,16 +238,17 @@ final class ZnunyClientTransportTest extends TestCase
     public function test_missing_route_fails_fast_without_http_retries(): void
     {
         Http::fake(['*' => Http::response(
-            "HTTP::REST Error while determine Operation for request URI '/QueueList'.",
+            "HTTP::REST Error while determine Operation for request URI '/Ticket/Search'.",
             500,
             ['Content-Type' => 'text/plain'],
         )]);
 
+        // TicketSearch only reads, so a server error would be repeated; a missing route is not.
         try {
-            $this->client(['auth' => 'credentials', 'retries' => 2, 'retry_delay' => 10])->call('QueueList');
+            $this->client(['auth' => 'credentials', 'retries' => 2, 'retry_delay' => 10])->call('TicketSearch');
             $this->fail('Expected ZnunyRouteNotFoundException');
         } catch (ZnunyRouteNotFoundException $e) {
-            $this->assertSame('QueueList', $e->getOperation());
+            $this->assertSame('TicketSearch', $e->getOperation());
             $this->assertSame(500, $e->getHttpStatus());
         }
 

@@ -22,8 +22,6 @@ class TicketBuilder
     /** @var array<string, mixed> */
     protected array $params = [];
 
-    protected ?int $limit = null;
-
     protected bool $withArticles = true;
 
     protected bool $withDynamicFields = true;
@@ -355,7 +353,6 @@ class TicketBuilder
 
     public function limit(int $limit): self
     {
-        $this->limit = $limit;
         $this->params['Limit'] = $limit;
 
         return $this;

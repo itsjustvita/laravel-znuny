@@ -36,7 +36,6 @@ class ZnunyClient
      */
     protected const READ_OPERATIONS = [
         'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet', 'TimeAccountingGet',
-        'QueueList', 'QueueGet', 'StateList', 'PriorityList', 'TypeList', 'CustomerUserGet',
     ];
 
     protected readonly ConnectionConfig $settings;

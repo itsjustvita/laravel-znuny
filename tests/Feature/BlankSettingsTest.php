@@ -19,7 +19,6 @@ final class BlankSettingsTest extends TestCase
         Http::fake([
             '*SessionCreate' => Http::response(['SessionID' => 'S1']),
             '*TicketSearch' => Http::response(['TicketID' => []]),
-            '*QueueList' => Http::response(['Queue' => [['QueueID' => '1', 'Name' => 'Support']]]),
         ]);
     }
 
@@ -59,37 +58,5 @@ final class BlankSettingsTest extends TestCase
         $this->expectExceptionMessage('The Znuny configuration has invalid [session.ttl] value [six hours]. Use a whole number.');
 
         Znuny::call('TicketSearch');
-    }
-
-    #[DataProvider('blank')]
-    public function test_a_blank_cache_switch_keeps_the_lookup_cache_on(mixed $enabled): void
-    {
-        config(['znuny.cache.enabled' => $enabled]);
-        $this->fakeZnuny();
-
-        Znuny::queues()->all();
-        Znuny::queues()->all();
-
-        $this->assertSame(1, $this->requestsTo('QueueList'));
-    }
-
-    /**
-     * @return array<string, array{0: mixed}>
-     */
-    public static function switchedOff(): array
-    {
-        return ['false' => [false], '"false"' => ['false'], '"off"' => ['off'], '"no"' => ['no'], '"0"' => ['0'], '0' => [0]];
-    }
-
-    #[DataProvider('switchedOff')]
-    public function test_the_lookup_cache_can_be_switched_off_with_any_boolean_like_value(mixed $enabled): void
-    {
-        config(['znuny.cache.enabled' => $enabled]);
-        $this->fakeZnuny();
-
-        Znuny::queues()->all();
-        Znuny::queues()->all();
-
-        $this->assertSame(2, $this->requestsTo('QueueList'));
     }
 }

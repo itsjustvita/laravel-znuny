@@ -400,7 +400,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertTrue($config['session']['per_host']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);
-        $this->assertArrayNotHasKey('services', $config['cache']['ttl']);
+        $this->assertArrayNotHasKey('cache', $config);
         $this->assertSame('token', $config['webhooks']['auth']['type']);
     }
 

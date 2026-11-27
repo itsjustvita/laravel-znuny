@@ -20,22 +20,12 @@ use RuntimeException;
  * @method static \ItsJustVita\LaravelZnuny\Resources\SessionResource session()
  * @method static \ItsJustVita\LaravelZnuny\Resources\TimeAccountingResource timeAccounting()
  * @method static \ItsJustVita\LaravelZnuny\Resources\UserResource users()
- * @method static \ItsJustVita\LaravelZnuny\Resources\QueueResource queues()
- * @method static \ItsJustVita\LaravelZnuny\Resources\StateResource states()
- * @method static \ItsJustVita\LaravelZnuny\Resources\PriorityResource priorities()
- * @method static \ItsJustVita\LaravelZnuny\Resources\TypeResource types()
- * @method static \ItsJustVita\LaravelZnuny\Resources\CustomerResource customers()
  * @method static bool ping()
- * @method static void flush(?string $resource = null)
- * @method static void flushAll()
  * @method static void assertCalled(string $operation, \Closure|null $callback = null)
  * @method static void assertCalledTimes(string $operation, int $times)
  * @method static void assertNotCalled(string $operation, \Closure|null $callback = null)
  * @method static void assertNothingCalled()
  * @method static list<array{connection: string, operation: string, payload: array<string, mixed>}> recorded(string|null $operation = null)
- *
- * queues(), states(), priorities(), types(), customers(), flush() and flushAll() are deprecated
- * since 0.4.0 and will be removed in 1.0: they need operations Znuny does not ship.
  *
  * @see ZnunyManager
  * @see FakeZnunyManager

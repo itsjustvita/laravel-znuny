@@ -46,7 +46,6 @@ final class RoutePresets
         self::OPERATION_NAME => [
             'TicketGet' => 'POST /TicketGet/:TicketID',
             'TicketUpdate' => 'POST /TicketUpdate/:TicketID',
-            'QueueGet' => 'POST /QueueGet/:QueueID',
         ],
     ];
 

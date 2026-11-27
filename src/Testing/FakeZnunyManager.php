@@ -3,10 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Testing;
 
 use Closure;
-use Illuminate\Cache\ArrayStore;
-use Illuminate\Cache\Repository;
 use Illuminate\Contracts\Foundation\Application;
-use ItsJustVita\LaravelZnuny\Caching\CacheManager;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
 use PHPUnit\Framework\Assert as PHPUnit;
@@ -87,14 +84,6 @@ class FakeZnunyManager extends ZnunyManager
     public function recorded(?string $operation = null): array
     {
         return $this->state->calls($operation);
-    }
-
-    /**
-     * Lookups are not cached, so every call reaches the fake responses.
-     */
-    protected function buildCacheManager(): CacheManager
-    {
-        return new CacheManager(new Repository(new ArrayStore), 'znuny:fake:', [], false);
     }
 
     /**
