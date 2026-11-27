@@ -334,6 +334,35 @@ final class ZnunyIntegrationTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function test_time_accounting_entries(): void
+    {
+        $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
+        $ticket = $this->newTicket($this->znuny(), 'Time accounting '.uniqid(), article: ['timeUnit' => 15])->save();
+
+        // Znuny's own web service for it has no session route, so the connection sends its credentials.
+        $entries = $this->znuny(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')
+            ->timeAccounting()
+            ->entries($login, now()->subHour(), now()->addHour());
+
+        $entry = $entries->firstWhere('ticketNumber', $ticket->ticketNumber);
+
+        $this->assertNotNull($entry);
+        $this->assertSame(15.0, $entry->timeUnit);
+        $this->assertSame($ticket->title, $entry->ticketTitle);
+        $this->assertSame('Raw', $entry->queue);
+        $this->assertLessThan(300, abs($entry->created->diffInSeconds(now())));
+
+        $this->assertCount(0, $this->znuny(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')
+            ->timeAccounting()
+            ->entries($login, now()->subDays(3), now()->subDays(2)));
+
+        $this->expectException(ZnunyAccessDeniedException::class);
+
+        $this->admin(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')
+            ->timeAccounting()
+            ->entries($login, now()->subHour(), now()->addHour());
+    }
+
     /*
      * What Znuny itself does with the operations the package wraps. These tests call Znuny
      * directly, so a change in Znuny shows up here and not as a puzzling failure elsewhere.

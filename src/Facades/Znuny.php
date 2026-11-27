@@ -18,6 +18,7 @@ use RuntimeException;
  * @method static array<array-key, mixed> call(string $operation, array<string, mixed> $payload = [])
  * @method static \ItsJustVita\LaravelZnuny\Resources\TicketResource tickets()
  * @method static \ItsJustVita\LaravelZnuny\Resources\SessionResource session()
+ * @method static \ItsJustVita\LaravelZnuny\Resources\TimeAccountingResource timeAccounting()
  * @method static \ItsJustVita\LaravelZnuny\Resources\QueueResource queues()
  * @method static \ItsJustVita\LaravelZnuny\Resources\StateResource states()
  * @method static \ItsJustVita\LaravelZnuny\Resources\PriorityResource priorities()

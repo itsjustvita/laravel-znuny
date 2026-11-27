@@ -13,6 +13,7 @@ use ItsJustVita\LaravelZnuny\Resources\QueueResource;
 use ItsJustVita\LaravelZnuny\Resources\SessionResource;
 use ItsJustVita\LaravelZnuny\Resources\StateResource;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
+use ItsJustVita\LaravelZnuny\Resources\TimeAccountingResource;
 use ItsJustVita\LaravelZnuny\Resources\TypeResource;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
@@ -117,6 +118,11 @@ class ZnunyManager
     public function session(): SessionResource
     {
         return new SessionResource($this->client());
+    }
+
+    public function timeAccounting(): TimeAccountingResource
+    {
+        return new TimeAccountingResource($this->client());
     }
 
     public function queues(): QueueResource

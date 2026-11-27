@@ -305,6 +305,19 @@ final class ExceptionMapperTest extends TestCase
         $this->assertSame('TicketGet.AccessDenied', $exception->getErrorCode());
     }
 
+    public function test_no_permission_maps_to_access_denied(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TimeAccountingGet.NoPermission', 'ErrorMessage' => 'TimeAccountingGet: No permission!']],
+            operation: 'TimeAccountingGet',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertInstanceOf(ZnunyAccessDeniedException::class, $exception);
+        $this->assertSame('TimeAccountingGet.NoPermission', $exception->getErrorCode());
+    }
+
     public function test_not_valid_ticket_id_maps_to_ticket_not_found(): void
     {
         $exception = $this->mapper->fromErrorResponse(

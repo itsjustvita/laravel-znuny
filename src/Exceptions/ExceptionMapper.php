@@ -159,7 +159,8 @@ class ExceptionMapper
             return new ZnunySessionExpiredException($fullMessage);
         }
 
-        if ($suffix === 'AccessDenied') {
+        // NoPermission: what TimeAccountingGet answers outside its group.
+        if ($suffix === 'AccessDenied' || $suffix === 'NoPermission') {
             return new ZnunyAccessDeniedException($fullMessage);
         }
 

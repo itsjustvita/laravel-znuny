@@ -35,7 +35,7 @@ class ZnunyClient
      * Znuny may already have processed it (a slow TicketCreate would create duplicates).
      */
     protected const READ_OPERATIONS = [
-        'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet',
+        'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet', 'TimeAccountingGet',
         'QueueList', 'QueueGet', 'StateList', 'PriorityList', 'TypeList', 'CustomerUserGet',
     ];
 

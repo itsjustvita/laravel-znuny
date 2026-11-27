@@ -2,9 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Builders;
 
-use DateTimeImmutable;
 use DateTimeInterface;
-use DateTimeZone;
 use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
@@ -12,6 +10,7 @@ use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
+use ItsJustVita\LaravelZnuny\Support\ZnunyTime;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 
 class TicketBuilder
@@ -456,9 +455,7 @@ class TicketBuilder
      */
     protected function znunyTime(DateTimeInterface $date): string
     {
-        return DateTimeImmutable::createFromInterface($date)
-            ->setTimezone(new DateTimeZone($this->client->settings()->timezone))
-            ->format('Y-m-d H:i:s');
+        return ZnunyTime::dateTime($date, $this->client->settings()->timezone);
     }
 
     /**
