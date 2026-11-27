@@ -19,6 +19,7 @@ use RuntimeException;
  * @method static \ItsJustVita\LaravelZnuny\Resources\TicketResource tickets()
  * @method static \ItsJustVita\LaravelZnuny\Resources\SessionResource session()
  * @method static \ItsJustVita\LaravelZnuny\Resources\TimeAccountingResource timeAccounting()
+ * @method static \ItsJustVita\LaravelZnuny\Resources\UserResource users()
  * @method static \ItsJustVita\LaravelZnuny\Resources\QueueResource queues()
  * @method static \ItsJustVita\LaravelZnuny\Resources\StateResource states()
  * @method static \ItsJustVita\LaravelZnuny\Resources\PriorityResource priorities()

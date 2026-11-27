@@ -144,6 +144,12 @@ class ExceptionMapper
         $haystack = strtolower($code.' '.$message);
         $lowerMessage = strtolower($message);
 
+        // OutOfOffice also answers AuthFail to a user who is logged in but may not call it.
+        // That is no expired session; logging in again would change nothing.
+        if ($code === 'OutOfOffice.AuthFail' && (str_contains($lowerMessage, 'group admin') || str_contains($lowerMessage, 'needs to be an agent'))) {
+            return new ZnunyAccessDeniedException($fullMessage);
+        }
+
         // AuthFail on any operation other than SessionCreate means the cached session expired.
         // Without sessions (credentials mode) and for SessionCreate it means wrong credentials.
         if ($suffix === 'AuthFail' || str_contains($haystack, 'authfail')) {

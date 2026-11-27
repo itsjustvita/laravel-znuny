@@ -363,6 +363,39 @@ final class ZnunyIntegrationTest extends TestCase
             ->entries($login, now()->subHour(), now()->addHour());
     }
 
+    #[DataProvider('outOfOfficeWebServices')]
+    public function test_out_of_office_is_set_and_cleared(string $urlVariable): void
+    {
+        $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
+        $password = (string) getenv('ZNUNY_INTEGRATION_PASSWORD');
+        $users = $this->admin(['auth' => 'credentials'], $urlVariable)->users();
+
+        $users->setOutOfOffice($login, CarbonImmutable::parse('2032-03-04'), CarbonImmutable::parse('2032-03-11'));
+
+        $data = $this->freshSessionData($login, $password);
+        $this->assertEquals(1, $data['OutOfOffice']);
+        $this->assertEquals([2032, 3, 4], [$data['OutOfOfficeStartYear'], $data['OutOfOfficeStartMonth'], $data['OutOfOfficeStartDay']]);
+        $this->assertEquals([2032, 3, 11], [$data['OutOfOfficeEndYear'], $data['OutOfOfficeEndMonth'], $data['OutOfOfficeEndDay']]);
+
+        $users->clearOutOfOffice($login);
+
+        $this->assertEquals(0, $this->freshSessionData($login, $password)['OutOfOffice']);
+
+        // By e-mail address, and an entry that matches nobody: Znuny reports success for both.
+        $users->outOfOffice([
+            ['email' => $this->freshSessionData($login, $password)['UserEmail'], 'enabled' => true],
+            ['login' => 'no-such-agent-'.uniqid(), 'enabled' => true],
+        ]);
+
+        $this->assertEquals(1, $this->freshSessionData($login, $password)['OutOfOffice']);
+
+        $users->clearOutOfOffice($login);
+
+        $this->expectException(ZnunyAccessDeniedException::class);
+
+        $this->znuny(['auth' => 'credentials'], $urlVariable)->users()->clearOutOfOffice($login);
+    }
+
     /*
      * What Znuny itself does with the operations the package wraps. These tests call Znuny
      * directly, so a change in Znuny shows up here and not as a puzzling failure elsewhere.
