@@ -31,7 +31,7 @@ final readonly class SessionUser
     /**
      * Znuny returns the session as a list of {Key, Value} pairs and marks values it had to
      * encode as JSON with "Serialized". Values whose key names a secret, such as a customer's
-     * password hash or a two-factor key, are left out.
+     * password hash or a two-factor key, are left out, at any depth.
      *
      * @param  array<array-key, mixed>  $response  the response of SessionGet
      */
@@ -51,7 +51,8 @@ final readonly class SessionUser
                 $value = json_last_error() === JSON_ERROR_NONE ? $decoded : $value;
             }
 
-            $data[$row['Key']] = $value;
+            // A customer's session holds the customer backend's configuration, passwords included.
+            $data[$row['Key']] = is_array($value) ? Redactor::withoutSecrets($value) : $value;
         }
 
         return new self(

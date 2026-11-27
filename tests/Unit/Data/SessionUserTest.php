@@ -89,6 +89,23 @@ final class SessionUserTest extends TestCase
         $this->assertSame(['UserLogin' => 'jane', 'UserLastPwChangeTime' => '1795766307'], $user->attributes);
     }
 
+    public function test_secrets_inside_serialized_values_are_left_out(): void
+    {
+        // A customer's session carries the configuration of the customer backend, which for an
+        // LDAP directory or an external database includes the password Znuny connects with.
+        $user = SessionUser::fromZnunyResponse(['SessionData' => [
+            ['Key' => 'Config', 'Serialized' => 1, 'Value' => json_encode([
+                'CacheTTL' => 86400,
+                'Params' => ['Host' => 'ldap.example.com', 'UserDN' => 'cn=znuny', 'UserPw' => 'bind-secret', 'Password' => 'db-secret'],
+                'Map' => [['UserLogin', 'Username', 'uid']],
+            ])],
+        ]]);
+
+        $this->assertSame(['Host' => 'ldap.example.com', 'UserDN' => 'cn=znuny'], $user->attribute('Config.Params'));
+        $this->assertSame([['UserLogin', 'Username', 'uid']], $user->attribute('Config.Map'));
+        $this->assertStringNotContainsString('secret', (string) json_encode($user->attributes));
+    }
+
     public function test_missing_values_and_malformed_rows(): void
     {
         $user = SessionUser::fromZnunyResponse(['SessionData' => [

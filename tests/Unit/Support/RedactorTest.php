@@ -49,6 +49,34 @@ final class RedactorTest extends TestCase
         ]], $result);
     }
 
+    public function test_secrets_inside_serialized_values_of_pairs_are_redacted(): void
+    {
+        $config = ['CacheTTL' => 86400, 'Params' => ['Host' => 'ldap.example.com', 'UserPw' => 'bind-secret', 'Password' => 'db-secret']];
+
+        $result = Redactor::redact(['SessionData' => [
+            ['Key' => 'Config', 'Value' => json_encode($config), 'Serialized' => 1],
+            ['Key' => 'Broken', 'Value' => '{"UserPw":"bind-secret"', 'Serialized' => 1],
+            ['Key' => 'Decoded', 'Value' => ['Params' => ['UserPw' => 'bind-secret', 'Host' => 'h']]],
+        ]]);
+
+        $this->assertSame(
+            ['CacheTTL' => 86400, 'Params' => ['Host' => 'ldap.example.com', 'UserPw' => '[REDACTED]', 'Password' => '[REDACTED]']],
+            json_decode($result['SessionData'][0]['Value'], true),
+        );
+        // A value that claims to be JSON and is not cannot be inspected.
+        $this->assertSame('[REDACTED]', $result['SessionData'][1]['Value']);
+        $this->assertSame(['Params' => ['UserPw' => '[REDACTED]', 'Host' => 'h']], $result['SessionData'][2]['Value']);
+        $this->assertStringNotContainsString('secret', (string) json_encode($result));
+    }
+
+    public function test_secrets_can_be_dropped_at_any_depth(): void
+    {
+        $this->assertSame(
+            ['Host' => 'h', 'Nested' => ['List' => [['Name' => 'a']]]],
+            Redactor::withoutSecrets(['Host' => 'h', 'UserPw' => 'x', 'Nested' => ['Token' => 't', 'List' => [['Name' => 'a', 'ApiSecret' => 's']]]]),
+        );
+    }
+
     public function test_a_map_that_merely_has_a_key_named_key_is_left_alone(): void
     {
         $data = ['Key' => 'UserPassword', 'Label' => 'Password'];

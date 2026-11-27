@@ -23,8 +23,8 @@ final class Redactor
     public static function redact(array $data): array
     {
         // Session data arrives as a list of {Key, Value} pairs, so the secret is named by a value.
-        if (is_string($data['Key'] ?? null) && array_key_exists('Value', $data) && self::isSecretName($data['Key'])) {
-            $data['Value'] = self::REDACTED;
+        if (is_string($data['Key'] ?? null) && array_key_exists('Value', $data)) {
+            $data['Value'] = self::pairValue($data['Key'], $data['Value'], ! empty($data['Serialized']));
         }
 
         foreach ($data as $key => $value) {
@@ -59,6 +59,79 @@ final class Redactor
             || str_contains($name, 'secret')
             || str_contains($name, 'token')
             || str_ends_with($name, 'pw');
+    }
+
+    /**
+     * The data without the entries whose key names a secret, at any depth.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @return array<array-key, mixed>
+     */
+    public static function withoutSecrets(array $data): array
+    {
+        $result = [];
+
+        foreach ($data as $key => $value) {
+            if (is_string($key) && self::namesSecret($key)) {
+                continue;
+            }
+
+            $result[$key] = is_array($value) ? self::withoutSecrets($value) : $value;
+        }
+
+        return $result;
+    }
+
+    /**
+     * The value of a {Key, Value} pair for logs and events. Znuny marks values it encoded as
+     * JSON with "Serialized"; a customer's session holds the configuration of the customer
+     * backend that way, including the password of an LDAP directory or an external database.
+     */
+    private static function pairValue(string $key, mixed $value, bool $serialized): mixed
+    {
+        if (self::isSecretName($key)) {
+            return self::REDACTED;
+        }
+
+        if (is_array($value)) {
+            return self::maskSecrets($value);
+        }
+
+        if (! $serialized || ! is_string($value)) {
+            return $value;
+        }
+
+        $decoded = json_decode($value, true);
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return self::REDACTED;
+        }
+
+        return is_array($decoded)
+            ? (string) json_encode(self::maskSecrets($decoded), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+            : $value;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     * @return array<array-key, mixed>
+     */
+    private static function maskSecrets(array $data): array
+    {
+        foreach ($data as $key => $value) {
+            if (is_string($key) && self::namesSecret($key)) {
+                $data[$key] = self::REDACTED;
+            } elseif (is_array($value)) {
+                $data[$key] = self::maskSecrets($value);
+            }
+        }
+
+        return $data;
+    }
+
+    private static function namesSecret(string $key): bool
+    {
+        return self::isSensitive($key) || self::isSecretName($key);
     }
 
     /**
