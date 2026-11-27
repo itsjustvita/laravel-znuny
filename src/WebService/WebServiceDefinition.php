@@ -4,10 +4,13 @@ namespace ItsJustVita\LaravelZnuny\WebService;
 
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 
 /**
  * A Znuny web service definition that matches the routes of a connection, optionally with a
  * requester that sends ticket events to this application's webhook endpoint.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 final class WebServiceDefinition
 {
@@ -85,7 +88,7 @@ final class WebServiceDefinition
         $type = strtolower((string) ($auth['type'] ?? 'token'));
 
         $config = [
-            'AdditionalHeaders' => $type === 'token' ? [(string) ($auth['header'] ?? 'X-Znuny-Token') => $secret('token')] : null,
+            'AdditionalHeaders' => $type === 'token' ? [Setting::string('X-Znuny-Token', $auth['header'] ?? null) => $secret('token')] : null,
             'ContentType' => 'JSON',
             'DefaultCommand' => 'POST',
             'Host' => rtrim($baseUrl, '/'),

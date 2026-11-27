@@ -7,6 +7,8 @@ use InvalidArgumentException;
 /**
  * Writes the YAML of a Znuny web service definition, so the package needs no YAML library.
  * Znuny reads every value as a string, so all scalars are written as quoted strings.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 final class Yaml
 {

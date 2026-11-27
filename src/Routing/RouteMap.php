@@ -8,6 +8,8 @@ final class RouteMap
 {
     /**
      * @param  array<string, Route>  $routes
+     *
+     * @internal
      */
     public function __construct(
         private readonly array $routes,
@@ -19,6 +21,8 @@ final class RouteMap
      * "Operation" => "METHOD /Path/:Param" with an optional "extends" preset.
      *
      * @param  string|array<array-key, mixed>|null  $config
+     *
+     * @internal
      */
     public static function fromConfig(string|array|null $config): self
     {

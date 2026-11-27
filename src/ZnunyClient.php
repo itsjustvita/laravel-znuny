@@ -24,6 +24,7 @@ use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Support\Redactor;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 use stdClass;
 use Throwable;
 
@@ -36,18 +37,26 @@ class ZnunyClient
      */
     protected const READ_OPERATIONS = [
         'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet', 'TimeAccountingGet',
-        'QueueList', 'QueueGet', 'StateList', 'PriorityList', 'TypeList', 'CustomerUserGet',
     ];
+
+    /** What is logged unless the configuration says otherwise. */
+    private const LOG_DEFAULTS = ['log_requests' => true, 'log_responses' => false, 'log_errors' => true];
 
     protected readonly ConnectionConfig $settings;
 
     protected readonly RequestBuilder $requests;
 
-    /** True while call() sends a request whose expired session it would replace. */
-    private bool $replacesExpiredSession = false;
+    /**
+     * The failures the callers further up handle themselves, innermost last.
+     *
+     * @var list<array{handles: Closure(ZnunyException): bool, message: string}>
+     */
+    private array $handled = [];
 
     /**
      * @param  array<string, mixed>  $config  connection config, see config/znuny.php
+     *
+     * @internal
      */
     public function __construct(
         protected readonly string $connection,
@@ -92,26 +101,26 @@ class ZnunyClient
         }
 
         $sessionId = $this->sessionId();
-        $retry = (bool) config('znuny.session.auto_retry_on_expired', true);
+        $retry = Setting::boolean(true, config('znuny.session.auto_retry_on_expired'));
 
-        // A listener of the request events may call Znuny itself, so the outer value is put back.
-        $outer = $this->replacesExpiredSession;
-        $this->replacesExpiredSession = $retry;
+        $send = fn (): array => $this->send($operation, $payload, ['SessionID' => $sessionId]);
 
         try {
-            return $this->send($operation, $payload, ['SessionID' => $sessionId]);
+            // Znuny drops idle sessions long before the cached session ID runs out. The
+            // request is repeated below with a new session, so nothing has failed yet.
+            return $retry
+                ? $this->expecting(fn (ZnunyException $e): bool => $e instanceof ZnunySessionExpiredException, $send, 'Znuny session expired, logging in again')
+                : $send();
         } catch (ZnunySessionExpiredException $e) {
             if (! $retry) {
                 throw $e;
             }
-        } finally {
-            $this->replacesExpiredSession = $outer;
         }
 
         $this->sessionManager->invalidate($this->identityKey());
         $sessionId = $this->sessionId();
 
-        event(new ZnunySessionRefreshed(connection: $this->connection));
+        $this->fire(new ZnunySessionRefreshed(connection: $this->connection));
 
         return $this->send($operation, $payload, ['SessionID' => $sessionId]);
     }
@@ -141,6 +150,8 @@ class ZnunyClient
 
     /**
      * The session ID that is cached for this connection, if any. Does not log in.
+     *
+     * @internal
      */
     public function cachedSessionId(): ?string
     {
@@ -149,10 +160,37 @@ class ZnunyClient
 
     /**
      * Forget the cached session ID; the next call that needs a session logs in again.
+     *
+     * @internal
      */
     public function forgetSession(): void
     {
         $this->sessionManager->invalidate($this->identityKey());
+    }
+
+    /**
+     * Run the callback as a caller that deals with some failures itself. A failed request
+     * whose exception $handles accepts is still thrown, but it is logged as information and
+     * fires no ZnunyRequestFailed: those two mean that a failure reached the application.
+     * Scopes add up, so a failure an outer caller handles stays handled further in.
+     *
+     * @internal
+     *
+     * @template T
+     *
+     * @param  Closure(ZnunyException): bool  $handles
+     * @param  Closure(): T  $callback
+     * @return T
+     */
+    public function expecting(Closure $handles, Closure $callback, string $message = 'Znuny failure handled by the package'): mixed
+    {
+        $this->handled[] = ['handles' => $handles, 'message' => $message];
+
+        try {
+            return $callback();
+        } finally {
+            array_pop($this->handled);
+        }
     }
 
     /**
@@ -166,13 +204,15 @@ class ZnunyClient
             return;
         }
 
+        // Znuny no longer knows the session, which is what logout() is for.
+        $gone = fn (ZnunyException $e): bool => $e->getErrorCode() === 'SessionRemove.Fail';
+
         try {
             // Znuny up to 6.5.11 and 7.1 authenticates SessionRemove with the credentials, newer
             // versions with the session ID; sending both works everywhere. No repeat, no new login.
-            $this->send('SessionDelete', ['SessionID' => $sessionId], $this->credentials());
+            $this->expecting($gone, fn (): array => $this->send('SessionDelete', ['SessionID' => $sessionId], $this->credentials()));
         } catch (ZnunyException $e) {
-            // Znuny no longer knows the session, which is what logout() is for.
-            if ($e->getErrorCode() !== 'SessionRemove.Fail') {
+            if (! $gone($e)) {
                 throw $e;
             }
         } finally {
@@ -181,7 +221,9 @@ class ZnunyClient
     }
 
     /**
-     * Key under which the session and cached lookups of this connection are stored.
+     * Key under which the session of this connection is stored.
+     *
+     * @internal
      */
     public function identityKey(): string
     {
@@ -209,7 +251,7 @@ class ZnunyClient
     {
         return [
             $this->settings->loginKey() => $this->settings->username,
-            'Password' => $this->settings->password,
+            'Password' => $this->settings->password(),
         ];
     }
 
@@ -229,7 +271,7 @@ class ZnunyClient
         $data = array_merge($auth, $payload);
         $redacted = Redactor::redact($data);
 
-        event(new ZnunyRequestSent(
+        $this->fire(new ZnunyRequestSent(
             connection: $this->connection,
             operation: $operation,
             payload: $redacted,
@@ -294,7 +336,7 @@ class ZnunyClient
             ));
         }
 
-        event(new ZnunyResponseReceived(
+        $this->fire(new ZnunyResponseReceived(
             connection: $this->connection,
             operation: $operation,
             responseTimeMs: $elapsed,
@@ -364,7 +406,7 @@ class ZnunyClient
     private function headersFor(PreparedRequest $request): array
     {
         $own = array_change_key_case($request->headers, CASE_LOWER);
-        $configured = $this->settings->options['headers'] ?? [];
+        $configured = $this->settings->options()['headers'] ?? [];
 
         return array_merge(
             array_filter(
@@ -385,25 +427,44 @@ class ZnunyClient
     }
 
     /**
+     * Dispatch one of the client's events. Listeners are application code: when one of them
+     * calls Znuny and that call fails, the failure is the application's, whatever the package
+     * is handling for the call that fired the event.
+     */
+    private function fire(object $event): void
+    {
+        $handled = $this->handled;
+        $this->handled = [];
+
+        try {
+            event($event);
+        } finally {
+            $this->handled = $handled;
+        }
+    }
+
+    /**
      * Dispatch the failure event, write the error log and hand the exception back for throwing.
-     * An expired session that call() replaces is no failure: it is only logged as information.
+     * A failure that a caller handles itself (see expecting()) is only logged as information.
      *
      * @param  array<string, mixed>  $redacted
      */
     protected function failed(string $operation, PreparedRequest $request, array $redacted, ZnunyException $exception): ZnunyException
     {
-        if ($exception instanceof ZnunySessionExpiredException && $this->replacesExpiredSession) {
-            // Znuny drops idle sessions long before the cached session ID runs out. call()
-            // logs in again and repeats the request, so nothing has failed yet.
-            $this->log('info', 'log_requests', 'Znuny session expired, logging in again', [
-                'connection' => $this->connection,
-                'operation' => $operation,
-            ]);
+        foreach (array_reverse($this->handled) as $scope) {
+            if ($scope['handles']($exception)) {
+                $this->log('info', 'log_requests', $scope['message'], [
+                    'connection' => $this->connection,
+                    'operation' => $operation,
+                    'code' => $exception->getErrorCode(),
+                    'message' => $exception->getMessage(),
+                ]);
 
-            return $exception;
+                return $exception;
+            }
         }
 
-        event(new ZnunyRequestFailed(
+        $this->fire(new ZnunyRequestFailed(
             connection: $this->connection,
             operation: $operation,
             exception: $exception,
@@ -427,6 +488,8 @@ class ZnunyClient
      * Write a warning to the package's log channel, if error logging is enabled.
      *
      * @param  array<string, mixed>  $context
+     *
+     * @internal
      */
     public function warn(string $message, array $context = []): void
     {
@@ -438,11 +501,12 @@ class ZnunyClient
      */
     protected function log(string $level, string $toggle, string $message, array|Closure $context): void
     {
-        if (! config('znuny.logging.enabled') || ! config("znuny.logging.{$toggle}")) {
+        if (! Setting::boolean(true, config('znuny.logging.enabled'))
+            || ! Setting::boolean(self::LOG_DEFAULTS[$toggle] ?? true, config("znuny.logging.{$toggle}"))) {
             return;
         }
 
-        Log::channel((string) config('znuny.logging.channel', 'znuny'))
+        Log::channel(Setting::string('znuny', config('znuny.logging.channel')))
             ->{$level}($message, $context instanceof Closure ? $context() : $context);
     }
 
@@ -476,7 +540,7 @@ class ZnunyClient
 
         // The connection's own request options (proxy, client certificate, ...). They cannot
         // name "verify" or a timeout: ConnectionConfig accepts a fixed list only.
-        $options = array_diff_key($this->settings->options, ['headers' => true]);
+        $options = array_diff_key($this->settings->options(), ['headers' => true]);
 
         if ($options !== []) {
             $client = $client->withOptions($options);

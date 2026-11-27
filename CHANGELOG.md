@@ -4,6 +4,40 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [1.0.0-rc.1] - 2026-11-27
+
+The candidate for the first stable release; 1.0.0 follows with the same content unless the candidate turns something up. It removes what 0.4.0 deprecated, corrects the API before it is frozen and says what semantic versioning covers from now on. See [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- A "Stability" section in the README: what a minor release will not break, what is not covered, and the policy for deprecations and supported versions. Classes outside the promise are marked `@internal`, and a test fails when a new class is neither public nor internal.
+- Ticket IDs can be integers in every method of `tickets()`.
+- `Znuny::partialMock()` and Laravel's `partialMock()` work for the manager.
+- `SECURITY.md`, `CONTRIBUTING.md`, issue templates and a pull request template.
+
+### Changed
+
+- **Breaking:** a setting that is null or blank counts as not set everywhere. An empty `ZNUNY_SEARCH_LIMIT=` is the default of 500 instead of switching the limit off (`null` still does); an empty `ZNUNY_LOGGING_ENABLED=` no longer switches logging off; empty `ZNUNY_AUTH=`, `ZNUNY_USER_TYPE=` and `ZNUNY_AUTH_TRANSPORT=` take their defaults instead of failing; switches read `"off"` and `"no"` as off.
+- **Breaking:** `HistoryEntry::$createTime` is `$created` and `$createBy` is `$createdBy`.
+- **Breaking:** every data object throws an `Error` for an undefined property, as `Ticket` did. A renamed property's message names the new one, and it fails wherever it is read, also with `??`, `data_get()` and collection helpers such as `pluck()` and `sortBy()`, instead of reading as null.
+- **Breaking:** `lazy()` returns a `LazyCollection` instead of a `Generator`.
+- **Breaking:** `users()->outOfOffice()` is `users()->updateOutOfOffice()`.
+- **Breaking:** the password and the request options of a connection are no longer public properties of `ConnectionConfig`, so that logging or dumping `settings()` does not write them out.
+- **Breaking:** a custom operation is repeated after timeouts and server errors on a `GET` route only; the package no longer keeps a list of custom reading operations. The `operation-name` preset no longer contains the `QueueGet` route.
+- **Breaking:** `cert` and `ssl_key` in `options` must name existing files, `headers` must map names to values, and `Content-Type` cannot be configured. An option that is null or blank counts as not set; in a connection it removes the global option.
+- **Breaking:** `session()->user()` throws a `ZnunyServerException` when Znuny sends no session data.
+- `users()->updateOutOfOffice()` trims `login`, `email` and `search` and refuses a range whose start is after its end.
+- `Znuny::fake()` ignores `options` and `verify_ssl`: files that only exist in production do not stop a test.
+- `composer.json` no longer sets `minimum-stability: dev`.
+
+### Removed
+
+- **Breaking:** the lookups deprecated in 0.4.0: `Znuny::queues()`, `states()`, `priorities()`, `types()`, `customers()`, `flush()`, `flushAll()`, the command `znuny:cache-clear`, the `cache` config block, the classes behind them, and `QueueNotFoundException` and `CustomerNotFoundException`. Custom operations are called with `Znuny::call()`; their not-found errors raise `ZnunyNotFoundException`.
+
+### Fixed
+
+- A failure the package handles itself is no longer logged as an error and no longer fires `ZnunyRequestFailed`: a rejected batch that `findMany()` splits, a new ticket that cannot be read back after `save()`, a session already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode. A failing call made by an event listener is still reported.
+
 ## [0.4.0] - 2026-11-27
 
 Every operation Znuny ships now has a typed method, tested against Znuny 6.5 to 7.3. What does not rest on stock Znuny is deprecated. Four breaking changes; see [UPGRADE.md](UPGRADE.md).
@@ -198,7 +232,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v1.0.0-rc.1...HEAD
+[1.0.0-rc.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.4.0...v1.0.0-rc.1
 [0.4.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...v0.3.1

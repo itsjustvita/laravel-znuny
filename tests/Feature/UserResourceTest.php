@@ -61,6 +61,33 @@ final class UserResourceTest extends TestCase
         $this->assertSame(['2026-07-01', '2026-07-14'], [$this->sent()['OutOfOfficeEntries'][0]['StartDate'], $this->sent()['OutOfOfficeEntries'][0]['EndDate']]);
     }
 
+    public function test_user_values_are_trimmed(): void
+    {
+        $this->fakeZnuny();
+
+        Znuny::users()->updateOutOfOffice([
+            ['login' => ' jane.agent ', 'enabled' => false],
+            ['email' => "\tbob@example.com ", 'enabled' => false],
+            ['search' => ' Miller ', 'enabled' => false],
+        ]);
+
+        $this->assertSame(
+            [['UserLogin' => 'jane.agent', 'OutOfOffice' => 0], ['UserEmail' => 'bob@example.com', 'OutOfOffice' => 0], ['UserSearch' => 'Miller', 'OutOfOffice' => 0]],
+            $this->sent()['OutOfOfficeEntries'],
+        );
+        $this->assertStringContainsString('"jane.agent","",""', $this->sent()['OutOfOfficeEntriesCSVString']);
+    }
+
+    public function test_a_single_day_is_a_valid_range(): void
+    {
+        $this->fakeZnuny();
+
+        // Also when the time of the start is later than the time of the end on that day.
+        Znuny::users()->setOutOfOffice('jane.agent', CarbonImmutable::parse('2026-07-01 18:00'), CarbonImmutable::parse('2026-07-01 08:00'));
+
+        $this->assertSame(['2026-07-01', '2026-07-01'], [$this->sent()['OutOfOfficeEntries'][0]['StartDate'], $this->sent()['OutOfOfficeEntries'][0]['EndDate']]);
+    }
+
     public function test_clear_out_of_office_sends_no_dates(): void
     {
         $this->fakeZnuny();
@@ -74,7 +101,7 @@ final class UserResourceTest extends TestCase
     {
         $this->fakeZnuny();
 
-        Znuny::users()->outOfOffice([
+        Znuny::users()->updateOutOfOffice([
             ['login' => 'jane.agent', 'from' => CarbonImmutable::parse('2026-07-01'), 'until' => CarbonImmutable::parse('2026-07-14')],
             ['email' => 'bob@example.com', 'enabled' => true],
             ['search' => 'Miller', 'enabled' => false],
@@ -104,6 +131,7 @@ final class UserResourceTest extends TestCase
             'an end without a start' => [[['login' => 'jane.agent', 'until' => new \DateTimeImmutable('2026-07-14')]], '[from] and [until]'],
             'a start without an end' => [[['login' => 'jane.agent', 'from' => new \DateTimeImmutable('2026-07-01')]], '[from] and [until]'],
             'enabled as text' => [[['login' => 'jane.agent', 'enabled' => 'false']], '[enabled]'],
+            'a start after the end' => [[['login' => 'jane.agent', 'from' => new \DateTimeImmutable('2026-07-14'), 'until' => new \DateTimeImmutable('2026-07-01')]], 'is after its [until]'],
             // Znuny's mapping reads the entries from CSV lines and drops lines that start with "#".
             'a line break in the search' => [[['search' => "Miller\n#x"]], 'line break'],
         ];
@@ -118,7 +146,7 @@ final class UserResourceTest extends TestCase
         Http::fake();
 
         try {
-            Znuny::users()->outOfOffice($entries);
+            Znuny::users()->updateOutOfOffice($entries);
             $this->fail('The entries must be refused.');
         } catch (InvalidArgumentException $e) {
             $this->assertStringContainsString($hint, $e->getMessage());

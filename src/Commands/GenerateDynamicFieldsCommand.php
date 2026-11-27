@@ -5,6 +5,9 @@ namespace ItsJustVita\LaravelZnuny\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class GenerateDynamicFieldsCommand extends Command
 {
     protected $signature = 'znuny:generate-fields

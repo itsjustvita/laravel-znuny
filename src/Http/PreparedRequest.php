@@ -2,6 +2,9 @@
 
 namespace ItsJustVita\LaravelZnuny\Http;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 final readonly class PreparedRequest
 {
     /**

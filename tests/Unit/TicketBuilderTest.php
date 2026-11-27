@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\LazyCollection;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -739,6 +740,31 @@ final class TicketBuilderTest extends TestCase
         }
 
         $this->assertSame(['1', '2', '3', '4', '5'], $collected);
+    }
+
+    public function test_lazy_is_a_lazy_collection_that_loads_only_what_is_used(): void
+    {
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => ['1', '2', '3', '4', '5']]),
+            '*TicketGet*' => fn (Request $r) => Http::response(['Ticket' => array_map(
+                fn (mixed $id): array => $this->fakeTicket((string) $id),
+                (array) $r['TicketID'],
+            )]),
+        ]);
+
+        $tickets = Znuny::tickets()->where('X', 'Y')->lazy(chunkSize: 2);
+
+        $this->assertInstanceOf(LazyCollection::class, $tickets);
+        Http::assertNothingSent();
+
+        // Two tickets are one chunk: the other two chunks are never fetched.
+        $this->assertSame(['1', '2'], $tickets->map(fn ($ticket) => $ticket->id)->take(2)->values()->all());
+        $this->assertCount(1, collect(Http::recorded())->filter(fn (array $pair) => str_contains($pair[0]->url(), 'TicketGet')));
+
+        // It can be gone through again, which searches again.
+        $this->assertSame(5, $tickets->count());
+        $this->assertCount(2, collect(Http::recorded())->filter(fn (array $pair) => str_contains($pair[0]->url(), 'TicketSearch')));
     }
 
     private function fakeTicket(string $id): array

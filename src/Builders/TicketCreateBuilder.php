@@ -25,6 +25,8 @@ class TicketCreateBuilder
 
     /**
      * @param  array<string, mixed>  $ticket
+     *
+     * @internal
      */
     public function __construct(
         protected readonly ZnunyClient $client,
@@ -99,7 +101,11 @@ class TicketCreateBuilder
         }
 
         try {
-            $ticket = $this->resource->find($ticketId, withArticles: true, withDynamicFields: true);
+            // Whatever goes wrong here is dealt with below; the warning there is its record.
+            $ticket = $this->client->expecting(
+                fn (ZnunyException $e): bool => true,
+                fn (): Ticket => $this->resource->find($ticketId, withArticles: true, withDynamicFields: true),
+            );
         } catch (ZnunyException $e) {
             // The ticket exists, so failing here would make the caller create it again.
             $this->client->warn(sprintf(

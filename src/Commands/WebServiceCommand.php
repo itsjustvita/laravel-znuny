@@ -6,10 +6,14 @@ use Illuminate\Console\Command;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 use ItsJustVita\LaravelZnuny\Support\Yaml;
 use ItsJustVita\LaravelZnuny\WebService\WebServiceDefinition;
 use Symfony\Component\Console\Output\OutputInterface;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class WebServiceCommand extends Command
 {
     protected $signature = 'znuny:webservice
@@ -26,7 +30,7 @@ class WebServiceCommand extends Command
 
     public function handle(): int
     {
-        $name = (string) ($this->argument('connection') ?? config('znuny.default', 'default'));
+        $name = Setting::string('default', $this->argument('connection') ?? config('znuny.default'));
         $preset = $this->option('routes');
         $connection = config("znuny.connections.{$name}");
 
@@ -71,7 +75,7 @@ class WebServiceCommand extends Command
                 return self::FAILURE;
             }
 
-            $prefix = (string) config('znuny.webhooks.route_prefix', 'znuny/webhooks');
+            $prefix = Setting::string('znuny/webhooks', config('znuny.webhooks.route_prefix'));
             $endpoint = rtrim($url, '/').'/'.trim($prefix, '/');
             $host = strtolower(trim((string) parse_url($url, PHP_URL_HOST), '[]'));
 

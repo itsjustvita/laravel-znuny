@@ -46,7 +46,9 @@ final class RouteMapTest extends TestCase
         $this->assertSame('operation-name', $map->preset());
         $this->assertSame('POST /TicketGet/:TicketID', (string) $map->route('TicketGet'));
         $this->assertSame('POST /TicketUpdate/:TicketID', (string) $map->route('TicketUpdate'));
-        $this->assertSame('POST /QueueGet/:QueueID', (string) $map->route('QueueGet'));
+        // An operation the preset does not name, such as a custom one, goes to POST /<Operation>.
+        $this->assertSame('POST /QueueGet', (string) $map->route('QueueGet'));
+        $this->assertFalse($map->has('QueueGet'));
         $this->assertSame('POST /SessionCreate', (string) $map->route('SessionCreate'));
         $this->assertSame('POST /TicketSearch', (string) $map->route('TicketSearch'));
     }

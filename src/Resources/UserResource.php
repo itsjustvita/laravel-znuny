@@ -26,7 +26,7 @@ class UserResource extends Resource
      */
     public function setOutOfOffice(string $login, DateTimeInterface $from, DateTimeInterface $until): void
     {
-        $this->outOfOffice([['login' => $login, 'from' => $from, 'until' => $until]]);
+        $this->updateOutOfOffice([['login' => $login, 'from' => $from, 'until' => $until]]);
     }
 
     /**
@@ -37,7 +37,7 @@ class UserResource extends Resource
      */
     public function clearOutOfOffice(string $login): void
     {
-        $this->outOfOffice([['login' => $login, 'enabled' => false]]);
+        $this->updateOutOfOffice([['login' => $login, 'enabled' => false]]);
     }
 
     /**
@@ -48,7 +48,7 @@ class UserResource extends Resource
      *
      * @param  array<array-key, mixed>  $entries  list<array{login?: string, email?: string, search?: string, from?: DateTimeInterface, until?: DateTimeInterface, enabled?: bool}>
      */
-    public function outOfOffice(array $entries): void
+    public function updateOutOfOffice(array $entries): void
     {
         if ($entries === []) {
             throw new InvalidArgumentException('Pass at least one out-of-office entry.');
@@ -84,12 +84,14 @@ class UserResource extends Resource
                 continue;
             }
 
+            $value = trim($entry[$key]);
+
             // Znuny's own web service reads the entries from CSV lines and drops lines that start with "#".
-            if (preg_match('/[\r\n]/', $entry[$key]) === 1) {
+            if (preg_match('/[\r\n]/', $value) === 1) {
                 throw new InvalidArgumentException("The [{$key}] of out-of-office entry {$position} must not contain a line break.");
             }
 
-            $users[$znunyKey] = $entry[$key];
+            $users[$znunyKey] = $value;
         }
 
         if (count($users) !== 1) {
@@ -118,6 +120,11 @@ class UserResource extends Resource
             }
 
             $mapped[$znunyKey] = ZnunyTime::day($entry[$key]);
+        }
+
+        // Days are compared, so a range within one day is fine whatever its times of day.
+        if (isset($mapped['StartDate'], $mapped['EndDate']) && $mapped['StartDate'] > $mapped['EndDate']) {
+            throw new InvalidArgumentException("The [from] of out-of-office entry {$position} is after its [until].");
         }
 
         $mapped['OutOfOffice'] = ($entry['enabled'] ?? true) ? 1 : 0;

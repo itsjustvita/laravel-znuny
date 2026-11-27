@@ -3,10 +3,10 @@
 namespace ItsJustVita\LaravelZnuny\Builders;
 
 use DateTimeInterface;
-use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\LazyCollection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
 use ItsJustVita\LaravelZnuny\DynamicFields\FieldValue;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
@@ -22,8 +22,6 @@ class TicketBuilder
     /** @var array<string, mixed> */
     protected array $params = [];
 
-    protected ?int $limit = null;
-
     protected bool $withArticles = true;
 
     protected bool $withDynamicFields = true;
@@ -33,6 +31,9 @@ class TicketBuilder
     /** @var array<string, mixed> raw TicketGet parameters for get(), paginate() and lazy() */
     protected array $options = [];
 
+    /**
+     * @internal
+     */
     public function __construct(
         protected readonly ZnunyClient $client,
         protected readonly TicketResource $resource,
@@ -355,7 +356,6 @@ class TicketBuilder
 
     public function limit(int $limit): self
     {
-        $this->limit = $limit;
         $this->params['Limit'] = $limit;
 
         return $this;
@@ -444,14 +444,21 @@ class TicketBuilder
         );
     }
 
-    /** @return Generator<int, Ticket> */
-    public function lazy(int $chunkSize = 100): Generator
+    /**
+     * The tickets, fetched in chunks while they are gone through. Nothing is sent before
+     * that; going through the collection again searches again.
+     *
+     * @return LazyCollection<int, Ticket>
+     */
+    public function lazy(int $chunkSize = 100): LazyCollection
     {
-        foreach (array_chunk($this->ids()->all(), max(1, $chunkSize)) as $chunk) {
-            foreach ($this->fetch($chunk) as $ticket) {
-                yield $ticket;
+        return LazyCollection::make(function () use ($chunkSize) {
+            foreach (array_chunk($this->ids()->all(), max(1, $chunkSize)) as $chunk) {
+                foreach ($this->fetch($chunk) as $ticket) {
+                    yield $ticket;
+                }
             }
-        }
+        });
     }
 
     /**

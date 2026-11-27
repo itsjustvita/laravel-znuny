@@ -8,6 +8,8 @@ use Throwable;
 
 /**
  * Responses and recorded calls of one Znuny::fake(), shared by all its connections.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 final class FakeZnunyState
 {

@@ -4,6 +4,9 @@ namespace ItsJustVita\LaravelZnuny\Exceptions;
 
 use Throwable;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 class ExceptionMapper
 {
     private const VALIDATION_SUFFIXES = ['MissingParameter', 'InvalidParameter', 'WrongStructure', 'EmptyRequest'];
@@ -213,8 +216,6 @@ class ExceptionMapper
     {
         return match (true) {
             str_starts_with($operation, 'Ticket') => new TicketNotFoundException($message),
-            str_starts_with($operation, 'Queue') => new QueueNotFoundException($message),
-            str_starts_with($operation, 'Customer') => new CustomerNotFoundException($message),
             default => new ZnunyNotFoundException($message),
         };
     }

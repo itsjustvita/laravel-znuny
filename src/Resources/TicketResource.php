@@ -17,12 +17,18 @@ use ItsJustVita\LaravelZnuny\Events\ZnunyArticleAdded;
 use ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
 
 /**
  * @mixin TicketBuilder
  */
 class TicketResource extends Resource
 {
+    /*
+     * A ticket ID may be given as a string, as Znuny returns it, or as an integer, as
+     * applications often store it. Tickets and events carry it as a string.
+     */
+
     /** A rejected batch of up to this many tickets is fetched ticket by ticket. */
     private const SINGLE_FETCH_THRESHOLD = 8;
 
@@ -41,8 +47,9 @@ class TicketResource extends Resource
     /**
      * @param  array<string, mixed>  $options  raw TicketGet parameters, e.g. ['Extended' => 1]; they override the flags
      */
-    public function find(string $ticketId, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false, array $options = []): Ticket
+    public function find(string|int $ticketId, bool $withArticles = false, bool $withDynamicFields = false, bool $withAttachments = false, array $options = []): Ticket
     {
+        $ticketId = (string) $ticketId;
         $payload = ['TicketID' => $ticketId] + array_merge(self::fetchOptions($withArticles, $withDynamicFields, $withAttachments), $options);
         $data = $this->client->call('TicketGet', $payload)['Ticket'][0] ?? null;
 
@@ -122,8 +129,10 @@ class TicketResource extends Resource
      * @param  array<string, mixed>  $ticket  ticket attributes (camelCase or Znuny keys)
      * @param  array<string, mixed>  $dynamicFields  name => value
      */
-    public function update(string $ticketId, array $ticket = [], array $dynamicFields = []): void
+    public function update(string|int $ticketId, array $ticket = [], array $dynamicFields = []): void
     {
+        $ticketId = (string) $ticketId;
+
         if ($ticket === [] && $dynamicFields === []) {
             throw new InvalidArgumentException('Nothing to update: pass ticket attributes and/or dynamic fields.');
         }
@@ -158,8 +167,9 @@ class TicketResource extends Resource
      * @param  list<Attachment>  $attachments
      * @return string|null the ArticleID of the new article
      */
-    public function addArticle(string $ticketId, array $article, array $attachments = []): ?string
+    public function addArticle(string|int $ticketId, array $article, array $attachments = []): ?string
     {
+        $ticketId = (string) $ticketId;
         $payload = [
             'TicketID' => $ticketId,
             'Article' => TicketInputMapper::mapArticle($article),
@@ -183,17 +193,17 @@ class TicketResource extends Resource
         return $articleId;
     }
 
-    public function close(string $ticketId, string $state = 'closed successful'): void
+    public function close(string|int $ticketId, string $state = 'closed successful'): void
     {
         $this->update($ticketId, ['state' => $state]);
     }
 
-    public function lock(string $ticketId): void
+    public function lock(string|int $ticketId): void
     {
         $this->update($ticketId, ['lock' => 'lock']);
     }
 
-    public function unlock(string $ticketId): void
+    public function unlock(string|int $ticketId): void
     {
         $this->update($ticketId, ['lock' => 'unlock']);
     }
@@ -201,7 +211,7 @@ class TicketResource extends Resource
     /**
      * @param  string|int  $owner  the agent's login, or an int for the agent's ID
      */
-    public function assign(string $ticketId, string|int $owner): void
+    public function assign(string|int $ticketId, string|int $owner): void
     {
         $this->update($ticketId, is_int($owner) ? ['ownerId' => $owner] : ['owner' => $owner]);
     }
@@ -209,7 +219,7 @@ class TicketResource extends Resource
     /**
      * @param  string|int  $queue  the queue's name, or an int for the queue's ID
      */
-    public function move(string $ticketId, string|int $queue): void
+    public function move(string|int $ticketId, string|int $queue): void
     {
         $this->update($ticketId, is_int($queue) ? ['queueId' => $queue] : ['queue' => $queue]);
     }
@@ -218,7 +228,7 @@ class TicketResource extends Resource
      * Set a pending state and its time. Znuny accepts a pending time only together with a
      * pending state; it is read to the minute in Znuny's time zone.
      */
-    public function setPending(string $ticketId, DateTimeInterface $until, string $state = 'pending reminder'): void
+    public function setPending(string|int $ticketId, DateTimeInterface $until, string $state = 'pending reminder'): void
     {
         $this->update($ticketId, ['state' => $state, 'pendingTime' => $until]);
     }
@@ -226,8 +236,9 @@ class TicketResource extends Resource
     /**
      * @return Collection<int, HistoryEntry>
      */
-    public function history(string $ticketId): Collection
+    public function history(string|int $ticketId): Collection
     {
+        $ticketId = (string) $ticketId;
         $entries = $this->client->call('TicketHistoryGet', ['TicketID' => $ticketId])['TicketHistory'][0]['History'] ?? [];
 
         return collect(is_array($entries) ? $entries : [])
@@ -287,6 +298,8 @@ class TicketResource extends Resource
      * TicketGet flags for the requested related data.
      *
      * @return array<string, int>
+     *
+     * @internal
      */
     public static function fetchOptions(bool $withArticles, bool $withDynamicFields, bool $withAttachments): array
     {
@@ -318,8 +331,14 @@ class TicketResource extends Resource
      */
     protected function fetchChunk(array $ids, array $options): array
     {
+        // A rejected batch is split and fetched again, so the rejection is no failure yet.
+        $rejected = fn (ZnunyException $e): bool => $e instanceof ZnunyAccessDeniedException || $e instanceof TicketNotFoundException;
+
         try {
-            $rows = $this->client->call('TicketGet', ['TicketID' => $ids] + $options)['Ticket'] ?? [];
+            $rows = $this->client->expecting(
+                $rejected,
+                fn (): array => $this->client->call('TicketGet', ['TicketID' => $ids] + $options),
+            )['Ticket'] ?? [];
         } catch (ZnunyAccessDeniedException|TicketNotFoundException) {
             if (count($ids) === 1) {
                 return [];

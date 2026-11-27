@@ -38,7 +38,7 @@ final class PublishedConfigTest extends TestCase
         $this->registerWithConfigPublishedBefore();
 
         $this->assertSame([], config('znuny.http.options'));
-        $this->assertSame([], Znuny::client()->settings()->options);
+        $this->assertSame([], Znuny::client()->settings()->options());
     }
 
     public function test_values_of_the_published_config_are_kept(): void

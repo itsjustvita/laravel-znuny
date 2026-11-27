@@ -2,14 +2,12 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
-use ItsJustVita\LaravelZnuny\Exceptions\CustomerNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ExceptionMapper;
 use ItsJustVita\LaravelZnuny\Exceptions\GenericZnunyException;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidPriorityException;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidQueueException;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidStateException;
-use ItsJustVita\LaravelZnuny\Exceptions\QueueNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
@@ -84,16 +82,19 @@ final class ExceptionMapperTest extends TestCase
         $this->assertInstanceOf(InvalidQueueException::class, $exception);
     }
 
-    public function test_it_maps_queue_not_found_for_queue_operations(): void
+    public function test_not_found_errors_of_custom_operations_map_to_the_general_exception(): void
     {
-        $exception = $this->mapper->fromErrorResponse(
-            body: ['Error' => ['ErrorCode' => 'QueueGet.NotFound', 'ErrorMessage' => 'Queue not found']],
-            operation: 'QueueGet',
-            connection: 'default',
-            payload: [],
-        );
+        foreach (['QueueGet' => 'Queue not found', 'CustomerUserGet' => 'Customer not found'] as $operation => $message) {
+            $exception = $this->mapper->fromErrorResponse(
+                body: ['Error' => ['ErrorCode' => $operation.'.NotFound', 'ErrorMessage' => $message]],
+                operation: $operation,
+                connection: 'default',
+                payload: [],
+            );
 
-        $this->assertInstanceOf(QueueNotFoundException::class, $exception);
+            // 0.x had exceptions of their own for queues and customers, with the lookups that needed them.
+            $this->assertSame(ZnunyNotFoundException::class, $exception::class);
+        }
     }
 
     public function test_it_maps_rate_limit(): void
@@ -193,18 +194,6 @@ final class ExceptionMapperTest extends TestCase
         );
 
         $this->assertInstanceOf(InvalidDynamicFieldException::class, $exception);
-    }
-
-    public function test_it_maps_customer_not_found(): void
-    {
-        $exception = $this->mapper->fromErrorResponse(
-            body: ['Error' => ['ErrorCode' => 'CustomerUserGet.NotFound', 'ErrorMessage' => 'Customer not found']],
-            operation: 'CustomerUserGet',
-            connection: 'default',
-            payload: [],
-        );
-
-        $this->assertInstanceOf(CustomerNotFoundException::class, $exception);
     }
 
     public function test_unknown_not_found_falls_back_to_base_not_found(): void

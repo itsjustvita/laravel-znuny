@@ -7,6 +7,7 @@ use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
+use ItsJustVita\LaravelZnuny\Support\Redactor;
 use ItsJustVita\LaravelZnuny\Support\Setting;
 
 final readonly class ConnectionConfig
@@ -49,12 +50,14 @@ final readonly class ConnectionConfig
      * @param  int<1, max>  $batchSize
      * @param  int<1, max>|null  $searchLimit
      * @param  array<string, mixed>  $options  Guzzle request options, see HTTP_OPTIONS
+     *
+     * @internal
      */
     public function __construct(
         public string $name,
         public string $baseUrl,
         public string $username,
-        public string $password,
+        private string $password,
         public RouteMap $routes,
         public string $auth,
         public string $userType,
@@ -67,13 +70,53 @@ final readonly class ConnectionConfig
         public int $batchSize,
         public string $timezone = 'UTC',
         public ?int $searchLimit = 500,
-        public array $options = [],
+        private array $options = [],
     ) {}
+
+    /**
+     * The password of the account. Not a public property, like the request options: someone
+     * who logs or serializes the settings of a connection must not write its secrets out.
+     *
+     * @internal
+     */
+    public function password(): string
+    {
+        return $this->password;
+    }
+
+    /**
+     * The request options, see HTTP_OPTIONS. They can hold proxy credentials and the
+     * passphrase of a key.
+     *
+     * @return array<string, mixed>
+     *
+     * @internal
+     */
+    public function options(): array
+    {
+        return $this->options;
+    }
+
+    /**
+     * What dump(), dd() and print_r() show.
+     *
+     * @return array<string, mixed>
+     */
+    public function __debugInfo(): array
+    {
+        return [
+            ...get_object_vars($this),
+            'password' => Redactor::REDACTED,
+            'options' => array_map(static fn (): string => Redactor::REDACTED, $this->options),
+        ];
+    }
 
     /**
      * @param  array<string, mixed>  $config  one entry of znuny.connections (or a runtime config)
      * @param  array<string, mixed>  $http  the global znuny.http config used as fallback
      * @param  string|null  $timezone  the global znuny.timezone used as fallback
+     *
+     * @internal
      */
     public static function fromArray(string $name, array $config, array $http = [], ?string $timezone = null): self
     {
@@ -107,12 +150,8 @@ final readonly class ConnectionConfig
             retryDelay: max(10, Setting::integer($owner, 'retry_delay', 100, $config['retry_delay'] ?? null, $http['retry_delay'] ?? null)),
             batchSize: max(1, Setting::integer($owner, 'batch_size', 50, $config['batch_size'] ?? null, $http['batch_size'] ?? null)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
-            searchLimit: self::searchLimit($name, match (true) {
-                array_key_exists('search_limit', $config) => $config['search_limit'],
-                array_key_exists('search_limit', $http) => $http['search_limit'],
-                default => 500,
-            }),
-            options: self::options($name, $http['options'] ?? null, $config['options'] ?? null),
+            searchLimit: self::searchLimit($name, $config, $http),
+            options: self::optionsFrom($name, $http['options'] ?? null, $config['options'] ?? null),
         );
     }
 
@@ -122,10 +161,12 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * Cache key for this connection's session and lookups. It covers the target and the
+     * Cache key for this connection's session. It covers the target and the
      * credentials, so connections that share a name (or a login with another password)
      * never share cached data. $secret (the app key) keeps the credentials from being
      * guessed from the key.
+     *
+     * @internal
      */
     public function identityKey(string $secret = ''): string
     {
@@ -136,6 +177,8 @@ final readonly class ConnectionConfig
 
     /**
      * The request field Znuny expects for the login of this user type.
+     *
+     * @internal
      */
     public function loginKey(): string
     {
@@ -145,6 +188,8 @@ final readonly class ConnectionConfig
     /**
      * Znuny's OTRSTimeZone: the time zone of the dates Znuny reads and returns. The
      * connection's own value wins over the global one; without either it is UTC, Znuny's default.
+     *
+     * @internal
      */
     public static function timezoneFor(string $connection, mixed $own, mixed $global = null): string
     {
@@ -181,15 +226,34 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * The most tickets a search without limit() may match. Without it (null or blank) no
-     * limit is sent and Znuny cuts the result off at its own SearchLimit.
+     * The most tickets a search without limit() may match: the connection's value, then the
+     * global one, then 500. Null is a value of its own and switches the limit off, so that no
+     * limit is sent and Znuny cuts the result off at its own SearchLimit. A blank string, as
+     * an empty ZNUNY_SEARCH_LIMIT= gives, counts as not set: an empty variable must not
+     * switch off the check that a search is complete.
      *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $http
      * @return int<1, max>|null
      */
-    private static function searchLimit(string $connection, mixed $value): ?int
+    private static function searchLimit(string $connection, array $config, array $http): ?int
     {
-        if (Setting::isBlank($value)) {
-            return null;
+        $value = 500;
+
+        foreach ([$config, $http] as $source) {
+            if (! array_key_exists('search_limit', $source)) {
+                continue;
+            }
+
+            if ($source['search_limit'] === null) {
+                return null;
+            }
+
+            if (! Setting::isBlank($source['search_limit'])) {
+                $value = $source['search_limit'];
+
+                break;
+            }
         }
 
         // Up to eight digits, like Znuny's own SearchLimit setting.
@@ -210,10 +274,12 @@ final readonly class ConnectionConfig
 
     /**
      * The request options of the connection: the global ones, replaced key by key by its own.
+     * An option that is null or blank is not set, as every setting: 'cert' => env('...') without
+     * the variable is no certificate, and for a connection it removes what the global options set.
      *
      * @return array<string, mixed>
      */
-    private static function options(string $connection, mixed $global, mixed $own): array
+    private static function optionsFrom(string $connection, mixed $global, mixed $own): array
     {
         $options = [];
 
@@ -249,14 +315,18 @@ final readonly class ConnectionConfig
                     ));
                 }
 
-                if ($key === 'headers') {
-                    if (! is_array($value)) {
-                        throw new ZnunyConfigurationException(
-                            "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
-                        );
-                    }
+                if (Setting::isBlank($value)) {
+                    unset($options[$key]);
 
-                    self::refuseAuthenticationHeaders($connection, $value);
+                    continue;
+                }
+
+                if ($key === 'headers') {
+                    self::checkHeaders($connection, $value);
+                }
+
+                if ($key === 'cert' || $key === 'ssl_key') {
+                    self::checkFile($connection, $key, $value);
                 }
 
                 $options[$key] = $value;
@@ -267,22 +337,51 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * Znuny copies the X-OTRS-Header-* authentication headers into the request, over its
-     * body. A configured one would therefore replace the authentication the package sends
-     * in the body of POST, PATCH and DELETE requests.
-     *
-     * @param  array<array-key, mixed>  $headers
+     * Headers must map names to values, and must not be ones the package sets itself. Znuny
+     * copies the X-OTRS-Header-* authentication headers into the request, over its body, so
+     * a configured one would replace the authentication the package sends in the body of
+     * POST, PATCH and DELETE requests. The content type belongs to the request body.
      */
-    private static function refuseAuthenticationHeaders(string $connection, array $headers): void
+    private static function checkHeaders(string $connection, mixed $headers): void
     {
-        $own = array_map(strtolower(...), array_values(RequestBuilder::AUTH_HEADERS));
+        if (! is_array($headers)) {
+            throw new ZnunyConfigurationException(
+                "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
+            );
+        }
+
+        $own = [...array_map(strtolower(...), array_values(RequestBuilder::AUTH_HEADERS)), 'content-type'];
 
         foreach (array_keys($headers) as $header) {
-            if (in_array(strtolower((string) $header), $own, true)) {
+            if (! is_string($header)) {
                 throw new ZnunyConfigurationException(
-                    "Znuny connection [{$connection}] cannot set the header [{$header}] in [options]: the package sends the authentication itself."
+                    "Znuny connection [{$connection}]: [headers] in [options] must map header names to values, e.g. ['X-Api' => '1']."
                 );
             }
+
+            if (in_array(strtolower($header), $own, true)) {
+                throw new ZnunyConfigurationException(
+                    "Znuny connection [{$connection}] cannot set the header [{$header}] in [options]: the package sets it itself."
+                );
+            }
+        }
+    }
+
+    /**
+     * A client certificate or key: the path of a file, or the path and its passphrase. A
+     * missing file is reported here, when the connection is built, and not by the first request.
+     */
+    private static function checkFile(string $connection, string $option, mixed $value): void
+    {
+        $file = is_array($value) ? ($value[0] ?? null) : $value;
+
+        if (! is_string($file) || ! is_file($file)) {
+            throw new ZnunyConfigurationException(sprintf(
+                'Znuny connection [%s]: the [%s] file [%s] in [options] does not exist.',
+                $connection,
+                $option,
+                is_string($file) ? $file : get_debug_type($file),
+            ));
         }
     }
 
@@ -320,7 +419,8 @@ final readonly class ConnectionConfig
      */
     private static function oneOf(string $connection, string $key, mixed $value, array $allowed): string
     {
-        $value = strtolower(trim((string) ($value ?? $allowed[0])));
+        // Blank counts as not set, like an empty variable in .env.
+        $value = Setting::isBlank($value) ? $allowed[0] : strtolower(trim((string) $value));
 
         if (! in_array($value, $allowed, true)) {
             throw new ZnunyConfigurationException(sprintf(

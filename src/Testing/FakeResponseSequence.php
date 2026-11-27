@@ -10,16 +10,25 @@ final class FakeResponseSequence
     /** @var list<mixed> */
     private array $responses;
 
+    /**
+     * @internal
+     */
     public function __construct(mixed ...$responses)
     {
         $this->responses = array_values($responses);
     }
 
+    /**
+     * @internal
+     */
     public function isEmpty(): bool
     {
         return $this->responses === [];
     }
 
+    /**
+     * @internal
+     */
     public function next(): mixed
     {
         return array_shift($this->responses);

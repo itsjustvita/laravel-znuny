@@ -2,6 +2,9 @@
 
 namespace ItsJustVita\LaravelZnuny\Support;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 final class Redactor
 {
     public const REDACTED = '[REDACTED]';

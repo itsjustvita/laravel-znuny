@@ -11,6 +11,8 @@ use ItsJustVita\LaravelZnuny\ZnunyClient;
 /**
  * Answers operations from Znuny::fake() instead of sending HTTP requests. Routing, logins
  * and request events do not happen; everything above call() runs as usual.
+ *
+ * @internal Not covered by the package's stability promise.
  */
 class FakeZnunyClient extends ZnunyClient
 {

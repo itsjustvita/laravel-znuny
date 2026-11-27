@@ -68,8 +68,7 @@ final class WebServiceDefinitionTest extends TestCase
         $this->assertSame(['POST', '/TicketGet/:TicketID'], $routes['TicketGet']);
         $this->assertSame(['POST', '/SessionCreate'], $routes['SessionCreate']);
         $this->assertSame(['POST', '/TicketHistoryGet'], $routes['TicketHistoryGet']);
-        $this->assertArrayNotHasKey('QueueGet', $routes);
-        $this->assertSame(['QueueGet'], $definition->skipped());
+        $this->assertSame([], $definition->skipped());
     }
 
     public function test_the_classic_preset_keeps_its_ticket_list_route(): void

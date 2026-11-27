@@ -106,28 +106,34 @@ final class ConnectionConfigTest extends TestCase
     {
         $config = $this->make(
             ['options' => ['proxy' => 'http://proxy.a:3128']],
-            ['options' => ['proxy' => 'http://proxy.global:3128', 'cert' => '/etc/ssl/client.pem']],
+            ['options' => ['proxy' => 'http://proxy.global:3128', 'force_ip_resolve' => 'v4']],
         );
 
-        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'cert' => '/etc/ssl/client.pem'], $config->options);
-        $this->assertSame([], $this->make()->options);
-        $this->assertSame([], $this->make(['options' => null], ['options' => []])->options);
+        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'force_ip_resolve' => 'v4'], $config->options());
+        $this->assertSame([], $this->make()->options());
+        $this->assertSame([], $this->make(['options' => null], ['options' => []])->options());
     }
 
     public function test_every_accepted_http_option_is_kept(): void
     {
-        $options = [
-            'proxy' => 'http://proxy.internal:3128',
-            'cert' => ['/etc/ssl/client.pem', 'passphrase'],
-            'ssl_key' => '/etc/ssl/client.key',
-            'headers' => ['X-Forwarded-Auth' => 'abc'],
-            'auth' => ['user', 'password'],
-            'force_ip_resolve' => 'v4',
-            'version' => '1.1',
-        ];
+        $file = (string) tempnam(sys_get_temp_dir(), 'znuny-cert-');
 
-        $this->assertSame($options, $this->make(['options' => $options])->options);
-        $this->assertSame(array_keys($options), ConnectionConfig::HTTP_OPTIONS);
+        try {
+            $options = [
+                'proxy' => 'http://proxy.internal:3128',
+                'cert' => [$file, 'passphrase'],
+                'ssl_key' => $file,
+                'headers' => ['X-Forwarded-Auth' => 'abc'],
+                'auth' => ['user', 'password'],
+                'force_ip_resolve' => 'v4',
+                'version' => '1.1',
+            ];
+
+            $this->assertSame($options, $this->make(['options' => $options])->options());
+            $this->assertSame(array_keys($options), ConnectionConfig::HTTP_OPTIONS);
+        } finally {
+            unlink($file);
+        }
     }
 
     /**
@@ -148,6 +154,12 @@ final class ConnectionConfigTest extends TestCase
             'a string from .env' => ['proxy=http://proxy.internal:3128', 'must be an array of named options'],
             'a list without names' => [['http://proxy.internal:3128'], 'must be an array of named options'],
             'headers that are no array' => [['headers' => 'X-Api: 1'], '[headers] in [options] must be an array'],
+            'headers as a list of lines' => [['headers' => ['X-Api: 1']], 'must map header names to values'],
+            'the content type' => [['headers' => ['Content-Type' => 'text/plain']], 'cannot set the header [Content-Type]'],
+            'the content type in lower case' => [['headers' => ['content-type' => 'text/plain']], 'cannot set the header [content-type]'],
+            'a certificate that does not exist' => [['cert' => '/no/such/file.pem'], 'the [cert] file [/no/such/file.pem]'],
+            'a key that does not exist' => [['ssl_key' => ['/no/such/key.pem', 'passphrase']], 'the [ssl_key] file [/no/such/key.pem]'],
+            'a certificate that is no path' => [['cert' => 42], 'the [cert] file'],
             // Znuny reads these headers into the request, over the body the package sends.
             'the password header' => [['headers' => ['X-OTRS-Header-Password' => 'x']], 'cannot set the header [X-OTRS-Header-Password]'],
             'the session header in lower case' => [['headers' => ['x-otrs-header-sessionid' => 'x']], 'cannot set the header [x-otrs-header-sessionid]'],
@@ -168,6 +180,45 @@ final class ConnectionConfigTest extends TestCase
         $this->make(['options' => $options]);
     }
 
+    public function test_headers_may_be_null(): void
+    {
+        $this->assertSame(['proxy' => 'http://proxy.a:3128'], $this->make(['options' => ['proxy' => 'http://proxy.a:3128', 'headers' => null]])->options());
+        $this->assertSame([], $this->make(['options' => ['headers' => []]])->options()['headers']);
+    }
+
+    public function test_an_option_that_is_null_or_blank_counts_as_not_set(): void
+    {
+        // What 'cert' => env('ZNUNY_CLIENT_CERT') gives without the variable, or with an empty one.
+        $options = ['cert' => null, 'ssl_key' => '', 'proxy' => '  ', 'headers' => null, 'auth' => null];
+
+        $this->assertSame([], $this->make(['options' => $options])->options());
+        $this->assertSame([], $this->make([], ['options' => $options])->options());
+    }
+
+    public function test_a_connections_blank_option_removes_the_global_one(): void
+    {
+        $config = $this->make(
+            ['options' => ['proxy' => null, 'headers' => null, 'version' => '']],
+            ['options' => ['proxy' => 'http://proxy.global:3128', 'headers' => ['X-Global' => '1'], 'version' => '1.1', 'force_ip_resolve' => 'v4']],
+        );
+
+        $this->assertSame(['force_ip_resolve' => 'v4'], $config->options());
+    }
+
+    public function test_the_password_and_the_request_options_are_not_readable_properties(): void
+    {
+        $config = $this->make(['password' => 'top-secret', 'options' => ['auth' => ['proxyuser', 'proxy-secret']]]);
+
+        // Someone who logs or dumps the settings of a connection must not write its secrets out.
+        $this->assertStringNotContainsString('secret', (string) json_encode($config));
+        $this->assertStringNotContainsString('secret', print_r($config, true));
+        $this->assertArrayNotHasKey('password', get_object_vars($config));
+        $this->assertArrayNotHasKey('options', get_object_vars($config));
+        $this->assertSame('top-secret', $config->password());
+        $this->assertSame(['auth' => ['proxyuser', 'proxy-secret']], $config->options());
+        $this->assertSame('agent', $config->username);
+    }
+
     public function test_refused_options_are_refused_in_the_global_config_too(): void
     {
         $this->expectException(ZnunyConfigurationException::class);
@@ -183,14 +234,36 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(5000, $this->make([], ['search_limit' => ' 5000 '])->searchLimit);
     }
 
-    public function test_the_search_limit_is_500_unless_switched_off(): void
+    /**
+     * @return array<string, array{0: array<string, mixed>, 1: array<string, mixed>, 2: int|null}>
+     */
+    public static function searchLimits(): array
     {
-        $this->assertSame(500, $this->make()->searchLimit);
+        return [
+            'nothing set' => [[], [], 500],
+            'null on the connection switches it off' => [['search_limit' => null], [], null],
+            'null on the connection wins over a global number' => [['search_limit' => null], ['search_limit' => 5000], null],
+            'a global null switches it off' => [[], ['search_limit' => null], null],
+            'blank on the connection is the default' => [['search_limit' => ''], [], 500],
+            'blank globally is the default' => [[], ['search_limit' => ''], 500],
+            'blank on the connection falls back to a global null' => [['search_limit' => ''], ['search_limit' => null], null],
+            'blank on the connection falls back to a global number' => [['search_limit' => '  '], ['search_limit' => 750], 750],
+            'a number on the connection wins over a global null' => [['search_limit' => 250], ['search_limit' => null], 250],
+        ];
+    }
 
-        // Off: no limit is sent and Znuny cuts the result off at its own SearchLimit.
-        $this->assertNull($this->make(['search_limit' => null], ['search_limit' => 5000])->searchLimit);
-        $this->assertNull($this->make([], ['search_limit' => null])->searchLimit);
-        $this->assertNull($this->make(['search_limit' => ''])->searchLimit);
+    /**
+     * Null is a value of its own: it switches the limit off, so no limit is sent and Znuny
+     * cuts the result off at its own SearchLimit. A blank string, as an empty
+     * ZNUNY_SEARCH_LIMIT= gives, counts as not set, so it cannot switch the check off by accident.
+     *
+     * @param  array<string, mixed>  $connection
+     * @param  array<string, mixed>  $http
+     */
+    #[DataProvider('searchLimits')]
+    public function test_search_limit_null_is_off_and_blank_is_the_default(array $connection, array $http, ?int $expected): void
+    {
+        $this->assertSame($expected, $this->make($connection, $http)->searchLimit);
     }
 
     /**
@@ -400,7 +473,7 @@ final class ConnectionConfigTest extends TestCase
         $this->assertTrue($config['session']['per_host']);
         $this->assertArrayNotHasKey('pool_size', $config['http']);
         $this->assertArrayNotHasKey('queues', $config);
-        $this->assertArrayNotHasKey('services', $config['cache']['ttl']);
+        $this->assertArrayNotHasKey('cache', $config);
         $this->assertSame('token', $config['webhooks']['auth']['type']);
     }
 

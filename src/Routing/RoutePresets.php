@@ -46,11 +46,14 @@ final class RoutePresets
         self::OPERATION_NAME => [
             'TicketGet' => 'POST /TicketGet/:TicketID',
             'TicketUpdate' => 'POST /TicketUpdate/:TicketID',
-            'QueueGet' => 'POST /QueueGet/:QueueID',
         ],
     ];
 
-    /** @return array<string, string> */
+    /**
+     * @return array<string, string>
+     *
+     * @internal
+     */
     public static function get(string $name): array
     {
         if (! isset(self::PRESETS[$name])) {
@@ -64,7 +67,11 @@ final class RoutePresets
         return self::PRESETS[$name];
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     *
+     * @internal
+     */
     public static function names(): array
     {
         return array_keys(self::PRESETS);

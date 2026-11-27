@@ -4,6 +4,9 @@ namespace ItsJustVita\LaravelZnuny\Http;
 
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 
+/**
+ * @internal Not covered by the package's stability promise.
+ */
 final class QueryString
 {
     /**
