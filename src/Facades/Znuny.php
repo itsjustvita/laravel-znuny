@@ -34,6 +34,9 @@ use RuntimeException;
  * @method static void assertNothingCalled()
  * @method static list<array{connection: string, operation: string, payload: array<string, mixed>}> recorded(string|null $operation = null)
  *
+ * queues(), states(), priorities(), types(), customers(), flush() and flushAll() are deprecated
+ * since 0.4.0 and will be removed in 1.0: they need operations Znuny does not ship.
+ *
  * @see ZnunyManager
  * @see FakeZnunyManager
  */

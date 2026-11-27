@@ -8,6 +8,8 @@ use ItsJustVita\LaravelZnuny\Exceptions\QueueNotFoundException;
 
 /**
  * Needs the custom operations QueueList and QueueGet in the web service.
+ *
+ * @deprecated since 0.4.0, removed in 1.0: Znuny does not ship these operations. Use Znuny::call() for custom operations.
  */
 class QueueResource extends Resource
 {

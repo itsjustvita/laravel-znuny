@@ -12,10 +12,12 @@ class CacheClearCommand extends Command
         {--resource= : Optional resource name (queues, states, priorities, types)}
         {--all : Clear cache for every configured connection}';
 
-    protected $description = 'Clear Znuny lookup caches';
+    protected $description = 'Clear Znuny lookup caches (deprecated, removed in 1.0 with the lookups)';
 
     public function handle(ZnunyManager $manager): int
     {
+        $this->warn('znuny:cache-clear is deprecated and will be removed in 1.0, together with the lookups whose cache it clears: they need operations Znuny does not ship.');
+
         if ($this->option('all')) {
             $manager->flushAll();
             $this->info('Znuny lookup caches cleared for all connections.');

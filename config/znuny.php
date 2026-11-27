@@ -72,7 +72,8 @@ return [
 
     /*
     | Caching of the lookup lists (queues, states, priorities, types). Single lookups such
-    | as customers()->find() always ask Znuny.
+    | as customers()->find() always ask Znuny. Deprecated since 0.4.0 together with the
+    | lookups, which need operations Znuny does not ship; removed in 1.0.
     */
 
     'cache' => [
