@@ -669,6 +669,30 @@ final class TicketBuilderTest extends TestCase
         $this->assertSame(['1', '2'], collect($paginator->items())->pluck('id')->all());
     }
 
+    public function test_paginate_reads_the_page_from_the_request(): void
+    {
+        $this->fakeFiveTickets();
+
+        $describe = fn (LengthAwarePaginator $page): array => [
+            'page' => $page->currentPage(),
+            'ids' => collect($page->items())->pluck('id')->all(),
+        ];
+
+        Route::get('/support/tickets', fn (): array => [
+            'from the request' => $describe(Znuny::tickets()->paginate(perPage: 2)),
+            'given' => $describe(Znuny::tickets()->paginate(perPage: 2, page: 1)),
+        ]);
+
+        $this->get('/support/tickets?page=2')->assertExactJson([
+            'from the request' => ['page' => 2, 'ids' => ['3', '4']],
+            'given' => ['page' => 1, 'ids' => ['1', '2']],
+        ]);
+
+        // Without a page in the request, and for one that is no page, it is the first.
+        $this->get('/support/tickets')->assertJsonPath('from the request.page', 1);
+        $this->get('/support/tickets?page=abc')->assertJsonPath('from the request.ids', ['1', '2']);
+    }
+
     public function test_pagination_links_point_to_the_current_url(): void
     {
         $this->fakeFiveTickets();

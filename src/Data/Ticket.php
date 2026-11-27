@@ -7,9 +7,6 @@ use Error;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Concerns\HasAttributes;
 
-/**
- * @property-read string|null $customerUserID deprecated since 0.3.0, use $customerUserId; removed in 0.4.0
- */
 final readonly class Ticket
 {
     use HasAttributes;
@@ -133,25 +130,25 @@ final readonly class Ticket
     }
 
     /**
-     * Keeps the 0.2 property name $customerUserID working until 0.4.0.
+     * An undefined property is an error, not a silent null. $customerUserID was renamed to
+     * $customerUserId in 0.3.0 and removed in 0.4.0.
      */
     public function __get(string $name): mixed
     {
-        if ($name === 'customerUserID') {
-            trigger_error('Ticket::$customerUserID is deprecated, use $customerUserId.', E_USER_DEPRECATED);
-
-            return $this->customerUserId;
-        }
-
-        throw new Error(sprintf('Undefined property: %s::$%s', self::class, $name));
+        throw new Error(sprintf(
+            'Undefined property: %s::$%s%s',
+            self::class,
+            $name,
+            $name === 'customerUserID' ? ' (renamed to $customerUserId)' : '',
+        ));
     }
 
     /**
-     * isset(), ?? and data_get() on the 0.2 name behave as on a real property.
+     * Without this, isset() and ?? on an undefined property would call __get() and fail.
      */
     public function __isset(string $name): bool
     {
-        return $name === 'customerUserID' && $this->customerUserId !== null;
+        return false;
     }
 
     /**

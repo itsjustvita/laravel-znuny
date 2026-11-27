@@ -86,43 +86,21 @@ final class TicketTest extends TestCase
         $this->assertSame('jane', Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane'])->customerUserId);
     }
 
-    public function test_the_old_customer_user_id_name_still_works_but_is_deprecated(): void
+    public function test_the_old_customer_user_id_name_is_gone(): void
     {
         $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane']);
-        $deprecations = [];
 
-        set_error_handler(function (int $level, string $message) use (&$deprecations): bool {
-            $deprecations[] = $message;
-
-            return true;
-        }, E_USER_DEPRECATED);
+        // 0.3 kept $customerUserID working with a deprecation notice and announced its removal for 0.4.0.
+        $this->assertFalse(isset($ticket->customerUserID));
+        $this->assertSame('unknown', $ticket->customerUserID ?? 'unknown');
+        $this->assertSame([null], collect([$ticket])->pluck('customerUserID')->all());
 
         try {
-            $this->assertSame('jane', $ticket->customerUserID);
-        } finally {
-            restore_error_handler();
-        }
-
-        $this->assertCount(1, $deprecations);
-        $this->assertStringContainsString('customerUserId', $deprecations[0]);
-    }
-
-    public function test_the_old_customer_user_id_name_works_with_isset_and_null_coalescing(): void
-    {
-        $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane']);
-        $withoutCustomer = Ticket::fromZnunyResponse(['TicketID' => '2']);
-
-        set_error_handler(fn (): bool => true, E_USER_DEPRECATED);
-
-        try {
-            // 0.2 code such as $ticket->customerUserID ?? 'unknown' must keep its result.
-            $this->assertTrue(isset($ticket->customerUserID));
-            $this->assertSame('jane', $ticket->customerUserID ?? 'unknown');
-            $this->assertSame(['jane', null], collect([$ticket, $withoutCustomer])->pluck('customerUserID')->all());
-            $this->assertFalse(isset($withoutCustomer->customerUserID));
-            $this->assertSame('unknown', $withoutCustomer->customerUserID ?? 'unknown');
-        } finally {
-            restore_error_handler();
+            $ticket->customerUserID;
+            $this->fail('Reading the removed property must fail.');
+        } catch (\Error $e) {
+            // The message says where the value went.
+            $this->assertStringContainsString('$customerUserId', $e->getMessage());
         }
     }
 

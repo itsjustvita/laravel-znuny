@@ -423,14 +423,15 @@ class TicketBuilder
     }
 
     /**
-     * Fetches all matching IDs, then loads only the tickets of the requested page. A page
+     * Fetches all matching IDs, then loads only the tickets of the requested page. Without
+     * a page it is the page of the current request ("?page="), as with Eloquent; a page
      * below 1 is the first page. The paginator's links point to the current URL.
      *
      * @return LengthAwarePaginator<int, Ticket>
      */
-    public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
+    public function paginate(int $perPage = 25, ?int $page = null): LengthAwarePaginator
     {
-        $page = max(1, $page);
+        $page = max(1, $page ?? Paginator::resolveCurrentPage());
         $ids = $this->ids();
         $pageIds = $ids->slice(($page - 1) * $perPage, $perPage)->values()->all();
 
