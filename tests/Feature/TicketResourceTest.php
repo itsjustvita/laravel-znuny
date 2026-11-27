@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeZone;
 use Illuminate\Http\Client\Request;
@@ -514,6 +515,28 @@ final class TicketResourceTest extends TestCase
         Http::assertSent(fn (Request $r) => str_ends_with($r->url(), '/TicketUpdate/42')
             && ! isset($r['Ticket'])
             && $r['DynamicField'] === [['Name' => 'OrderId', 'Value' => 'ORD-2'], ['Name' => 'Flag', 'Value' => 1]]);
+    }
+
+    public function test_update_sends_dates_in_dynamic_fields_in_znunys_format(): void
+    {
+        config([
+            'znuny.connections.default.timezone' => 'Europe/Berlin',
+            'znuny.dynamic_fields' => ['DueOn' => ['type' => 'date'], 'DueAt' => ['type' => 'datetime']],
+        ]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketUpdate*' => Http::response(['TicketID' => '42']),
+        ]);
+
+        $date = CarbonImmutable::parse('2026-07-01 12:00:00', 'America/New_York');
+
+        Znuny::tickets()->update('42', dynamicFields: ['DueAt' => $date, 'DueOn' => $date]);
+
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'TicketUpdate/42') && $r['DynamicField'] === [
+            ['Name' => 'DueAt', 'Value' => '2026-07-01 18:00:00'],
+            ['Name' => 'DueOn', 'Value' => '2026-07-01 00:00:00'],
+        ]);
     }
 
     public function test_update_validates_dynamic_fields_before_sending(): void

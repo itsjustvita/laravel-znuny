@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Unit\Builders;
 
+use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -103,6 +104,16 @@ final class TicketInputMapperTest extends TestCase
         $this->assertSame(
             [['Name' => 'Flag', 'Value' => 1], ['Name' => 'Tags', 'Value' => ['a', 'b']]],
             TicketInputMapper::mapDynamicFields(['Flag' => true, 'Tags' => ['a', 'b']]),
+        );
+    }
+
+    public function test_dates_in_dynamic_fields_are_sent_in_znunys_format(): void
+    {
+        $date = CarbonImmutable::parse('2026-07-01 12:00:00', 'America/New_York');
+
+        $this->assertSame(
+            [['Name' => 'DueAt', 'Value' => '2026-07-01 18:00:00'], ['Name' => 'DueOn', 'Value' => '2026-07-01 00:00:00']],
+            TicketInputMapper::mapDynamicFields(['DueAt' => $date, 'DueOn' => $date], 'Europe/Berlin', ['DueOn' => ['type' => 'date']]),
         );
     }
 

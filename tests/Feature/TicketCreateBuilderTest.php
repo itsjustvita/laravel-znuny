@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\Tests\Feature;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -153,6 +154,32 @@ final class TicketCreateBuilderTest extends TestCase
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'TicketCreate')
             && $request['Ticket']['PendingTime'] === ['Year' => 2026, 'Month' => 7, 'Day' => 1, 'Hour' => 10, 'Minute' => 0]);
+    }
+
+    public function test_save_sends_dates_in_dynamic_fields_in_znunys_format(): void
+    {
+        config(['znuny.connections.default.timezone' => 'Europe/Berlin']);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketCreate*' => Http::response(['TicketID' => '99', 'TicketNumber' => '1']),
+            '*TicketGet*' => Http::response(['Ticket' => [[
+                'TicketID' => '99', 'TicketNumber' => '1',
+                'DynamicField' => [['Name' => 'DueAt', 'Value' => '2026-07-01 18:00:00']],
+            ]]]),
+        ]);
+
+        $date = CarbonImmutable::parse('2026-07-01 12:00:00', 'America/New_York');
+
+        $ticket = Znuny::tickets()->create(['title' => 't', 'queue' => 'Q', 'state' => 'new', 'priority' => '3 normal', 'customerUser' => 'c@example.com'])
+            ->withArticle(['subject' => 's', 'body' => 'b'])
+            ->withDynamicFields(['DueAt' => $date])
+            ->save();
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'TicketCreate')
+            && $request['DynamicField'] === [['Name' => 'DueAt', 'Value' => '2026-07-01 18:00:00']]);
+        // And read back as the same point in time.
+        $this->assertTrue($date->equalTo($ticket->dynamicField('DueAt')?->date()));
     }
 
     public function test_save_sends_attachments(): void

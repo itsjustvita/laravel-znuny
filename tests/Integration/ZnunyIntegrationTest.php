@@ -276,6 +276,39 @@ final class ZnunyIntegrationTest extends TestCase
         $this->assertSame([], $znuny->tickets()->whereDynamicField('OrderId', 'no-such-order')->whereDynamicField('OrderId', $orderId.'*', 'Like')->ids()->all());
     }
 
+    public function test_dates_in_dynamic_fields_round_trip(): void
+    {
+        // DueOn is a Znuny field of type "Date", which takes a day; DueAt is "Date / Time".
+        config(['znuny.dynamic_fields' => ['DueOn' => ['type' => 'date'], 'DueAt' => ['type' => 'datetime']]]);
+
+        $znuny = $this->znuny();
+        $title = 'Dynamic field dates '.uniqid();
+        $dueAt = CarbonImmutable::parse('2033-04-05 12:30:00', 'America/New_York');
+        $dueOn = CarbonImmutable::parse('2033-04-05 00:30:00', 'Asia/Tokyo');
+
+        $ticket = $this->newTicket($znuny, $title)->withDynamicFields(['DueAt' => $dueAt, 'DueOn' => $dueOn])->save();
+
+        $this->assertTrue($dueAt->equalTo($ticket->dynamicField('DueAt')?->date()));
+        $this->assertSame('2033-04-05 00:00:00', $ticket->dynamicField('DueOn')?->value);
+        $this->assertSame('2033-04-05', $ticket->dynamicField('DueOn')?->date()?->format('Y-m-d'));
+
+        $search = fn () => $znuny->tickets()->whereTitle($title);
+
+        $this->assertSame([$ticket->id], $search()
+            ->whereDynamicField('DueAt', $dueAt->subMinute(), 'GreaterThan')
+            ->whereDynamicField('DueAt', $dueAt->addMinute(), 'SmallerThan')
+            ->ids()->all());
+        $this->assertSame([], $search()->whereDynamicField('DueAt', $dueAt->addMinute(), 'GreaterThan')->ids()->all());
+        $this->assertSame([$ticket->id], $search()->whereDynamicField('DueOn', $dueOn)->ids()->all());
+        $this->assertSame([], $search()->whereDynamicField('DueOn', $dueOn->addDay())->ids()->all());
+
+        $znuny->tickets()->update($ticket->id, dynamicFields: ['DueAt' => $dueAt->addDay(), 'DueOn' => $dueOn->addDay()]);
+        $updated = $znuny->tickets()->find($ticket->id, withDynamicFields: true);
+
+        $this->assertTrue($dueAt->addDay()->equalTo($updated->dynamicField('DueAt')?->date()));
+        $this->assertSame('2033-04-06', $updated->dynamicField('DueOn')?->date()?->format('Y-m-d'));
+    }
+
     #[DataProvider('webServices')]
     public function test_the_session_user_is_the_user_of_the_connection(string $urlVariable, string $routes): void
     {

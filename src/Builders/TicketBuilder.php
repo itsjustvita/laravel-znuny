@@ -8,6 +8,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\DynamicFields\FieldValue;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\Support\ZnunyTime;
@@ -324,12 +325,14 @@ class TicketBuilder
      * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals, Empty.
      * Several calls for one field add up, e.g. GreaterThanEquals and SmallerThan for a range;
      * Znuny combines them with AND. The same operator again replaces its value.
+     * A date is sent in Znuny's format and time zone, like a date in a field that is written.
      * Needs a TicketSearch route with a request body, e.g. 'POST /TicketSearch'.
      */
     public function whereDynamicField(string $name, mixed $value, string $operator = 'Equals'): self
     {
         $field = 'DynamicField_'.$name;
         $conditions = is_array($this->params[$field] ?? null) ? $this->params[$field] : [];
+        $value = FieldValue::forZnuny($name, $value, $this->client->settings()->timezone, (array) config('znuny.dynamic_fields', []));
 
         return $this->where($field, [...$conditions, $operator => $value]);
     }

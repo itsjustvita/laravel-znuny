@@ -98,7 +98,10 @@ return [
     /*
     | Optional validation of dynamic field values before they are sent, e.g.
     | 'Segment' => ['type' => 'string', 'allowed' => ['business', 'private']],
-    | Types: string, integer, float, boolean, array. Options: allowed, min, max.
+    | Types: string, integer, float, boolean, array, date, datetime. Options: allowed, min, max.
+    |
+    | A DateTimeInterface is sent as date and time in Znuny's time zone. Declare a Znuny field
+    | of type "Date" as 'DueOn' => ['type' => 'date'], so that it is sent as a day.
     */
 
     'dynamic_fields' => [],

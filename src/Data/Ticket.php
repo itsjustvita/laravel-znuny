@@ -67,7 +67,7 @@ final readonly class Ticket
             ->values();
 
         $dynamicFields = collect(self::dynamicFieldRows($data))
-            ->map(fn (array $field): DynamicField => DynamicField::fromZnunyResponse($field))
+            ->map(fn (array $field): DynamicField => DynamicField::fromZnunyResponse($field, $timezone))
             ->values();
 
         $customerUser = $data['CustomerUser'] ?? null;
@@ -121,6 +121,15 @@ final readonly class Ticket
         }
 
         return CarbonImmutable::createFromTimestamp((int) $until, $timezone);
+    }
+
+    /**
+     * The dynamic field with this name, if the ticket was loaded with its dynamic fields and
+     * has it. Its value is $field->value; $field->date() reads a date field.
+     */
+    public function dynamicField(string $name): ?DynamicField
+    {
+        return $this->dynamicFields->first(fn (DynamicField $field): bool => $field->name === $name);
     }
 
     /**

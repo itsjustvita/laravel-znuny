@@ -152,6 +152,19 @@ final class TicketTest extends TestCase
         $this->assertNull(Ticket::fromZnunyResponse(['TicketID' => '1', 'StateType' => 'pending auto'])->pendingUntil);
     }
 
+    public function test_a_dynamic_field_is_found_by_name_and_reads_dates_in_the_tickets_time_zone(): void
+    {
+        $ticket = Ticket::fromZnunyResponse([
+            'TicketID' => '1',
+            'DynamicField' => [['Name' => 'OrderId', 'Value' => 'ORD-1'], ['Name' => 'DueAt', 'Value' => '2026-07-01 10:00:00']],
+        ], 'Europe/Berlin');
+
+        $this->assertSame('ORD-1', $ticket->dynamicField('OrderId')?->value);
+        $this->assertSame('2026-07-01 08:00:00', $ticket->dynamicField('DueAt')?->date()?->utc()->format('Y-m-d H:i:s'));
+        $this->assertNull($ticket->dynamicField('Unknown'));
+        $this->assertNull($ticket->dynamicField('Unknown')?->date());
+    }
+
     public function test_empty_dates_are_null(): void
     {
         $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'Created' => '', 'Changed' => '']);

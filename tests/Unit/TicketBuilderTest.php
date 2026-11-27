@@ -489,6 +489,31 @@ final class TicketBuilderTest extends TestCase
             && ($r['DynamicField_OrderId'] ?? null) === ['Equals' => 'ORD-2']);
     }
 
+    public function test_a_date_in_a_dynamic_field_condition_is_sent_in_znunys_format(): void
+    {
+        config([
+            'znuny.connections.default.timezone' => 'Europe/Berlin',
+            'znuny.dynamic_fields' => ['DueOn' => ['type' => 'date']],
+        ]);
+
+        Http::fake([
+            '*SessionCreate' => Http::response(['SessionID' => 'S1']),
+            '*TicketSearch*' => Http::response(['TicketID' => []]),
+        ]);
+
+        $date = new DateTimeImmutable('2026-07-01 12:00:00', new DateTimeZone('America/New_York'));
+
+        Znuny::tickets()
+            ->whereDynamicField('DueAt', $date, 'GreaterThan')
+            ->whereDynamicField('DueOn', $date)
+            ->whereDynamicField('Archived', true, 'Empty')
+            ->ids();
+
+        Http::assertSent(fn (Request $r) => ($r['DynamicField_DueAt'] ?? null) === ['GreaterThan' => '2026-07-01 18:00:00']
+            && ($r['DynamicField_DueOn'] ?? null) === ['Equals' => '2026-07-01 00:00:00']
+            && ($r['DynamicField_Archived'] ?? null) === ['Empty' => 1]);
+    }
+
     public function test_order_by_accepts_asc_and_desc(): void
     {
         Http::fake([

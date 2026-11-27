@@ -7,6 +7,7 @@ use DateTimeInterface;
 use DateTimeZone;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Data\Attachment;
+use ItsJustVita\LaravelZnuny\DynamicFields\FieldValue;
 
 class TicketInputMapper
 {
@@ -107,15 +108,19 @@ class TicketInputMapper
     }
 
     /**
+     * Dates are sent in Znuny's format and time zone, see FieldValue.
+     *
      * @param  array<string, mixed>  $input  name => value
+     * @param  string  $timezone  Znuny's OTRSTimeZone
+     * @param  array<array-key, mixed>  $definitions  the znuny.dynamic_fields config
      * @return list<array{Name: string, Value: mixed}>
      */
-    public static function mapDynamicFields(array $input): array
+    public static function mapDynamicFields(array $input, string $timezone = 'UTC', array $definitions = []): array
     {
         $fields = [];
 
         foreach ($input as $name => $value) {
-            $fields[] = ['Name' => (string) $name, 'Value' => is_bool($value) ? (int) $value : $value];
+            $fields[] = ['Name' => (string) $name, 'Value' => FieldValue::forZnuny((string) $name, $value, $timezone, $definitions)];
         }
 
         return $fields;

@@ -136,7 +136,11 @@ class TicketResource extends Resource
 
         if ($dynamicFields !== []) {
             DynamicFieldValidator::fromConfig()->validate($dynamicFields);
-            $payload['DynamicField'] = TicketInputMapper::mapDynamicFields($dynamicFields);
+            $payload['DynamicField'] = TicketInputMapper::mapDynamicFields(
+                $dynamicFields,
+                $this->client->settings()->timezone,
+                (array) config('znuny.dynamic_fields', []),
+            );
         }
 
         $this->client->call('TicketUpdate', $payload);

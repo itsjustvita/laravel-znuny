@@ -264,6 +264,25 @@ final class CommandsTest extends TestCase
         $this->assertStringContainsString('public function tags(array $value)', $contents);
     }
 
+    public function test_generate_fields_accepts_dates_for_the_date_types(): void
+    {
+        $target = storage_path('app/znuny-test/DynamicFieldsDates.php');
+        @unlink($target);
+
+        config()->set('znuny.dynamic_fields', [
+            'DueOn' => ['type' => 'date'],
+            'DueAt' => ['type' => 'datetime'],
+        ]);
+
+        $this->artisan('znuny:generate-fields', ['--output' => $target])->assertExitCode(0);
+
+        $contents = (string) file_get_contents($target);
+        $this->assertStringContainsString('public function dueOn(\\DateTimeInterface|string $value)', $contents);
+        $this->assertStringContainsString('public function dueAt(\\DateTimeInterface|string $value)', $contents);
+        // The generated class is valid PHP.
+        $this->assertSame('0', exec('php -l '.escapeshellarg($target).' >/dev/null 2>&1; echo $?'));
+    }
+
     public function test_test_connection_skips_session_create_in_credentials_mode(): void
     {
         config()->set('znuny.connections.default.auth', 'credentials');
