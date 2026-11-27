@@ -4,6 +4,9 @@ namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use ReflectionClass;
+use ReflectionClassConstant;
+use ReflectionMethod;
+use ReflectionProperty;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -68,6 +71,24 @@ final class PublicApiTest extends TestCase
         'ZnunyServiceProvider',
     ];
 
+    /**
+     * Public members of public classes that the promise leaves out. Every other public
+     * member of a public class is covered.
+     */
+    private const INTERNAL_MEMBERS = [
+        'Builders\TicketBuilder' => ['__construct()'],
+        'Builders\TicketCreateBuilder' => ['__construct()'],
+        'Config\ConnectionConfig' => ['__construct()', 'fromArray()', 'identityKey()', 'loginKey()', 'options()', 'password()', 'timezoneFor()'],
+        'Resources\TicketResource' => ['fetchOptions()'],
+        'Routing\Route' => ['__construct()', 'parse()'],
+        'Routing\RouteMap' => ['__construct()', 'fromConfig()'],
+        'Routing\RoutePresets' => ['get()', 'names()'],
+        'Testing\FakeResponseSequence' => ['__construct()', 'isEmpty()', 'next()'],
+        'Testing\FakeZnunyManager' => ['__construct()'],
+        'ZnunyClient' => ['__construct()', 'cachedSessionId()', 'expecting()', 'forgetSession()', 'identityKey()', 'warn()'],
+        'ZnunyManager' => ['__construct()'],
+    ];
+
     public function test_every_class_is_public_or_internal(): void
     {
         $public = [];
@@ -97,6 +118,74 @@ final class PublicApiTest extends TestCase
             .'Neither listed nor @internal: '.implode(', ', array_diff($public, $expected) ?: ['none'])."\n"
             .'Listed, but gone or @internal: '.implode(', ', array_diff($expected, $public) ?: ['none'])."\n"
             ."Add a new class to PUBLIC_CLASSES and to the README's Stability section, or mark it @internal.",
+        );
+    }
+
+    /**
+     * Marking a covered member @internal takes it out of the promise, which is a breaking
+     * change; taking the marker off one adds it to the promise. Neither should happen in passing.
+     */
+    public function test_the_internal_members_of_the_public_classes_are_the_listed_ones(): void
+    {
+        $internal = [];
+
+        foreach (self::PUBLIC_CLASSES as $name) {
+            $class = new ReflectionClass(self::NAMESPACE.$name);
+            $members = [];
+
+            foreach ($class->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                $members[$method->getName().'()'] = $method;
+            }
+
+            foreach ($class->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+                $members['$'.$property->getName()] = $property;
+            }
+
+            foreach ($class->getReflectionConstants(ReflectionClassConstant::IS_PUBLIC) as $constant) {
+                $members[$constant->getName()] = $constant;
+            }
+
+            $marked = array_keys(array_filter(
+                $members,
+                fn (ReflectionMethod|ReflectionProperty|ReflectionClassConstant $member): bool => $member->getDeclaringClass()->getName() === $class->getName()
+                    && str_contains((string) $member->getDocComment(), '@internal'),
+            ));
+
+            if ($marked !== []) {
+                sort($marked);
+                $internal[$name] = $marked;
+            }
+        }
+
+        $describe = fn (array $list): string => implode(', ', array_map(
+            fn (string $class, array $members): string => $class.': '.implode(' ', $members),
+            array_keys($list),
+            $list,
+        )) ?: 'none';
+
+        $added = [];
+        $removed = [];
+
+        foreach (array_keys($internal + self::INTERNAL_MEMBERS) as $name) {
+            $now = $internal[$name] ?? [];
+            $listed = self::INTERNAL_MEMBERS[$name] ?? [];
+
+            if ($diff = array_values(array_diff($now, $listed))) {
+                $added[$name] = $diff;
+            }
+
+            if ($diff = array_values(array_diff($listed, $now))) {
+                $removed[$name] = $diff;
+            }
+        }
+
+        $this->assertSame(
+            self::INTERNAL_MEMBERS,
+            $internal,
+            "The members marked @internal changed.\n"
+            .'Newly @internal (taken out of the stability promise): '.$describe($added)."\n"
+            .'No longer @internal, or gone (now covered by the promise): '.$describe($removed)."\n"
+            .'If that is meant, update INTERNAL_MEMBERS; taking a member out of the promise needs a major version.',
         );
     }
 }
