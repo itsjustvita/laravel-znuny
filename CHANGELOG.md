@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-27
+
 Every operation Znuny ships now has a typed method, tested against Znuny 6.5 to 7.3. What does not rest on stock Znuny is deprecated. Four breaking changes; see [UPGRADE.md](UPGRADE.md).
 
 ### Added
@@ -196,7 +198,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.2.2...v0.3.0
