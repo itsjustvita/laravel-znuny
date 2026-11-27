@@ -5,6 +5,7 @@ namespace ItsJustVita\LaravelZnuny\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Sleep;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 use ItsJustVita\LaravelZnuny\Support\TimeZoneCheck;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
@@ -24,7 +25,7 @@ class TestConnectionCommand extends Command
 
     public function handle(ZnunyManager $manager): int
     {
-        $name = (string) ($this->argument('connection') ?? config('znuny.default', 'default'));
+        $name = Setting::string('default', $this->argument('connection') ?? config('znuny.default'));
 
         try {
             $client = $manager->connection($name)->client();

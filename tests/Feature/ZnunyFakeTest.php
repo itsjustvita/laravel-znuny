@@ -199,7 +199,8 @@ final class ZnunyFakeTest extends TestCase
         config(['znuny.connections.default.search_limit' => null]);
         Znuny::fake(['TicketSearch' => ['TicketID' => array_map('strval', range(1, 600))]]);
 
-        $runtime = Znuny::build(['base_url' => 'https://runtime.test/ws', 'username' => 'r', 'password' => 'r', 'search_limit' => '']);
+        // Null switches the limit off; a blank value would be the default of 500.
+        $runtime = Znuny::build(['base_url' => 'https://runtime.test/ws', 'username' => 'r', 'password' => 'r', 'search_limit' => null]);
 
         $this->assertCount(600, Znuny::tickets()->query()->ids());
         $this->assertCount(600, $runtime->tickets()->query()->ids());

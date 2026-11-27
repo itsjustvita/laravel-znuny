@@ -9,6 +9,7 @@ use ItsJustVita\LaravelZnuny\Commands\GenerateDynamicFieldsCommand;
 use ItsJustVita\LaravelZnuny\Commands\RoutesCommand;
 use ItsJustVita\LaravelZnuny\Commands\TestConnectionCommand;
 use ItsJustVita\LaravelZnuny\Commands\WebServiceCommand;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 use ItsJustVita\LaravelZnuny\Webhooks\AuthenticateWebhook;
 use ItsJustVita\LaravelZnuny\Webhooks\WebhookController;
 
@@ -20,7 +21,7 @@ class ZnunyServiceProvider extends ServiceProvider
         $this->mergeNestedConfig(['http', 'session']);
 
         // Without a channel definition Laravel would write an emergency entry on every request.
-        $channel = (string) $this->app->make('config')->get('znuny.logging.channel', 'znuny');
+        $channel = Setting::string('znuny', $this->app->make('config')->get('znuny.logging.channel'));
 
         if ($this->app->make('config')->get("logging.channels.{$channel}") === null) {
             $this->app->make('config')->set("logging.channels.{$channel}", [
@@ -75,14 +76,14 @@ class ZnunyServiceProvider extends ServiceProvider
 
         $this->app->make('router')->aliasMiddleware('znuny.webhook', AuthenticateWebhook::class);
 
-        if ((bool) config('znuny.webhooks.enabled', false)) {
+        if (Setting::boolean(false, config('znuny.webhooks.enabled'))) {
             $this->registerWebhookRoutes();
         }
     }
 
     public function registerWebhookRoutes(): void
     {
-        $prefix = trim((string) config('znuny.webhooks.route_prefix', 'znuny/webhooks'), '/');
+        $prefix = trim(Setting::string('znuny/webhooks', config('znuny.webhooks.route_prefix')), '/');
         $middleware = array_merge((array) config('znuny.webhooks.middleware', ['api']), ['znuny.webhook']);
 
         Route::post($prefix.'/{event?}', WebhookController::class)

@@ -183,14 +183,36 @@ final class ConnectionConfigTest extends TestCase
         $this->assertSame(5000, $this->make([], ['search_limit' => ' 5000 '])->searchLimit);
     }
 
-    public function test_the_search_limit_is_500_unless_switched_off(): void
+    /**
+     * @return array<string, array{0: array<string, mixed>, 1: array<string, mixed>, 2: int|null}>
+     */
+    public static function searchLimits(): array
     {
-        $this->assertSame(500, $this->make()->searchLimit);
+        return [
+            'nothing set' => [[], [], 500],
+            'null on the connection switches it off' => [['search_limit' => null], [], null],
+            'null on the connection wins over a global number' => [['search_limit' => null], ['search_limit' => 5000], null],
+            'a global null switches it off' => [[], ['search_limit' => null], null],
+            'blank on the connection is the default' => [['search_limit' => ''], [], 500],
+            'blank globally is the default' => [[], ['search_limit' => ''], 500],
+            'blank on the connection falls back to a global null' => [['search_limit' => ''], ['search_limit' => null], null],
+            'blank on the connection falls back to a global number' => [['search_limit' => '  '], ['search_limit' => 750], 750],
+            'a number on the connection wins over a global null' => [['search_limit' => 250], ['search_limit' => null], 250],
+        ];
+    }
 
-        // Off: no limit is sent and Znuny cuts the result off at its own SearchLimit.
-        $this->assertNull($this->make(['search_limit' => null], ['search_limit' => 5000])->searchLimit);
-        $this->assertNull($this->make([], ['search_limit' => null])->searchLimit);
-        $this->assertNull($this->make(['search_limit' => ''])->searchLimit);
+    /**
+     * Null is a value of its own: it switches the limit off, so no limit is sent and Znuny
+     * cuts the result off at its own SearchLimit. A blank string, as an empty
+     * ZNUNY_SEARCH_LIMIT= gives, counts as not set, so it cannot switch the check off by accident.
+     *
+     * @param  array<string, mixed>  $connection
+     * @param  array<string, mixed>  $http
+     */
+    #[DataProvider('searchLimits')]
+    public function test_search_limit_null_is_off_and_blank_is_the_default(array $connection, array $http, ?int $expected): void
+    {
+        $this->assertSame($expected, $this->make($connection, $http)->searchLimit);
     }
 
     /**

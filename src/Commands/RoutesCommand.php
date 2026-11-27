@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Routing\Route;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 
 class RoutesCommand extends Command
 {
@@ -15,7 +16,7 @@ class RoutesCommand extends Command
 
     public function handle(): int
     {
-        $name = (string) ($this->argument('connection') ?? config('znuny.default', 'default'));
+        $name = Setting::string('default', $this->argument('connection') ?? config('znuny.default'));
         $config = config("znuny.connections.{$name}");
 
         try {

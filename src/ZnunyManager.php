@@ -140,7 +140,7 @@ class ZnunyManager
 
     protected function defaultConnection(): string
     {
-        return (string) $this->config('znuny.default', 'default');
+        return Setting::string('default', $this->config('znuny.default'));
     }
 
     /**
@@ -174,7 +174,7 @@ class ZnunyManager
     {
         $store = $this->config('znuny.session.cache_store');
         $cache = $store ? Cache::store($store) : Cache::store();
-        $prefix = (string) $this->config('znuny.session.cache_prefix', 'znuny:session:');
+        $prefix = Setting::string('znuny:session:', $this->config('znuny.session.cache_prefix'));
 
         // Znuny binds a session to the IP address that created it (SessionCheckRemoteIP). Hosts
         // that share a cache store but reach Znuny from different addresses would invalidate

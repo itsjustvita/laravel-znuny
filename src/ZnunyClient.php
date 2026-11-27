@@ -24,6 +24,7 @@ use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Support\Redactor;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 use stdClass;
 use Throwable;
 
@@ -37,6 +38,9 @@ class ZnunyClient
     protected const READ_OPERATIONS = [
         'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet', 'TimeAccountingGet',
     ];
+
+    /** What is logged unless the configuration says otherwise. */
+    private const LOG_DEFAULTS = ['log_requests' => true, 'log_responses' => false, 'log_errors' => true];
 
     protected readonly ConnectionConfig $settings;
 
@@ -91,7 +95,7 @@ class ZnunyClient
         }
 
         $sessionId = $this->sessionId();
-        $retry = (bool) config('znuny.session.auto_retry_on_expired', true);
+        $retry = Setting::boolean(true, config('znuny.session.auto_retry_on_expired'));
 
         // A listener of the request events may call Znuny itself, so the outer value is put back.
         $outer = $this->replacesExpiredSession;
@@ -437,11 +441,12 @@ class ZnunyClient
      */
     protected function log(string $level, string $toggle, string $message, array|Closure $context): void
     {
-        if (! config('znuny.logging.enabled') || ! config("znuny.logging.{$toggle}")) {
+        if (! Setting::boolean(true, config('znuny.logging.enabled'))
+            || ! Setting::boolean(self::LOG_DEFAULTS[$toggle] ?? true, config("znuny.logging.{$toggle}"))) {
             return;
         }
 
-        Log::channel((string) config('znuny.logging.channel', 'znuny'))
+        Log::channel(Setting::string('znuny', config('znuny.logging.channel')))
             ->{$level}($message, $context instanceof Closure ? $context() : $context);
     }
 

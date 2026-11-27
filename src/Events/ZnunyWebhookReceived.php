@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny\Events;
 
 use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 
 /**
  * Dispatched when Znuny calls the webhook endpoint. Contains only scalars and arrays,
@@ -47,7 +48,7 @@ final readonly class ZnunyWebhookReceived
 
     private static function defaultTimezone(): string
     {
-        $connection = (string) config('znuny.default', 'default');
+        $connection = Setting::string('default', config('znuny.default'));
 
         return ConnectionConfig::timezoneFor(
             $connection,

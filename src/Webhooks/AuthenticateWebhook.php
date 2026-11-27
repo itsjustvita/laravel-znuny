@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use ItsJustVita\LaravelZnuny\Support\Setting;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -44,7 +45,7 @@ class AuthenticateWebhook
             return $this->reject('ZNUNY_WEBHOOK_TOKEN is not set');
         }
 
-        $header = $request->header((string) ($config['header'] ?? 'X-Znuny-Token'));
+        $header = $request->header(Setting::string('X-Znuny-Token', $config['header'] ?? null));
 
         $candidates = [
             (string) $request->bearerToken(),

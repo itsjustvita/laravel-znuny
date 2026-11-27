@@ -51,6 +51,18 @@ final class Setting
     }
 
     /**
+     * A text setting, trimmed. Anything that is not a non-blank string or a number is the default.
+     */
+    public static function string(string $default, mixed $value): string
+    {
+        if (self::isBlank($value) || ! is_scalar($value)) {
+            return $default;
+        }
+
+        return trim((string) $value);
+    }
+
+    /**
      * A switch: true, false and the strings PHP reads as booleans ("on", "off", "yes",
      * "no", "1", "0"). Anything else, such as a typo, leaves the default in place.
      */

@@ -107,11 +107,7 @@ final readonly class ConnectionConfig
             retryDelay: max(10, Setting::integer($owner, 'retry_delay', 100, $config['retry_delay'] ?? null, $http['retry_delay'] ?? null)),
             batchSize: max(1, Setting::integer($owner, 'batch_size', 50, $config['batch_size'] ?? null, $http['batch_size'] ?? null)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
-            searchLimit: self::searchLimit($name, match (true) {
-                array_key_exists('search_limit', $config) => $config['search_limit'],
-                array_key_exists('search_limit', $http) => $http['search_limit'],
-                default => 500,
-            }),
+            searchLimit: self::searchLimit($name, $config, $http),
             options: self::options($name, $http['options'] ?? null, $config['options'] ?? null),
         );
     }
@@ -181,15 +177,34 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * The most tickets a search without limit() may match. Without it (null or blank) no
-     * limit is sent and Znuny cuts the result off at its own SearchLimit.
+     * The most tickets a search without limit() may match: the connection's value, then the
+     * global one, then 500. Null is a value of its own and switches the limit off, so that no
+     * limit is sent and Znuny cuts the result off at its own SearchLimit. A blank string, as
+     * an empty ZNUNY_SEARCH_LIMIT= gives, counts as not set: an empty variable must not
+     * switch off the check that a search is complete.
      *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $http
      * @return int<1, max>|null
      */
-    private static function searchLimit(string $connection, mixed $value): ?int
+    private static function searchLimit(string $connection, array $config, array $http): ?int
     {
-        if (Setting::isBlank($value)) {
-            return null;
+        $value = 500;
+
+        foreach ([$config, $http] as $source) {
+            if (! array_key_exists('search_limit', $source)) {
+                continue;
+            }
+
+            if ($source['search_limit'] === null) {
+                return null;
+            }
+
+            if (! Setting::isBlank($source['search_limit'])) {
+                $value = $source['search_limit'];
+
+                break;
+            }
         }
 
         // Up to eight digits, like Znuny's own SearchLimit setting.
@@ -320,7 +335,8 @@ final readonly class ConnectionConfig
      */
     private static function oneOf(string $connection, string $key, mixed $value, array $allowed): string
     {
-        $value = strtolower(trim((string) ($value ?? $allowed[0])));
+        // Blank counts as not set, like an empty variable in .env.
+        $value = Setting::isBlank($value) ? $allowed[0] : strtolower(trim((string) $value));
 
         if (! in_array($value, $allowed, true)) {
             throw new ZnunyConfigurationException(sprintf(
