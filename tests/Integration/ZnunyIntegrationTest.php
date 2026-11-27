@@ -20,6 +20,7 @@ use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAuthenticationException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyRouteNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
@@ -90,6 +91,37 @@ final class ZnunyIntegrationTest extends TestCase
             'password' => $password,
             'user_type' => 'customer',
         ]);
+    }
+
+    /**
+     * An agent in the group admin, for operations that need one.
+     */
+    private function admin(array $config = [], string $urlVariable = 'ZNUNY_INTEGRATION_URL'): ZnunyManager
+    {
+        $password = getenv('ZNUNY_INTEGRATION_ADMIN_PASSWORD');
+
+        if (! $password) {
+            $this->markTestSkipped('Set ZNUNY_INTEGRATION_ADMIN_USERNAME and ZNUNY_INTEGRATION_ADMIN_PASSWORD to test operations that need an administrator.');
+        }
+
+        return $this->znuny([
+            'username' => getenv('ZNUNY_INTEGRATION_ADMIN_USERNAME') ?: 'api-admin',
+            'password' => $password,
+        ] + $config, $urlVariable);
+    }
+
+    /**
+     * The data of a session created just now, by key. Znuny reads a user's data into the
+     * session at login, so only a new session shows what has changed since.
+     *
+     * @return array<string, mixed>
+     */
+    private function freshSessionData(string $login, string $password, string $userType = 'agent'): array
+    {
+        $znuny = $this->znuny(['username' => $login, 'password' => $password, 'user_type' => $userType, 'auth' => 'credentials']);
+        $sessionId = $znuny->call('SessionCreate')['SessionID'];
+
+        return array_column($znuny->call('SessionGet', ['SessionID' => $sessionId])['SessionData'], 'Value', 'Key');
     }
 
     /**
@@ -242,6 +274,148 @@ final class ZnunyIntegrationTest extends TestCase
         // Several conditions on one field: Znuny combines them with AND.
         $this->assertSame([$ticket->id], $znuny->tickets()->whereDynamicField('OrderId', $orderId.'*', 'Like')->whereDynamicField('OrderId', $orderId.'-2')->ids()->all());
         $this->assertSame([], $znuny->tickets()->whereDynamicField('OrderId', 'no-such-order')->whereDynamicField('OrderId', $orderId.'*', 'Like')->ids()->all());
+    }
+
+    /*
+     * What Znuny itself does with the operations the package wraps. These tests call Znuny
+     * directly, so a change in Znuny shows up here and not as a puzzling failure elsewhere.
+     */
+
+    public function test_znuny_returns_the_user_of_a_session(): void
+    {
+        $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
+        $agent = $this->freshSessionData($login, (string) getenv('ZNUNY_INTEGRATION_PASSWORD'));
+
+        $this->assertMatchesRegularExpression('/^\d+$/', (string) $agent['UserID']);
+        $this->assertSame($login, $agent['UserLogin']);
+        $this->assertSame('User', $agent['UserType']);
+
+        foreach (['UserFirstname', 'UserLastname', 'UserFullname', 'UserEmail'] as $key) {
+            $this->assertNotSame('', (string) ($agent[$key] ?? ''), $key);
+        }
+
+        $this->assertArrayNotHasKey('UserPw', $agent);
+        $this->assertArrayNotHasKey('UserChallengeToken', $agent);
+
+        $password = getenv('ZNUNY_INTEGRATION_CUSTOMER_PASSWORD');
+
+        if ($password) {
+            $customer = $this->freshSessionData($this->customerUser(), $password, 'customer');
+
+            $this->assertSame($this->customerUser(), $customer['UserLogin']);
+            $this->assertSame($this->customerUser(), $customer['UserID']);
+            $this->assertSame('Customer', $customer['UserType']);
+        }
+    }
+
+    public function test_znuny_books_time_units_for_the_time_accounting_web_service(): void
+    {
+        // Znuny's TimeAccountingREST web service has this one route and no session route.
+        $service = $this->znuny(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL');
+        $ticket = $this->newTicket($this->znuny(), 'Time accounting '.uniqid(), article: ['timeUnit' => 15])->save();
+
+        $window = fn (int $from, int $until): array => [
+            'TimeAccountingUserLogin' => getenv('ZNUNY_INTEGRATION_USERNAME'),
+            'TimeAccountingStart' => CarbonImmutable::now($this->timezone())->addHours($from)->format('Y-m-d H:i:s'),
+            'TimeAccountingEnd' => CarbonImmutable::now($this->timezone())->addHours($until)->format('Y-m-d H:i:s'),
+        ];
+
+        $row = collect($service->call('TimeAccountingGet', $window(-1, 1))['TimeAccountingResult'] ?? [])
+            ->firstWhere('TicketNumber', $ticket->ticketNumber);
+
+        $this->assertIsArray($row);
+        $this->assertEquals(15, $row['TimeUnit']);
+        $this->assertSame($ticket->title, $row['TicketTitle']);
+        $this->assertSame('Raw', $row['Queue']);
+        $this->assertArrayHasKey('TicketCustomerID', $row);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $row['Created']);
+
+        // Without entries Znuny leaves the key out.
+        $this->assertArrayNotHasKey('TimeAccountingResult', $service->call('TimeAccountingGet', $window(-48, -24)));
+
+        try {
+            $this->admin(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')->call('TimeAccountingGet', $window(-1, 1));
+            $this->fail('An agent outside the group timeaccounting_webservice must be refused.');
+        } catch (ZnunyException $e) {
+            $this->assertSame('TimeAccountingGet.NoPermission', $e->getErrorCode());
+        }
+    }
+
+    /**
+     * @return array<string, array{0: string}> URL variable
+     */
+    public static function outOfOfficeWebServices(): array
+    {
+        return [
+            "Znuny's web service with its inbound mapping" => ['ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL'],
+            'a web service without mapping' => ['ZNUNY_INTEGRATION_OUT_OF_OFFICE_PLAIN_URL'],
+        ];
+    }
+
+    #[DataProvider('outOfOfficeWebServices')]
+    public function test_znuny_sets_out_of_office_from_entries_and_csv(string $urlVariable): void
+    {
+        $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
+        $password = (string) getenv('ZNUNY_INTEGRATION_PASSWORD');
+        $columns = ['UserLogin', 'UserSearch', 'UserEmail', 'StartDate', 'EndDate', 'OutOfOffice'];
+
+        // The mapping reads the CSV string and fails without it; without mapping the operation reads the entries.
+        $payload = fn (array $entry): array => [
+            'OutOfOfficeEntries' => [$entry],
+            'OutOfOfficeEntriesCSVString' => implode(',', $columns)."\n"
+                .implode(',', array_map(fn (string $column): string => '"'.($entry[$column] ?? '').'"', $columns))."\n",
+        ];
+
+        $admin = $this->admin(['auth' => 'credentials'], $urlVariable);
+        $admin->call('OutOfOffice', $payload(['UserLogin' => $login, 'StartDate' => '2031-02-03', 'EndDate' => '2031-02-10', 'OutOfOffice' => 1]));
+
+        // No operation reads the setting of another user; that user's own session data shows it.
+        $data = $this->freshSessionData($login, $password);
+
+        $this->assertEquals(1, $data['OutOfOffice']);
+        $this->assertEquals([2031, 2, 3], [$data['OutOfOfficeStartYear'], $data['OutOfOfficeStartMonth'], $data['OutOfOfficeStartDay']]);
+        $this->assertEquals([2031, 2, 10], [$data['OutOfOfficeEndYear'], $data['OutOfOfficeEndMonth'], $data['OutOfOfficeEndDay']]);
+
+        $admin->call('OutOfOffice', $payload(['UserLogin' => $login, 'OutOfOffice' => 0]));
+
+        $this->assertEquals(0, $this->freshSessionData($login, $password)['OutOfOffice']);
+
+        try {
+            $this->znuny(['auth' => 'credentials'], $urlVariable)->call('OutOfOffice', $payload(['UserLogin' => $login, 'OutOfOffice' => 0]));
+            $this->fail('An agent outside the group admin must be refused.');
+        } catch (ZnunyException $e) {
+            $this->assertSame('OutOfOffice.AuthFail', $e->getErrorCode());
+            $this->assertStringContainsString('group admin', $e->getMessage());
+        }
+    }
+
+    public function test_znuny_accepts_dates_in_dynamic_fields_in_its_own_format_only(): void
+    {
+        $znuny = $this->znuny();
+        $title = 'Dynamic field dates '.uniqid();
+
+        $create = fn (string $field, string $value): array => $znuny->call('TicketCreate', [
+            'Ticket' => ['Title' => $title, 'Queue' => 'Raw', 'State' => 'new', 'Priority' => '3 normal', 'CustomerUser' => $this->customerUser()],
+            'Article' => ['Subject' => $title, 'Body' => 'Created by the laravel-znuny integration suite.', 'ContentType' => 'text/plain; charset=utf8'],
+            'DynamicField' => [['Name' => $field, 'Value' => $value]],
+        ]);
+
+        $dueAt = (string) $create('DueAt', '2031-02-03 10:00:00')['TicketID'];
+        $dueOn = (string) $create('DueOn', '2031-02-03 00:00:00')['TicketID'];
+
+        foreach ([['DueAt', '2031-02-03T10:00:00.000000Z'], ['DueOn', '2031-02-03 10:00:00']] as [$field, $value]) {
+            try {
+                $create($field, $value);
+                $this->fail("Znuny must refuse [{$value}] for {$field}.");
+            } catch (ZnunyException $e) {
+                $this->assertSame('TicketCreate.InvalidParameter', $e->getErrorCode());
+            }
+        }
+
+        $search = fn (array $conditions): array => array_map('strval', (array) ($znuny->call('TicketSearch', ['Title' => $title] + $conditions)['TicketID'] ?? []));
+
+        $this->assertSame([$dueAt], $search(['DynamicField_DueAt' => ['GreaterThan' => '2031-02-03 09:00:00', 'SmallerThan' => '2031-02-03 11:00:00']]));
+        $this->assertSame([$dueOn], $search(['DynamicField_DueOn' => ['Equals' => '2031-02-03 00:00:00']]));
     }
 
     public function test_dates_are_exchanged_in_the_znuny_time_zone(): void

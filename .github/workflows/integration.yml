@@ -69,8 +69,13 @@ jobs:
           ZNUNY_INTEGRATION_URL: http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/GenericTicketConnectorREST
           ZNUNY_INTEGRATION_CLASSIC_URL: http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/GenericTicketConnectorRESTClassic
           ZNUNY_INTEGRATION_OPERATION_NAME_URL: http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OperationNameREST
+          ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL: http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/TimeAccountingREST
+          ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL: http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OutOfOffice
+          ZNUNY_INTEGRATION_OUT_OF_OFFICE_PLAIN_URL: http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OutOfOfficePlain
           ZNUNY_INTEGRATION_USERNAME: api-agent
           ZNUNY_INTEGRATION_PASSWORD: api-secret
+          ZNUNY_INTEGRATION_ADMIN_USERNAME: api-admin
+          ZNUNY_INTEGRATION_ADMIN_PASSWORD: admin-secret
           ZNUNY_INTEGRATION_CUSTOMER_USER: jane
           ZNUNY_INTEGRATION_CUSTOMER_PASSWORD: jane-secret
           ZNUNY_INTEGRATION_WEBHOOK_LISTEN: 0.0.0.0:8099

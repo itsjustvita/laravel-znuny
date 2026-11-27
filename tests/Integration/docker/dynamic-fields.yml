@@ -22,3 +22,19 @@ DynamicFields:
         gamma: Gamma
       TranslatableValues: '0'
       TreeView: '0'
+  DueAt:
+    Name: DueAt
+    Label: Due at
+    ObjectType: Ticket
+    FieldType: DateTime
+    Config:
+      DefaultValue: 0
+      YearsPeriod: 0
+  DueOn:
+    Name: DueOn
+    Label: Due on
+    ObjectType: Ticket
+    FieldType: Date
+    Config:
+      DefaultValue: 0
+      YearsPeriod: 0
