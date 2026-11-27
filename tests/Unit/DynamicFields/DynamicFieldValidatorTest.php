@@ -5,6 +5,7 @@ namespace ItsJustVita\LaravelZnuny\Tests\Unit\DynamicFields;
 use ItsJustVita\LaravelZnuny\DynamicFields\DynamicFieldValidator;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 final class DynamicFieldValidatorTest extends TestCase
 {
@@ -111,6 +112,42 @@ final class DynamicFieldValidatorTest extends TestCase
 
         $this->expectException(InvalidDynamicFieldException::class);
         $validator->validate(['Tags' => ['a' => 'vip']]);
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: mixed, 2: bool}>
+     */
+    public static function dates(): array
+    {
+        return [
+            'date: a date object' => ['date', new \DateTimeImmutable('2026-07-01'), true],
+            'date: a day' => ['date', '2026-07-01', true],
+            'date: a day at midnight' => ['date', '2026-07-01 00:00:00', true],
+            'date: an empty string, which clears the field' => ['date', '', true],
+            'date: null, which Znuny refuses' => ['date', null, false],
+            'datetime: an empty string, which clears the field' => ['datetime', '', true],
+            'date: a day with a time' => ['date', '2026-07-01 10:00:00', false],
+            'date: words' => ['date', 'tomorrow', false],
+            'date: a number' => ['date', 20260701, false],
+            'datetime: a date object' => ['datetime', new \DateTimeImmutable('2026-07-01 10:00'), true],
+            'datetime: date and time' => ['datetime', '2026-07-01 10:00:00', true],
+            'datetime: a day only' => ['datetime', '2026-07-01', false],
+            'datetime: ISO 8601' => ['datetime', '2026-07-01T10:00:00Z', false],
+        ];
+    }
+
+    #[DataProvider('dates')]
+    public function test_date_types_accept_date_objects_and_znunys_formats(string $type, mixed $value, bool $valid): void
+    {
+        $validator = new DynamicFieldValidator(definitions: ['Due' => ['type' => $type]]);
+
+        if (! $valid) {
+            $this->expectException(InvalidDynamicFieldException::class);
+            $this->expectExceptionMessage('DynamicField [Due]');
+        }
+
+        $validator->validate(['Due' => $value]);
+        $this->addToAssertionCount(1);
     }
 
     public function test_from_config_reads_the_package_config(): void

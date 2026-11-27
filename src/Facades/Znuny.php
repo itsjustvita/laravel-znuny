@@ -17,6 +17,9 @@ use RuntimeException;
  * @method static \ItsJustVita\LaravelZnuny\ZnunyClient client()
  * @method static array<array-key, mixed> call(string $operation, array<string, mixed> $payload = [])
  * @method static \ItsJustVita\LaravelZnuny\Resources\TicketResource tickets()
+ * @method static \ItsJustVita\LaravelZnuny\Resources\SessionResource session()
+ * @method static \ItsJustVita\LaravelZnuny\Resources\TimeAccountingResource timeAccounting()
+ * @method static \ItsJustVita\LaravelZnuny\Resources\UserResource users()
  * @method static \ItsJustVita\LaravelZnuny\Resources\QueueResource queues()
  * @method static \ItsJustVita\LaravelZnuny\Resources\StateResource states()
  * @method static \ItsJustVita\LaravelZnuny\Resources\PriorityResource priorities()
@@ -30,6 +33,9 @@ use RuntimeException;
  * @method static void assertNotCalled(string $operation, \Closure|null $callback = null)
  * @method static void assertNothingCalled()
  * @method static list<array{connection: string, operation: string, payload: array<string, mixed>}> recorded(string|null $operation = null)
+ *
+ * queues(), states(), priorities(), types(), customers(), flush() and flushAll() are deprecated
+ * since 0.4.0 and will be removed in 1.0: they need operations Znuny does not ship.
  *
  * @see ZnunyManager
  * @see FakeZnunyManager
@@ -97,6 +103,32 @@ class Znuny extends Facade
         }
 
         return ['Ticket' => $rows];
+    }
+
+    /**
+     * A SessionGet response for Znuny::session()->user(). The values are merged over those
+     * of an agent; pass 'UserType' => 'Customer' for a customer user.
+     *
+     * @param  array<string, mixed>  $user  session values by Znuny's keys, e.g. ['UserLogin' => 'jane.agent']
+     * @return array{SessionData: list<array{Key: string, Value: mixed}>}
+     */
+    public static function fakeSessionUser(array $user = []): array
+    {
+        $data = array_merge([
+            'UserID' => '1',
+            'UserLogin' => 'fake.agent',
+            'UserFirstname' => 'Fake',
+            'UserLastname' => 'Agent',
+            'UserFullname' => 'Fake Agent',
+            'UserEmail' => 'fake.agent@example.com',
+            'UserType' => 'User',
+        ], $user);
+
+        return ['SessionData' => array_map(
+            fn (string $key, mixed $value): array => ['Key' => $key, 'Value' => $value],
+            array_keys($data),
+            array_values($data),
+        )];
     }
 
     /**

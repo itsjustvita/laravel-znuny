@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\DynamicFields;
 
+use DateTimeInterface;
 use ItsJustVita\LaravelZnuny\Exceptions\InvalidDynamicFieldException;
 
 class DynamicFieldValidator
@@ -84,6 +85,21 @@ class DynamicFieldValidator
 
                 return;
 
+            case 'date':
+                // Znuny's "Date" fields take a day, optionally written with midnight. An empty string clears the field.
+                if ($value !== '' && ! $value instanceof DateTimeInterface && ! (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2}( 00:00:00)?$/', $value) === 1)) {
+                    throw $this->invalid($def, 'expected a date (a DateTimeInterface or a string like 2026-07-01), got '.$this->describe($value));
+                }
+
+                return;
+
+            case 'datetime':
+                if ($value !== '' && ! $value instanceof DateTimeInterface && ! (is_string($value) && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $value) === 1)) {
+                    throw $this->invalid($def, 'expected a date and time (a DateTimeInterface or a string like 2026-07-01 10:00:00), got '.$this->describe($value));
+                }
+
+                return;
+
             default:
                 throw $this->invalid($def, "unsupported field type '{$def->type}'");
         }
@@ -116,6 +132,11 @@ class DynamicFieldValidator
         if ($def->max !== null && $value > $def->max) {
             throw $this->invalid($def, "value {$value} is above maximum {$def->max}");
         }
+    }
+
+    private function describe(mixed $value): string
+    {
+        return is_string($value) ? "'{$value}'" : get_debug_type($value);
     }
 
     private function invalid(FieldDefinition $def, string $message): InvalidDynamicFieldException

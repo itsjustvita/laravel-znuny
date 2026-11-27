@@ -75,6 +75,7 @@ PHP;
             'boolean' => 'bool',
             'float' => 'float',
             'array' => 'array',
+            'date', 'datetime' => '\DateTimeInterface|string',
             default => 'string',
         };
     }

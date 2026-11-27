@@ -9,6 +9,8 @@ use ItsJustVita\LaravelZnuny\Exceptions\CustomerNotFoundException;
 
 /**
  * Needs the custom operation CustomerUserGet in the web service.
+ *
+ * @deprecated since 0.4.0, removed in 1.0: Znuny does not ship this operation. Use Znuny::call() for custom operations.
  */
 class CustomerResource extends Resource
 {

@@ -4,10 +4,12 @@ namespace ItsJustVita\LaravelZnuny\Tests\Unit;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent;
 use ItsJustVita\LaravelZnuny\Events\ZnunyResponseReceived;
 use ItsJustVita\LaravelZnuny\Events\ZnunySessionRefreshed;
@@ -57,6 +59,78 @@ final class ZnunyClientTransportTest extends TestCase
         } finally {
             unlink($bundle);
         }
+    }
+
+    public function test_http_options_reach_the_request_and_leave_verification_alone(): void
+    {
+        $options = (new ReflectionMethod(ZnunyClient::class, 'httpClient'))
+            ->invoke($this->client(['verify_ssl' => false, 'timeout' => 7, 'options' => ['proxy' => 'http://proxy.internal:3128', 'headers' => ['X-Api' => '1']]]))
+            ->getOptions();
+
+        $this->assertSame('http://proxy.internal:3128', $options['proxy']);
+        $this->assertFalse($options['verify']);
+        $this->assertSame(7, $options['timeout']);
+    }
+
+    public function test_configured_headers_are_sent_with_every_request(): void
+    {
+        Http::fake([
+            self::BASE.'/Session' => Http::response(['SessionID' => 'S1']),
+            self::BASE.'/Ticket/Search' => Http::response(['TicketID' => []]),
+            self::BASE.'/Ticket/42*' => Http::response(['Ticket' => [['TicketID' => '42']]]),
+        ]);
+
+        $client = $this->client(['options' => ['headers' => ['X-Api' => '1']]]);
+        $client->call('TicketSearch', ['Title' => 'x']);
+        $client->call('TicketGet', ['TicketID' => '42']);
+
+        // The login and the search carry their authentication in the body, the read in a header.
+        Http::assertSentCount(3);
+        $this->assertSame([['1'], ['1'], ['1']], collect(Http::recorded())->map(fn (array $pair) => $pair[0]->header('X-Api'))->all());
+        Http::assertSent(fn (Request $r) => $r->method() === 'GET' && $r->header('X-OTRS-Header-SessionID') === ['S1']);
+    }
+
+    public function test_the_authentication_cannot_be_overridden_by_a_configured_header(): void
+    {
+        // Znuny copies X-OTRS-Header-Password and its siblings into the request, over the
+        // body, so on a POST route such a header would replace the package's authentication.
+        $this->expectException(ZnunyConfigurationException::class);
+        $this->expectExceptionMessage('cannot set the header [X-OTRS-Header-Password]');
+
+        $this->client(['options' => ['headers' => ['X-OTRS-Header-Password' => 'evil']]]);
+    }
+
+    public function test_http_options_do_not_reach_the_packages_logs_events_or_exceptions(): void
+    {
+        Http::fake([self::BASE.'/*' => Http::response('Bad Gateway', 502)]);
+
+        // What the package itself publishes: its events, its log entries and its exception.
+        $seen = [];
+        Event::listen(function (ZnunyRequestSent $event) use (&$seen): void {
+            $seen[] = get_object_vars($event);
+        });
+        Event::listen(function (ZnunyRequestFailed $event) use (&$seen): void {
+            $seen[] = [$event->payload, $event->exception->context(), $event->exception->getMessage()];
+        });
+        Event::listen(function (MessageLogged $message) use (&$seen): void {
+            $seen[] = [$message->message, $message->context];
+        });
+
+        try {
+            $this->client(['auth' => 'credentials', 'options' => ['auth' => ['proxyuser', 'proxy-secret'], 'headers' => ['X-Api' => 'header-secret']]])
+                ->call('TicketSearch', ['Title' => 'x']);
+            $this->fail('The request must fail.');
+        } catch (ZnunyServerException $e) {
+            $seen[] = [$e->context(), $e->getMessage()];
+        }
+
+        $published = (string) json_encode($seen);
+
+        $this->assertGreaterThanOrEqual(4, count($seen));
+        $this->assertStringNotContainsString('proxy-secret', $published);
+        $this->assertStringNotContainsString('header-secret', $published);
+        // The options were in use, so the check above means something.
+        Http::assertSent(fn (Request $r) => $r->header('X-Api') === ['header-secret']);
     }
 
     public function test_stock_routes_create_a_session_and_send_get_requests_with_auth_headers(): void

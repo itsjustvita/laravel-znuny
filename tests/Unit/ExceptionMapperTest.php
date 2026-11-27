@@ -305,6 +305,50 @@ final class ExceptionMapperTest extends TestCase
         $this->assertSame('TicketGet.AccessDenied', $exception->getErrorCode());
     }
 
+    public function test_no_permission_maps_to_access_denied(): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'TimeAccountingGet.NoPermission', 'ErrorMessage' => 'TimeAccountingGet: No permission!']],
+            operation: 'TimeAccountingGet',
+            connection: 'default',
+            payload: [],
+        );
+
+        $this->assertInstanceOf(ZnunyAccessDeniedException::class, $exception);
+        $this->assertSame('TimeAccountingGet.NoPermission', $exception->getErrorCode());
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool, 2: class-string}>
+     */
+    public static function outOfOfficeRefusals(): array
+    {
+        return [
+            'not in the admin group, session mode' => ['OutOfOffice: User needs to be in group admin.', true, ZnunyAccessDeniedException::class],
+            'not in the admin group, credentials mode' => ['OutOfOffice: User needs to be in group admin.', false, ZnunyAccessDeniedException::class],
+            'a customer user' => ['OutOfOffice: User needs to be an agent.', true, ZnunyAccessDeniedException::class],
+            'an expired session' => ['OutOfOffice: Authentication failed.', true, ZnunySessionExpiredException::class],
+            'wrong credentials' => ['OutOfOffice: Authentication failed.', false, ZnunyAuthenticationException::class],
+        ];
+    }
+
+    /**
+     * @param  class-string  $class
+     */
+    #[DataProvider('outOfOfficeRefusals')]
+    public function test_out_of_office_tells_a_missing_permission_from_a_failed_login(string $message, bool $sessionAuth, string $class): void
+    {
+        $exception = $this->mapper->fromErrorResponse(
+            body: ['Error' => ['ErrorCode' => 'OutOfOffice.AuthFail', 'ErrorMessage' => $message]],
+            operation: 'OutOfOffice',
+            connection: 'default',
+            payload: [],
+            sessionAuth: $sessionAuth,
+        );
+
+        $this->assertInstanceOf($class, $exception);
+    }
+
     public function test_not_valid_ticket_id_maps_to_ticket_not_found(): void
     {
         $exception = $this->mapper->fromErrorResponse(

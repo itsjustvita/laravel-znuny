@@ -10,9 +10,12 @@ use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Resources\CustomerResource;
 use ItsJustVita\LaravelZnuny\Resources\PriorityResource;
 use ItsJustVita\LaravelZnuny\Resources\QueueResource;
+use ItsJustVita\LaravelZnuny\Resources\SessionResource;
 use ItsJustVita\LaravelZnuny\Resources\StateResource;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
+use ItsJustVita\LaravelZnuny\Resources\TimeAccountingResource;
 use ItsJustVita\LaravelZnuny\Resources\TypeResource;
+use ItsJustVita\LaravelZnuny\Resources\UserResource;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Session\SessionStore;
 use ItsJustVita\LaravelZnuny\Support\Setting;
@@ -113,28 +116,68 @@ class ZnunyManager
         return new TicketResource($this->client());
     }
 
+    public function session(): SessionResource
+    {
+        return new SessionResource($this->client());
+    }
+
+    public function timeAccounting(): TimeAccountingResource
+    {
+        return new TimeAccountingResource($this->client());
+    }
+
+    public function users(): UserResource
+    {
+        return new UserResource($this->client());
+    }
+
+    /**
+     * @deprecated since 0.4.0, removed in 1.0: needs QueueList and QueueGet, which Znuny does not ship.
+     */
     public function queues(): QueueResource
     {
+        $this->deprecated(__FUNCTION__, "it needs operations Znuny does not ship. Use Znuny::call('QueueList') instead.");
+
         return new QueueResource($this->client(), $this->buildCacheManager());
     }
 
+    /**
+     * @deprecated since 0.4.0, removed in 1.0: needs StateList, which Znuny does not ship.
+     */
     public function states(): StateResource
     {
+        $this->deprecated(__FUNCTION__, "it needs operations Znuny does not ship. Use Znuny::call('StateList') instead.");
+
         return new StateResource($this->client(), $this->buildCacheManager());
     }
 
+    /**
+     * @deprecated since 0.4.0, removed in 1.0: needs PriorityList, which Znuny does not ship.
+     */
     public function priorities(): PriorityResource
     {
+        $this->deprecated(__FUNCTION__, "it needs operations Znuny does not ship. Use Znuny::call('PriorityList') instead.");
+
         return new PriorityResource($this->client(), $this->buildCacheManager());
     }
 
+    /**
+     * @deprecated since 0.4.0, removed in 1.0: needs TypeList, which Znuny does not ship.
+     */
     public function types(): TypeResource
     {
+        $this->deprecated(__FUNCTION__, "it needs operations Znuny does not ship. Use Znuny::call('TypeList') instead.");
+
         return new TypeResource($this->client(), $this->buildCacheManager());
     }
 
+    /**
+     * @deprecated since 0.4.0, removed in 1.0: needs CustomerUserGet, which Znuny does not ship.
+     */
     public function customers(): CustomerResource
     {
+        $this->deprecated(__FUNCTION__, "it needs operations Znuny does not ship. Use Znuny::call('CustomerUserGet') instead, and Znuny::tickets()->whereCustomerId() for a customer's tickets.");
+
         return new CustomerResource($this->client());
     }
 
@@ -146,13 +189,23 @@ class ZnunyManager
         return $this->client()->ping();
     }
 
+    /**
+     * @deprecated since 0.4.0, removed in 1.0 together with the lookups whose cache it clears.
+     */
     public function flush(?string $resource = null): void
     {
+        $this->deprecated(__FUNCTION__, 'it clears the cache of the lookups, which need operations Znuny does not ship.');
+
         $this->buildCacheManager()->flush($this->client()->identityKey(), $resource);
     }
 
+    /**
+     * @deprecated since 0.4.0, removed in 1.0 together with the lookups whose cache it clears.
+     */
     public function flushAll(): void
     {
+        $this->deprecated(__FUNCTION__, 'it clears the cache of the lookups, which need operations Znuny does not ship.');
+
         $connections = array_keys((array) $this->config('znuny.connections', []));
         $manager = $this->buildCacheManager();
 
@@ -163,6 +216,14 @@ class ZnunyManager
                 // An incomplete connection cannot have cached anything.
             }
         }
+    }
+
+    /**
+     * The package covers the operations Znuny ships. What needs other operations works until 1.0.
+     */
+    private function deprecated(string $method, string $why): void
+    {
+        trigger_error("Znuny::{$method}() is deprecated and will be removed in 1.0: {$why}", E_USER_DEPRECATED);
     }
 
     protected function config(string $key, mixed $default = null): mixed

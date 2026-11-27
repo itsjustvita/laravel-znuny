@@ -9,10 +9,11 @@
 
 > Laravel SDK for the Znuny / OTRS Community Edition Generic Interface REST API.
 
-Works out of the box with the **GenericTicketConnectorREST** example web service that Znuny ships, and with any custom web service through configurable routes. You get typed DTOs, a fluent ticket search with batching and pagination, attachments, ticket history, session handling with automatic re-login, inbound webhooks, events, logging, and a generic `call()` for every other operation.
+Works out of the box with the **GenericTicketConnectorREST** example web service that Znuny ships, and with any custom web service through configurable routes. Every operation Znuny ships has a typed method. You get DTOs, a fluent ticket search with batching and pagination, attachments, ticket history, session handling with automatic re-login, time accounting, out-of-office settings, inbound webhooks, events, logging, and a generic `call()` for every other operation.
 
 ## Contents
 
+- [What this package covers](#what-this-package-covers)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Setting up the web service in Znuny](#setting-up-the-web-service-in-znuny)
@@ -20,8 +21,11 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 - [Tickets](#tickets)
 - [Searching tickets](#searching-tickets)
 - [Attachments](#attachments)
+- [Session](#session)
+- [Time accounting](#time-accounting)
+- [Out of office](#out-of-office)
 - [Calling any operation](#calling-any-operation)
-- [Lookups (custom operations)](#lookups-custom-operations)
+- [Lookups (deprecated)](#lookups-deprecated)
 - [Dynamic fields](#dynamic-fields)
 - [Webhooks (Znuny to Laravel)](#webhooks-znuny-to-laravel)
 - [Events](#events)
@@ -31,6 +35,19 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 - [Troubleshooting](#troubleshooting)
 - [Testing your application](#testing-your-application)
 - [Upgrading](#upgrading)
+
+## What this package covers
+
+The package has a typed method for an operation if, and only if, Znuny ships that operation. Znuny 6.5 to 7.3 ship ten, and CI runs each of them against a real Znuny of every supported version:
+
+| Znuny operation | Method | Web service Znuny ships it in | Needs |
+|---|---|---|---|
+| `SessionCreate`, `SessionGet`, `SessionRemove` | the automatic login, `session()->user()`, `session()->logout()` | `GenericTicketConnectorREST` | |
+| `TicketCreate`, `TicketGet`, `TicketSearch`, `TicketUpdate`, `TicketHistoryGet` | `tickets()` | `GenericTicketConnectorREST` | permissions on the queues |
+| `TimeAccountingGet` | `timeAccounting()->entries()` | `TimeAccountingREST` | `rw` in the group `timeaccounting_webservice` |
+| `OutOfOffice` | `users()->setOutOfOffice()`, `clearOutOfOffice()`, `outOfOffice()` | `OutOfOffice` | an agent with `rw` in the group `admin` |
+
+Everything else, such as operations of Znuny add-ons or your own, goes through [`Znuny::call()`](#calling-any-operation) with the same routing, authentication, error handling, events and logging.
 
 ## Requirements
 
@@ -67,7 +84,7 @@ The command checks the login, the routes and the [time zone](#time-zone) setting
      php artisan znuny:webservice --output=znuny-webservice.yml
      ```
 
-     and import it under **Admin → Web Services → Add Web Service → Import web service**, or on the Znuny server with `bin/otrs.Console.pl Admin::WebService::Add --name GenericTicketConnectorREST --source-path znuny-webservice.yml`. CI imports generated definitions into Znuny 6.5, 7.0, 7.1, 7.2 and 7.3.
+     and import it under **Admin → Web Services → Add Web Service → Import web service**, or on the Znuny server with `bin/otrs.Console.pl Admin::WebService::Add --name GenericTicketConnectorREST --source-path znuny-webservice.yml`. CI imports generated definitions into Znuny 6.5, 7.0, 7.1, 7.2 and 7.3. Add `--also=TimeAccountingGet --also=OutOfOffice` to get those two operations into the same web service; see [Time accounting](#time-accounting) and [Out of office](#out-of-office).
 2. Keep the name `GenericTicketConnectorREST` or choose your own. The base URL is `https://<host>/otrs/nph-genericinterface.pl/Webservice/<name>`; use your installation's script alias if it is not `/otrs/`.
 3. Create an agent for the API and give it permissions on the queues it needs.
 
@@ -98,6 +115,21 @@ Web services that were set up from the older example in `development/webservices
 `verify_ssl` is `true`, `false` or the absolute path of a CA bundle; any other value is rejected, so a typo cannot switch certificate verification off.
 
 A connection can also set `retries`, `retry_delay` (milliseconds), `batch_size` and `search_limit`; they default to the values under `http`. Retries repeat reads after timeouts and server errors. Writes such as `TicketCreate` and `TicketUpdate` are only repeated when no connection could be established, so a slow Znuny never receives the same ticket twice.
+
+`options` adds Guzzle request options to every request of a connection, for a proxy, a client certificate or a reverse proxy in front of Znuny:
+
+```php
+'default' => [
+    // ...
+    'options' => [
+        'proxy'   => 'http://proxy.internal:3128',
+        'cert'    => '/etc/ssl/client.pem',
+        'headers' => ['X-Forwarded-Auth' => env('ZNUNY_PROXY_TOKEN')],
+    ],
+],
+```
+
+Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. The authentication headers (`X-OTRS-Header-UserLogin`, `-CustomerUserLogin`, `-Password`, `-SessionID`) cannot be configured: Znuny reads them over the request the package sends.
 
 ### Routes
 
@@ -247,7 +279,7 @@ $tickets = Znuny::tickets()
     ->limit(50)
     ->get();                                       // Collection<Ticket>
 
-$page  = Znuny::tickets()->whereCustomerUser('jane')->paginate(perPage: 25, page: 1);
+$page  = Znuny::tickets()->whereCustomerUser('jane')->paginate(perPage: 25);   // the page of the request, or page: 2
 $count = Znuny::tickets()->whereLock('lock')->whereOwnerId(3)->count();
 $ids   = Znuny::tickets()->whereFullText('printer')->ids();
 
@@ -294,7 +326,7 @@ Date filters accept any `DateTimeInterface` and convert it to Znuny's [time zone
 | `whereClosedAfter()`, `whereClosedBefore()` | the close time |
 | `wherePendingAfter()`, `wherePendingBefore()` | the pending time |
 
-`get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that, and `withOptions(['ArticleLimit' => 5])` for other `TicketGet` parameters. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page; its links point to the current URL, so pass the page of the request, e.g. `paginate(25, (int) $request->query('page', 1))`.
+`get()`, `paginate()` and `lazy()` load articles and dynamic fields by default; use `withoutArticles()`, `withoutDynamicFields()` or `withAttachments()` to change that, and `withOptions(['ArticleLimit' => 5])` for other `TicketGet` parameters. `paginate()` fetches all matching IDs first and then loads only the tickets of the requested page. Without a page it uses the page of the current request (`?page=`), as Eloquent does, and its links point to the current URL.
 
 ### Incomplete results
 
@@ -331,6 +363,75 @@ foreach ($ticket->articles as $article) {
 }
 ```
 
+## Session
+
+```php
+$user = Znuny::session()->user();
+
+$user->id;          // "5"; for a customer user the login
+$user->login;       // "api-agent"
+$user->firstName;   $user->lastName;   $user->fullName;   $user->email;
+$user->type;        // "agent" or "customer"
+$user->attribute('UserLastLoginTimestamp');   // any other value of the session, e.g. preferences
+
+Znuny::session()->logout();                  // ends the session in Znuny; the next call logs in again
+```
+
+`user()` is the account of the connection, that is the user your application logs in with. It is not the person who uses your application. It works with `auth => credentials` too; the package then logs in once to have a session to ask about.
+
+Znuny's session data contains secrets: a customer user's password hash, a two-factor key, and the password of an LDAP directory or external customer database inside the customer backend's configuration. `SessionUser` leaves out every value whose key names a secret, and the package redacts them in its logs and events. `Znuny::call('SessionGet', …)` returns what Znuny sends.
+
+`logout()` needs the `SessionRemove` operation, which the web service set up from the older example in `development/webservices/` does not have.
+
+## Time accounting
+
+```php
+$entries = Znuny::timeAccounting()->entries('agent-login', now()->startOfMonth(), now());   // Collection<TimeAccountingEntry>
+
+$entries->sum('timeUnit');
+$entries->first()->ticketNumber;   // also ticketTitle, queue, customerId, timeUnit, created
+```
+
+The entries are the time units an agent booked on tickets between two points in time, oldest first; `queue` is the queue the ticket was in at that time. Znuny answers only users with `rw` in the group `timeaccounting_webservice`, otherwise you get a `ZnunyAccessDeniedException`. For a login Znuny does not know it answers like for an agent who booked nothing: the result is empty.
+
+Znuny ships this operation in a web service of its own, **TimeAccountingREST** (Ready2Adopt Web Services), not in `GenericTicketConnectorREST`. Use one of these:
+
+```php
+// 1. A second connection to Znuny's web service. It has no session route, so it sends the credentials.
+'time-accounting' => [
+    'base_url' => 'https://znuny.example.com/otrs/nph-genericinterface.pl/Webservice/TimeAccountingREST',
+    'username' => env('ZNUNY_USERNAME'),
+    'password' => env('ZNUNY_PASSWORD'),
+    'auth'     => 'credentials',
+],
+
+Znuny::connection('time-accounting')->timeAccounting()->entries(...);
+```
+
+```bash
+# 2. The operation in your own web service; then the default connection has it.
+php artisan znuny:webservice --also=TimeAccountingGet --output=znuny-webservice.yml
+```
+
+## Out of office
+
+```php
+Znuny::users()->setOutOfOffice('agent-login', now()->addDay(), now()->addWeeks(2));
+Znuny::users()->clearOutOfOffice('agent-login');
+
+// Several agents at once, also by e-mail address or Znuny's user search:
+Znuny::users()->outOfOffice([
+    ['email' => 'jane@example.com', 'from' => $from, 'until' => $until],
+    ['search' => 'Miller', 'enabled' => false],
+]);
+```
+
+`from` and `until` are calendar days: the day the date names in its own time zone is sent, without conversion. Give both or neither.
+
+- **Znuny reports success even when nothing happened.** An entry that matches no agent, or more than one, is skipped and written to Znuny's log; the response is the same, and no operation reads the setting back for another agent. The methods therefore return nothing. An agent's own session shows the setting once they have logged in again: `Znuny::session()->user()->attribute('OutOfOffice')`.
+- The caller must be an agent with `rw` in the group `admin`, otherwise you get a `ZnunyAccessDeniedException`.
+- Znuny ships the operation in a web service of its own, **OutOfOffice**. As for [time accounting](#time-accounting), use a second connection with `'auth' => 'credentials'` and the `base_url` of that web service, or `php artisan znuny:webservice --also=OutOfOffice`. The package's request works with Znuny's web service, which reads the entries from a CSV text, and with a generated one, which reads them directly.
+
 ## Calling any operation
 
 Every other operation — Znuny add-ons such as FAQ or ITSM, or your own — goes through the same routing, authentication, error handling, events and logging:
@@ -342,7 +443,9 @@ $result = Znuny::connection('tenant-a')->call('ConfigItemSearch', ['ConfigItem' 
 
 `call()` returns Znuny's decoded response as an array.
 
-## Lookups (custom operations)
+## Lookups (deprecated)
+
+> **Deprecated since 0.4.0, removed in 1.0.** These helpers need operations Znuny does not ship, in a response format only this package defines. They keep working until 1.0 and trigger a deprecation notice (`E_USER_DEPRECATED`). Use `Znuny::call('QueueList')` and so on for your custom operations, and `Znuny::tickets()->whereCustomerId($id)->get()` instead of `customers()->tickets($id)`. `Znuny::flush()`, `flushAll()`, `znuny:cache-clear` and the `cache` block of the config go with them.
 
 Znuny has no operations for listing queues, states, priorities, types or customer users. If your web service exposes such custom operations, these helpers use them. The lists (`all()`, `findByName()`) are cached, see `cache.ttl`; `queues()->find()` and `customers()->find()` ask Znuny every time:
 
@@ -370,12 +473,26 @@ If the web service does not expose an operation you get a `ZnunyRouteNotFoundExc
     'Tags'    => ['type' => 'array', 'allowed' => ['vip', 'urgent']],
     'Rating'  => ['type' => 'integer', 'min' => 1, 'max' => 5],
     'Flag'    => ['type' => 'boolean'],
+    'DueAt'   => ['type' => 'datetime'],   // a Znuny field of type "Date / Time"
+    'DueOn'   => ['type' => 'date'],       // a Znuny field of type "Date"
 ],
 // Invalid values throw InvalidDynamicFieldException before anything is sent (create and update).
 
 // 3. Typed helper generated from that config
 php artisan znuny:generate-fields
 ```
+
+Dates go in as `DateTimeInterface` and are sent the way Znuny reads them, on create, update and in search conditions:
+
+```php
+->withDynamicFields(['DueAt' => now()->addDays(3)])
+Znuny::tickets()->whereDynamicField('DueAt', now(), 'SmallerThan')->get();   // overdue
+
+$ticket->dynamicField('DueAt')?->date();   // CarbonImmutable, or null without a value
+$ticket->dynamicField('OrderId')?->value;  // any field by name
+```
+
+A date is sent as date and time in Znuny's [time zone](#time-zone), which is what a Znuny field of type "Date / Time" takes. A field of type "Date" takes a day only, and the package cannot see a field's type: declare such a field as `'type' => 'date'`, and it is sent as the day the date names. `date()` reads both back in Znuny's time zone. An empty string clears a date field: `update($id, dynamicFields: ['DueAt' => ''])`.
 
 ## Webhooks (Znuny to Laravel)
 
@@ -469,7 +586,7 @@ ZnunyException (abstract, extends RuntimeException)
 ├── ZnunyConnectionException             // network, timeout, TLS
 ├── ZnunyAuthenticationException         // wrong credentials, HTTP 401/403
 │   └── ZnunySessionExpiredException     // handled by the automatic re-login
-├── ZnunyAccessDeniedException           // *.AccessDenied
+├── ZnunyAccessDeniedException           // *.AccessDenied, *.NoPermission, OutOfOffice outside the group admin
 ├── ZnunyValidationException             // *.MissingParameter, *.InvalidParameter, ...
 │   ├── InvalidQueueException
 │   ├── InvalidStateException
@@ -493,9 +610,9 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 |---|---|
 | `znuny:test-connection [connection]` | Shows the connection settings, logs in, runs a `TicketSearch` and a `TicketGet` to check routing and permissions, and compares the time zone setting with the dates Znuny returns |
 | `znuny:routes [connection]` | Prints the effective route map |
-| `znuny:cache-clear [connection] [--resource=queues] [--all]` | Clears cached lookups |
+| `znuny:cache-clear [connection] [--resource=queues] [--all]` | Clears cached lookups (deprecated with them) |
 | `znuny:generate-fields [--output=path]` | Generates a typed dynamic field helper from the config |
-| `znuny:webservice [connection] [--routes=preset] [--webhooks=events] [--webhook-url=url] [--with-token] [--sync] [--output=path]` | Generates the Znuny web service definition for the connection's routes, optionally with a webhook requester |
+| `znuny:webservice [connection] [--routes=preset] [--also=operation] [--webhooks=events] [--webhook-url=url] [--with-token] [--sync] [--output=path]` | Generates the Znuny web service definition for the connection's routes, optionally with `TimeAccountingGet`, `OutOfOffice` and a webhook requester |
 
 ## Troubleshooting
 
@@ -507,6 +624,8 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 | `ZnunyAccessDeniedException` for a ticket that does not exist | Znuny checks permissions before existence, so a missing ticket is reported as access denied. |
 | A search returns exactly 500 tickets although `search_limit` is off | Znuny cut the result off. Remove `ZNUNY_SEARCH_LIMIT=null` to get an exception instead. See [Incomplete results](#incomplete-results). |
 | `ZnunySearchLimitExceededException` | A search without `limit()` matches more than `search_limit` tickets. Narrow it down, call `limit()`, or raise `ZNUNY_SEARCH_LIMIT`. See [Incomplete results](#incomplete-results). |
+| `ZnunyRouteNotFoundException` for `POST /Session` when calling time accounting or out of office | Znuny's `TimeAccountingREST` and `OutOfOffice` web services have no session route. Give that connection `'auth' => 'credentials'`. See [Time accounting](#time-accounting). |
+| `setOutOfOffice()` succeeds but the agent is not out of office | Znuny skips an entry that matches no agent or several and still reports success. Check the login; Znuny's log names the entry. See [Out of office](#out-of-office). |
 | `ZnunySessionRefreshed` fires on almost every request | Requests reach Znuny from changing IP addresses, and Znuny deletes a session that another address uses. See [Authentication](#authentication). |
 
 ## Testing your application
@@ -533,6 +652,7 @@ Znuny::assertNotCalled('TicketUpdate');
 ```
 
 - `fakeTickets()` builds a `TicketGet` response from complete default tickets; pass only the fields that matter.
+- `fakeSessionUser()` builds the `SessionGet` response for `Znuny::session()->user()`: `Znuny::fake(['SessionGet' => Znuny::fakeSessionUser(['UserLogin' => 'jane.agent'])])`. `TimeAccountingGet` answers `['TimeAccountingResult' => [['TicketNumber' => '…', 'TicketTitle' => '…', 'Queue' => '…', 'TimeUnit' => '15', 'Created' => '2026-07-01 10:00:00']]]`, `OutOfOffice` and `SessionDelete` (for `logout()`) answer `['Success' => 1]`.
 - `findByNumber()` returns a ticket only if its number is exactly the one asked for, so give the faked ticket that number: `Znuny::fakeTickets(['TicketID' => '42', 'TicketNumber' => '2026110610000042'])`.
 - A response can be an array, a closure that receives the payload and the connection name, an exception to throw, or a `Znuny::sequence()` that answers one call after the other. `'*'` answers every operation without its own response.
 - An operation without a response throws a `StrayZnunyCallException`, so a forgotten fake shows up in the test.

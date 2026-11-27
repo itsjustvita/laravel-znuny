@@ -35,7 +35,7 @@ class ZnunyClient
      * Znuny may already have processed it (a slow TicketCreate would create duplicates).
      */
     protected const READ_OPERATIONS = [
-        'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet',
+        'SessionCreate', 'SessionGet', 'TicketGet', 'TicketSearch', 'TicketHistoryGet', 'TimeAccountingGet',
         'QueueList', 'QueueGet', 'StateList', 'PriorityList', 'TypeList', 'CustomerUserGet',
     ];
 
@@ -140,6 +140,47 @@ class ZnunyClient
     }
 
     /**
+     * The session ID that is cached for this connection, if any. Does not log in.
+     */
+    public function cachedSessionId(): ?string
+    {
+        return $this->sessionManager->cached($this->identityKey());
+    }
+
+    /**
+     * Forget the cached session ID; the next call that needs a session logs in again.
+     */
+    public function forgetSession(): void
+    {
+        $this->sessionManager->invalidate($this->identityKey());
+    }
+
+    /**
+     * Remove the cached session in Znuny and forget it. Without a cached session nothing is sent.
+     */
+    public function logout(): void
+    {
+        $sessionId = $this->cachedSessionId();
+
+        if ($sessionId === null) {
+            return;
+        }
+
+        try {
+            // Znuny up to 6.5.11 and 7.1 authenticates SessionRemove with the credentials, newer
+            // versions with the session ID; sending both works everywhere. No repeat, no new login.
+            $this->send('SessionDelete', ['SessionID' => $sessionId], $this->credentials());
+        } catch (ZnunyException $e) {
+            // Znuny no longer knows the session, which is what logout() is for.
+            if ($e->getErrorCode() !== 'SessionRemove.Fail') {
+                throw $e;
+            }
+        } finally {
+            $this->forgetSession();
+        }
+    }
+
+    /**
      * Key under which the session and cached lookups of this connection are stored.
      */
     public function identityKey(): string
@@ -229,10 +270,21 @@ class ZnunyClient
         $json = $this->decode($response);
 
         if ($json === null || $response->failed() || isset($json['Error'])) {
+            // Znuny's error texts can repeat what was sent, such as the session ID in
+            // "Could not remove session with ID '...'". They end up in logs, events and exceptions.
+            $secrets = $this->secretsOf($auth, $payload);
+            $mask = fn (mixed $text): mixed => is_string($text) ? str_replace($secrets, Redactor::REDACTED, $text) : $text;
+
+            if ($json !== null) {
+                array_walk_recursive($json, function (mixed &$value) use ($mask): void {
+                    $value = $mask($value);
+                });
+            }
+
             throw $this->failed($operation, $request, $redacted, $this->exceptionMapper->fromResponse(
                 status: $response->status(),
                 json: $json,
-                rawBody: $response->body(),
+                rawBody: (string) $mask($response->body()),
                 operation: $operation,
                 connection: $this->connection,
                 payload: $data,
@@ -265,7 +317,7 @@ class ZnunyClient
     protected function dispatch(PreparedRequest $request, string $operation): Response
     {
         $repeatable = $request->method === 'GET' || in_array($operation, self::READ_OPERATIONS, true);
-        $client = $this->httpClient($repeatable)->withHeaders($request->headers);
+        $client = $this->httpClient($repeatable)->withHeaders($this->headersFor($request));
 
         if ($request->body === null) {
             return $client->send('GET', $request->url);
@@ -277,6 +329,51 @@ class ZnunyClient
         );
 
         return $client->withBody($body, 'application/json')->send($request->method, $request->url);
+    }
+
+    /**
+     * The session IDs and passwords of a request, as far as they are long enough to be told
+     * from ordinary text.
+     *
+     * @param  array<string, mixed>  ...$sources  the authentication and the payload
+     * @return list<string>
+     */
+    private function secretsOf(array ...$sources): array
+    {
+        $secrets = [];
+
+        foreach ($sources as $source) {
+            foreach (['SessionID', 'Password'] as $key) {
+                $value = $source[$key] ?? null;
+
+                if (is_string($value) && strlen($value) >= 4) {
+                    $secrets[] = $value;
+                }
+            }
+        }
+
+        return array_values(array_unique($secrets));
+    }
+
+    /**
+     * The headers configured for the connection, under the request's own: a configured
+     * header never replaces or doubles one the package sets, such as the authentication.
+     *
+     * @return array<array-key, mixed>
+     */
+    private function headersFor(PreparedRequest $request): array
+    {
+        $own = array_change_key_case($request->headers, CASE_LOWER);
+        $configured = $this->settings->options['headers'] ?? [];
+
+        return array_merge(
+            array_filter(
+                is_array($configured) ? $configured : [],
+                fn (int|string $name): bool => ! isset($own[strtolower((string) $name)]),
+                ARRAY_FILTER_USE_KEY,
+            ),
+            $request->headers,
+        );
     }
 
     /** @return array<array-key, mixed>|null */
@@ -375,6 +472,14 @@ class ZnunyClient
                     && $exception->response->serverError()
                     && ! str_contains($exception->response->body(), 'determine Operation');
             });
+        }
+
+        // The connection's own request options (proxy, client certificate, ...). They cannot
+        // name "verify" or a timeout: ConnectionConfig accepts a fixed list only.
+        $options = array_diff_key($this->settings->options, ['headers' => true]);
+
+        if ($options !== []) {
+            $client = $client->withOptions($options);
         }
 
         return $this->settings->verifySsl === true

@@ -77,7 +77,11 @@ class TicketCreateBuilder
 
         if ($this->dynamicFields !== []) {
             DynamicFieldValidator::fromConfig()->validate($this->dynamicFields);
-            $payload['DynamicField'] = TicketInputMapper::mapDynamicFields($this->dynamicFields);
+            $payload['DynamicField'] = TicketInputMapper::mapDynamicFields(
+                $this->dynamicFields,
+                $this->client->settings()->timezone,
+                (array) config('znuny.dynamic_fields', []),
+            );
         }
 
         if ($this->attachments !== []) {

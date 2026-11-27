@@ -2,16 +2,16 @@
 
 namespace ItsJustVita\LaravelZnuny\Builders;
 
-use DateTimeImmutable;
 use DateTimeInterface;
-use DateTimeZone;
 use Generator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Collection;
 use ItsJustVita\LaravelZnuny\Data\Ticket;
+use ItsJustVita\LaravelZnuny\DynamicFields\FieldValue;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunySearchLimitExceededException;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
+use ItsJustVita\LaravelZnuny\Support\ZnunyTime;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 
 class TicketBuilder
@@ -325,12 +325,14 @@ class TicketBuilder
      * Operators: Equals, Like, GreaterThan, GreaterThanEquals, SmallerThan, SmallerThanEquals, Empty.
      * Several calls for one field add up, e.g. GreaterThanEquals and SmallerThan for a range;
      * Znuny combines them with AND. The same operator again replaces its value.
+     * A date is sent in Znuny's format and time zone, like a date in a field that is written.
      * Needs a TicketSearch route with a request body, e.g. 'POST /TicketSearch'.
      */
     public function whereDynamicField(string $name, mixed $value, string $operator = 'Equals'): self
     {
         $field = 'DynamicField_'.$name;
         $conditions = is_array($this->params[$field] ?? null) ? $this->params[$field] : [];
+        $value = FieldValue::forZnuny($name, $value, $this->client->settings()->timezone, (array) config('znuny.dynamic_fields', []));
 
         return $this->where($field, [...$conditions, $operator => $value]);
     }
@@ -421,14 +423,15 @@ class TicketBuilder
     }
 
     /**
-     * Fetches all matching IDs, then loads only the tickets of the requested page. A page
+     * Fetches all matching IDs, then loads only the tickets of the requested page. Without
+     * a page it is the page of the current request ("?page="), as with Eloquent; a page
      * below 1 is the first page. The paginator's links point to the current URL.
      *
      * @return LengthAwarePaginator<int, Ticket>
      */
-    public function paginate(int $perPage = 25, int $page = 1): LengthAwarePaginator
+    public function paginate(int $perPage = 25, ?int $page = null): LengthAwarePaginator
     {
-        $page = max(1, $page);
+        $page = max(1, $page ?? Paginator::resolveCurrentPage());
         $ids = $this->ids();
         $pageIds = $ids->slice(($page - 1) * $perPage, $perPage)->values()->all();
 
@@ -456,9 +459,7 @@ class TicketBuilder
      */
     protected function znunyTime(DateTimeInterface $date): string
     {
-        return DateTimeImmutable::createFromInterface($date)
-            ->setTimezone(new DateTimeZone($this->client->settings()->timezone))
-            ->format('Y-m-d H:i:s');
+        return ZnunyTime::dateTime($date, $this->client->settings()->timezone);
     }
 
     /**

@@ -1,5 +1,47 @@
 # Upgrade guide
 
+## 0.3.x → 0.4.0
+
+0.4.0 gives every operation Znuny ships a typed method (see the CHANGELOG) and deprecates what does not rest on stock Znuny. Four changes can break existing code. Nothing has to change in Znuny or in your config file.
+
+### `$ticket->customerUserID` is gone
+
+The property was renamed to `$ticket->customerUserId` in 0.3.0 and has triggered a deprecation notice since. Reading the old name now throws an `Error` that names the new one; `isset()` and `??` on it are false. The input key `customerUserID` of `create()` and `update()` keeps working, as does the key `CustomerUserID` of `toArray()`.
+
+### `paginate()` follows the page of the request
+
+`paginate()` without a page used to return page 1. It now returns the page of the current request (`?page=`), as Eloquent's `paginate()` does. Pass `page: 1` where page 1 is meant whatever the request says. Calls that pass a page are unchanged.
+
+### Two refusals raise `ZnunyAccessDeniedException`
+
+Only relevant if you already call these operations through `Znuny::call()`:
+
+- `TimeAccountingGet.NoPermission` (the user is not in the group `timeaccounting_webservice`) was a `GenericZnunyException`.
+- `OutOfOffice.AuthFail` with "User needs to be in group admin" or "User needs to be an agent" was a `ZnunySessionExpiredException` in session mode, after a pointless new login, and a `ZnunyAuthenticationException` in credentials mode.
+
+### Dates in dynamic fields are sent in Znuny's format
+
+A `DateTimeInterface` as a dynamic field value, on create, update or in `whereDynamicField()`, is sent as `Y-m-d H:i:s` in Znuny's time zone. Before, it was sent as an ISO 8601 string, which Znuny rejects, so working code is not affected. If a Znuny field is of type "Date" (without time), declare it in `config/znuny.php` as `'YourField' => ['type' => 'date']`; otherwise Znuny rejects the time of day.
+
+### Deprecated: the lookups
+
+`Znuny::queues()`, `states()`, `priorities()`, `types()`, `customers()`, `flush()`, `flushAll()`, the command `znuny:cache-clear` and the `cache` block of the config are deprecated and will be removed in 1.0. They need operations Znuny does not ship, in a response format only this package defines. They keep working and trigger `E_USER_DEPRECATED`, which Laravel writes to the deprecations log channel.
+
+| Deprecated | Use instead |
+|---|---|
+| `Znuny::queues()->all()` | `Znuny::call('QueueList')['Queue']` (the response of your operation, as an array) |
+| `Znuny::queues()->find($id)` | `Znuny::call('QueueGet', ['QueueID' => $id])` |
+| `Znuny::states()->all()`, `priorities()->all()`, `types()->all()` | `Znuny::call('StateList')`, `call('PriorityList')`, `call('TypeList')` |
+| `Znuny::customers()->find($id)` | `Znuny::call('CustomerUserGet', ['CustomerUserID' => $id])` |
+| `Znuny::customers()->tickets($id)` | `Znuny::tickets()->whereCustomerId($id)->get()` |
+| the lookup cache, `flush()`, `znuny:cache-clear` | Laravel's cache around your own `call()`, e.g. `Cache::remember('queues', 3600, fn () => Znuny::call('QueueList'))` |
+
+### Other things you may notice
+
+- Session data in logs and events: values whose key names a secret are redacted, also inside values Znuny returns as JSON.
+- `php artisan znuny:webservice` has a new option `--also`. Without it the generated file is the same as before, unless the connection's routes already map `TimeAccountingGet` or `OutOfOffice`: those two were left out as unknown operations and are now generated.
+- Znuny's error messages sometimes repeat the session ID or the password that was sent. Both are replaced with `[REDACTED]` in exception messages, logs and events.
+
 ## 0.2.x → 0.3.0
 
 0.3.0 adds a lot (see the CHANGELOG) and makes four breaking changes. Each of them fails loudly rather than changing results silently. Nothing has to change in Znuny.

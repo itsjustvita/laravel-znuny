@@ -43,4 +43,19 @@ class FakeZnunyClient extends ZnunyClient
     {
         return 'fake-session';
     }
+
+    public function cachedSessionId(): ?string
+    {
+        return $this->sessionId();
+    }
+
+    public function forgetSession(): void {}
+
+    /**
+     * Answered from the fake responses like every other operation.
+     */
+    public function logout(): void
+    {
+        $this->state->respond($this->connection, 'SessionDelete', ['SessionID' => $this->sessionId()]);
+    }
 }

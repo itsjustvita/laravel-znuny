@@ -206,6 +206,35 @@ final class ZnunyFakeTest extends TestCase
         Znuny::assertNotCalled('TicketSearch', fn (array $payload) => array_key_exists('Limit', $payload));
     }
 
+    public function test_the_session_user_and_logout_run_against_the_fake(): void
+    {
+        Znuny::fake([
+            'SessionGet' => Znuny::fakeSessionUser(['UserLogin' => 'api-agent', 'UserID' => '7', 'OutOfOffice' => '1']),
+            'SessionDelete' => ['Success' => 1],
+        ]);
+
+        $user = Znuny::session()->user();
+
+        $this->assertSame('api-agent', $user->login);
+        $this->assertSame('7', $user->id);
+        $this->assertSame('agent', $user->type);
+        $this->assertNotNull($user->email);
+        $this->assertSame('1', $user->attribute('OutOfOffice'));
+
+        Znuny::session()->logout();
+
+        Znuny::assertCalled('SessionDelete', fn (array $payload): bool => $payload === ['SessionID' => 'fake-session']);
+    }
+
+    public function test_logout_against_the_fake_needs_a_response_like_any_other_operation(): void
+    {
+        Znuny::fake();
+
+        $this->expectException(StrayZnunyCallException::class);
+
+        Znuny::session()->logout();
+    }
+
     public function test_nothing_is_sent_over_http(): void
     {
         Event::fake([ZnunyRequestSent::class]);

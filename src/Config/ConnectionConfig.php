@@ -5,6 +5,7 @@ namespace ItsJustVita\LaravelZnuny\Config;
 use DateTimeZone;
 use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
+use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Support\Setting;
 
@@ -25,6 +26,12 @@ final readonly class ConnectionConfig
     public const TRANSPORT_HEADERS = 'headers';
 
     /**
+     * The Guzzle request options a connection may set. Others could switch off certificate
+     * verification or the timeouts, or change what the client relies on.
+     */
+    public const HTTP_OPTIONS = ['proxy', 'cert', 'ssl_key', 'headers', 'auth', 'force_ip_resolve', 'version'];
+
+    /**
      * Zone names Znuny offers for OTRSTimeZone that PHP reads as fixed offsets without
      * daylight saving time, mapped to the regions the time zone database links them to.
      */
@@ -41,6 +48,7 @@ final readonly class ConnectionConfig
     /**
      * @param  int<1, max>  $batchSize
      * @param  int<1, max>|null  $searchLimit
+     * @param  array<string, mixed>  $options  Guzzle request options, see HTTP_OPTIONS
      */
     public function __construct(
         public string $name,
@@ -59,6 +67,7 @@ final readonly class ConnectionConfig
         public int $batchSize,
         public string $timezone = 'UTC',
         public ?int $searchLimit = 500,
+        public array $options = [],
     ) {}
 
     /**
@@ -103,6 +112,7 @@ final readonly class ConnectionConfig
                 array_key_exists('search_limit', $http) => $http['search_limit'],
                 default => 500,
             }),
+            options: self::options($name, $http['options'] ?? null, $config['options'] ?? null),
         );
     }
 
@@ -196,6 +206,84 @@ final readonly class ConnectionConfig
         }
 
         return max(1, $limit);
+    }
+
+    /**
+     * The request options of the connection: the global ones, replaced key by key by its own.
+     *
+     * @return array<string, mixed>
+     */
+    private static function options(string $connection, mixed $global, mixed $own): array
+    {
+        $options = [];
+
+        foreach ([$global, $own] as $source) {
+            if (Setting::isBlank($source) || $source === []) {
+                continue;
+            }
+
+            if (! is_array($source) || array_is_list($source)) {
+                throw new ZnunyConfigurationException(
+                    "Znuny connection [{$connection}] has invalid [options]: they must be an array of named options, e.g. ['proxy' => 'http://proxy.internal:3128']."
+                );
+            }
+
+            foreach ($source as $key => $value) {
+                $key = (string) $key;
+
+                if (in_array($key, ['verify', 'timeout', 'connect_timeout'], true)) {
+                    throw new ZnunyConfigurationException(sprintf(
+                        'Znuny connection [%s] cannot set [%s] in [options]. Use [%s] instead.',
+                        $connection,
+                        $key,
+                        $key === 'verify' ? 'verify_ssl' : $key,
+                    ));
+                }
+
+                if (! in_array($key, self::HTTP_OPTIONS, true)) {
+                    throw new ZnunyConfigurationException(sprintf(
+                        'Znuny connection [%s] has an unsupported entry in [options]: [%s]. Accepted: %s.',
+                        $connection,
+                        $key,
+                        implode(', ', self::HTTP_OPTIONS),
+                    ));
+                }
+
+                if ($key === 'headers') {
+                    if (! is_array($value)) {
+                        throw new ZnunyConfigurationException(
+                            "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
+                        );
+                    }
+
+                    self::refuseAuthenticationHeaders($connection, $value);
+                }
+
+                $options[$key] = $value;
+            }
+        }
+
+        return $options;
+    }
+
+    /**
+     * Znuny copies the X-OTRS-Header-* authentication headers into the request, over its
+     * body. A configured one would therefore replace the authentication the package sends
+     * in the body of POST, PATCH and DELETE requests.
+     *
+     * @param  array<array-key, mixed>  $headers
+     */
+    private static function refuseAuthenticationHeaders(string $connection, array $headers): void
+    {
+        $own = array_map(strtolower(...), array_values(RequestBuilder::AUTH_HEADERS));
+
+        foreach (array_keys($headers) as $header) {
+            if (in_array(strtolower((string) $header), $own, true)) {
+                throw new ZnunyConfigurationException(
+                    "Znuny connection [{$connection}] cannot set the header [{$header}] in [options]: the package sends the authentication itself."
+                );
+            }
+        }
     }
 
     /**

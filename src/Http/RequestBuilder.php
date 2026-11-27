@@ -28,7 +28,9 @@ final class RequestBuilder
     public function build(string $operation, array $payload, array $auth = []): PreparedRequest
     {
         $route = $this->config->routes->route($operation);
-        [$path, $loggedPath, $used] = $this->expandPath($route, $operation, $payload);
+        // A placeholder the payload does not fill is taken from the authentication, so
+        // "GET /Session/:SessionID" describes the session of the connection by default.
+        [$path, $loggedPath, $used] = $this->expandPath($route, $operation, $payload + $auth);
         $url = $this->config->baseUrl.$path;
         $headers = [];
 
@@ -59,13 +61,13 @@ final class RequestBuilder
     }
 
     /**
-     * Fill ":Param" placeholders from the payload. Lists are joined with commas,
+     * Fill ":Param" placeholders from the given values. Lists are joined with commas,
      * which Znuny accepts for TicketGet/TicketHistoryGet batches.
      *
      * Also returns the path for logs, events and errors, in which sensitive placeholders
      * (e.g. ":SessionID") are redacted.
      *
-     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $payload  the payload, completed with the authentication
      * @return array{0: string, 1: string, 2: list<string>}
      */
     private function expandPath(Route $route, string $operation, array $payload): array

@@ -27,8 +27,8 @@ return [
     | auth_transport  "auto" (X-OTRS-Header-* headers for GET routes, request data
     |                 otherwise), "payload" or "headers" (headers need Znuny 6.5+).
     |
-    | Optional per connection: retries, retry_delay, batch_size, search_limit (see "http")
-    | and timezone (see "timezone").
+    | Optional per connection: retries, retry_delay, batch_size, search_limit, options
+    | (see "http") and timezone (see "timezone").
     |
     */
 
@@ -72,7 +72,8 @@ return [
 
     /*
     | Caching of the lookup lists (queues, states, priorities, types). Single lookups such
-    | as customers()->find() always ask Znuny.
+    | as customers()->find() always ask Znuny. Deprecated since 0.4.0 together with the
+    | lookups, which need operations Znuny does not ship; removed in 1.0.
     */
 
     'cache' => [
@@ -98,7 +99,10 @@ return [
     /*
     | Optional validation of dynamic field values before they are sent, e.g.
     | 'Segment' => ['type' => 'string', 'allowed' => ['business', 'private']],
-    | Types: string, integer, float, boolean, array. Options: allowed, min, max.
+    | Types: string, integer, float, boolean, array, date, datetime. Options: allowed, min, max.
+    |
+    | A DateTimeInterface is sent as date and time in Znuny's time zone. Declare a Znuny field
+    | of type "Date" as 'DueOn' => ['type' => 'date'], so that it is sent as a day.
     */
 
     'dynamic_fields' => [],
@@ -111,6 +115,10 @@ return [
     | search off at its SearchLimit (500 by default) without saying so; the package asks
     | for search_limit tickets and throws a ZnunySearchLimitExceededException when more
     | match. null sends no limit and accepts Znuny's cut-off, as 0.2 did by default.
+    |
+    | options: Guzzle request options for every request, e.g. ['proxy' => 'http://proxy:3128'].
+    | Accepted: proxy, cert, ssl_key, headers, auth, force_ip_resolve, version. A connection's
+    | own "options" replace these key by key.
     */
 
     'http' => [
@@ -118,6 +126,7 @@ return [
         'retry_delay' => 100,
         'batch_size' => 50,
         'search_limit' => env('ZNUNY_SEARCH_LIMIT', 500),
+        'options' => [],
     ],
 
     /*
