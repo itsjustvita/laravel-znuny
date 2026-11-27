@@ -26,6 +26,14 @@ class SessionManager
         return $fresh;
     }
 
+    /**
+     * The cached session ID, without logging in when there is none.
+     */
+    public function cached(string $connection): ?string
+    {
+        return $this->store->get($connection);
+    }
+
     public function invalidate(string $connection): void
     {
         $this->store->forget($connection);

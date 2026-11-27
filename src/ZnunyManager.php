@@ -10,6 +10,7 @@ use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Resources\CustomerResource;
 use ItsJustVita\LaravelZnuny\Resources\PriorityResource;
 use ItsJustVita\LaravelZnuny\Resources\QueueResource;
+use ItsJustVita\LaravelZnuny\Resources\SessionResource;
 use ItsJustVita\LaravelZnuny\Resources\StateResource;
 use ItsJustVita\LaravelZnuny\Resources\TicketResource;
 use ItsJustVita\LaravelZnuny\Resources\TypeResource;
@@ -111,6 +112,11 @@ class ZnunyManager
     public function tickets(): TicketResource
     {
         return new TicketResource($this->client());
+    }
+
+    public function session(): SessionResource
+    {
+        return new SessionResource($this->client());
     }
 
     public function queues(): QueueResource

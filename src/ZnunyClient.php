@@ -140,6 +140,47 @@ class ZnunyClient
     }
 
     /**
+     * The session ID that is cached for this connection, if any. Does not log in.
+     */
+    public function cachedSessionId(): ?string
+    {
+        return $this->sessionManager->cached($this->identityKey());
+    }
+
+    /**
+     * Forget the cached session ID; the next call that needs a session logs in again.
+     */
+    public function forgetSession(): void
+    {
+        $this->sessionManager->invalidate($this->identityKey());
+    }
+
+    /**
+     * Remove the cached session in Znuny and forget it. Without a cached session nothing is sent.
+     */
+    public function logout(): void
+    {
+        $sessionId = $this->cachedSessionId();
+
+        if ($sessionId === null) {
+            return;
+        }
+
+        try {
+            // Znuny up to 6.5.11 and 7.1 authenticates SessionRemove with the credentials, newer
+            // versions with the session ID; sending both works everywhere. No repeat, no new login.
+            $this->send('SessionDelete', ['SessionID' => $sessionId], $this->credentials());
+        } catch (ZnunyException $e) {
+            // Znuny no longer knows the session, which is what logout() is for.
+            if ($e->getErrorCode() !== 'SessionRemove.Fail') {
+                throw $e;
+            }
+        } finally {
+            $this->forgetSession();
+        }
+    }
+
+    /**
      * Key under which the session and cached lookups of this connection are stored.
      */
     public function identityKey(): string

@@ -276,6 +276,64 @@ final class ZnunyIntegrationTest extends TestCase
         $this->assertSame([], $znuny->tickets()->whereDynamicField('OrderId', 'no-such-order')->whereDynamicField('OrderId', $orderId.'*', 'Like')->ids()->all());
     }
 
+    #[DataProvider('webServices')]
+    public function test_the_session_user_is_the_user_of_the_connection(string $urlVariable, string $routes): void
+    {
+        $user = $this->znuny([], $urlVariable, $routes)->session()->user();
+
+        $this->assertSame(getenv('ZNUNY_INTEGRATION_USERNAME'), $user->login);
+        $this->assertSame('agent', $user->type);
+        $this->assertMatchesRegularExpression('/^\d+$/', $user->id);
+        $this->assertNotNull($user->email);
+        $this->assertNotNull($user->fullName);
+
+        // The same through a connection that sends its credentials with every request.
+        $this->assertSame($user->id, $this->znuny(['auth' => 'credentials'], $urlVariable, $routes)->session()->user()->id);
+    }
+
+    public function test_the_session_user_of_a_customer_connection(): void
+    {
+        $user = $this->customer()->session()->user();
+
+        $this->assertSame($this->customerUser(), $user->login);
+        $this->assertSame($this->customerUser(), $user->id);
+        $this->assertSame('customer', $user->type);
+        $this->assertArrayNotHasKey('UserPassword', $user->attributes);
+        $this->assertNotNull($user->attribute('UserCustomerID'));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}> URL variable and route preset
+     */
+    public static function webServicesWithSessionRemove(): array
+    {
+        // The classic example has no SessionRemove operation.
+        return array_diff_key(self::webServices(), ['classic example' => true]);
+    }
+
+    #[DataProvider('webServicesWithSessionRemove')]
+    public function test_logout_ends_the_session(string $urlVariable, string $routes): void
+    {
+        $znuny = $this->znuny([], $urlVariable, $routes);
+        $old = $znuny->client()->sessionId();
+
+        $znuny->session()->logout();
+
+        try {
+            $this->znuny(['auth' => 'credentials'], $urlVariable, $routes)->call('SessionGet', ['SessionID' => $old]);
+            $this->fail('Znuny must not know the session after logout().');
+        } catch (ZnunyException $e) {
+            $this->assertSame('SessionGet.SessionInvalid', $e->getErrorCode());
+        }
+
+        $this->assertNotSame($old, $znuny->client()->sessionId());
+
+        // A second logout right away, and one for a session Znuny no longer knows, are quiet.
+        $znuny->session()->logout();
+        $znuny->session()->logout();
+        $this->addToAssertionCount(1);
+    }
+
     /*
      * What Znuny itself does with the operations the package wraps. These tests call Znuny
      * directly, so a change in Znuny shows up here and not as a puzzling failure elsewhere.

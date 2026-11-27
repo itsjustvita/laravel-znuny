@@ -32,6 +32,24 @@ final class RequestBuilderTest extends TestCase
         $this->assertSame(['X-OTRS-Header-SessionID' => 'S1'], $request->headers);
     }
 
+    public function test_a_placeholder_is_filled_from_the_authentication_when_the_payload_has_none(): void
+    {
+        $request = $this->builder()->build('SessionGet', [], ['SessionID' => 'S1']);
+
+        $this->assertSame('GET', $request->method);
+        $this->assertSame(self::BASE.'/Session/S1', $request->url);
+        $this->assertSame('/Session/[REDACTED]', $request->path);
+        $this->assertSame(['X-OTRS-Header-SessionID' => 'S1'], $request->headers);
+    }
+
+    public function test_the_payload_wins_over_the_authentication_for_a_placeholder(): void
+    {
+        $request = $this->builder()->build('SessionGet', ['SessionID' => 'OTHER'], ['SessionID' => 'S1']);
+
+        $this->assertSame(self::BASE.'/Session/OTHER', $request->url);
+        $this->assertSame(['X-OTRS-Header-SessionID' => 'S1'], $request->headers);
+    }
+
     public function test_list_placeholders_are_joined_with_commas(): void
     {
         $request = $this->builder()->build('TicketGet', ['TicketID' => ['1', '2', 3]], ['SessionID' => 'S1']);

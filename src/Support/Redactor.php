@@ -14,13 +14,19 @@ final class Redactor
     ];
 
     /**
-     * Replace the values of sensitive keys (case-insensitive, at any depth) with [REDACTED].
+     * Replace the values of sensitive keys (case-insensitive, at any depth) with [REDACTED],
+     * and the value of a {Key, Value} pair whose key names a secret.
      *
      * @param  array<array-key, mixed>  $data
      * @return array<array-key, mixed>
      */
     public static function redact(array $data): array
     {
+        // Session data arrives as a list of {Key, Value} pairs, so the secret is named by a value.
+        if (is_string($data['Key'] ?? null) && array_key_exists('Value', $data) && self::isSecretName($data['Key'])) {
+            $data['Value'] = self::REDACTED;
+        }
+
         foreach ($data as $key => $value) {
             if (is_string($key) && self::isSensitive($key)) {
                 $data[$key] = self::REDACTED;
@@ -39,6 +45,20 @@ final class Redactor
     public static function isSensitive(string $key): bool
     {
         return in_array(strtolower($key), self::SENSITIVE_KEYS, true);
+    }
+
+    /**
+     * Whether a name out of Znuny's data, such as a session key, names a secret: it contains
+     * "password", "secret" or "token", or ends with "pw" (UserPw, but not UserLastPwChangeTime).
+     */
+    public static function isSecretName(string $name): bool
+    {
+        $name = strtolower($name);
+
+        return str_contains($name, 'password')
+            || str_contains($name, 'secret')
+            || str_contains($name, 'token')
+            || str_ends_with($name, 'pw');
     }
 
     /**
