@@ -18,9 +18,9 @@ The setup creates:
 
 - the agent `api-agent` (password `api-secret`, also in the group `timeaccounting_webservice`), the agent `api-admin` (password `admin-secret`, in the group `admin`) and the customer user `jane` (password `jane-secret`, customer `acme`);
 - the ticket dynamic fields `OrderId` (text), `Tags` (multiselect with `alpha`, `beta`, `gamma`), `DueAt` (date and time) and `DueOn` (date);
-- Znuny's example web services `TimeAccountingREST` and `OutOfOffice`, each with one operation and without a session route, and `OutOfOfficePlain`, the same operation without Znuny's inbound mapping;
+- Znuny's example web services `TimeAccountingREST` and `OutOfOffice`, each with one operation and without a session route;
 - the web services `GenericTicketConnectorREST` (the Ready2Adopt example; versions that do not ship it get the file of a newer release) and `GenericTicketConnectorRESTClassic` (the example from `development/webservices/`, downloaded from GitHub for the image's version);
-- two web services generated with `php artisan znuny:webservice`, which the suite thereby tests too: `OperationNameREST` (routes named after the operations, as the `operation-name` preset expects) and `LaravelWebhook`, whose `Ticket::Generic` invoker posts every `TicketCreate` event to `http://host.docker.internal:8099/znuny/webhooks` with the header `X-Znuny-Token: integration-token`.
+- three web services generated with `php artisan znuny:webservice`, which the suite thereby tests too: `OperationNameREST` (routes named after the operations, as the `operation-name` preset expects), `AllOperationsREST` (the default routes plus `--also=TimeAccountingGet --also=OutOfOffice`, the latter without Znuny's inbound mapping) and `LaravelWebhook`, whose `Ticket::Generic` invoker posts every `TicketCreate` event to `http://host.docker.internal:8099/znuny/webhooks` with the header `X-Znuny-Token: integration-token`.
 
 ## Run the suite
 
@@ -30,7 +30,7 @@ ZNUNY_INTEGRATION_CLASSIC_URL=http://localhost:8080/otrs/nph-genericinterface.pl
 ZNUNY_INTEGRATION_OPERATION_NAME_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OperationNameREST \
 ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/TimeAccountingREST \
 ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OutOfOffice \
-ZNUNY_INTEGRATION_OUT_OF_OFFICE_PLAIN_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OutOfOfficePlain \
+ZNUNY_INTEGRATION_ALL_OPERATIONS_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/AllOperationsREST \
 ZNUNY_INTEGRATION_USERNAME=api-agent \
 ZNUNY_INTEGRATION_PASSWORD=api-secret \
 ZNUNY_INTEGRATION_ADMIN_USERNAME=api-admin \

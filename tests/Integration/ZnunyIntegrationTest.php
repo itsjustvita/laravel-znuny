@@ -334,13 +334,13 @@ final class ZnunyIntegrationTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
-    public function test_time_accounting_entries(): void
+    #[DataProvider('timeAccountingWebServices')]
+    public function test_time_accounting_entries(string $urlVariable, array $config): void
     {
         $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
         $ticket = $this->newTicket($this->znuny(), 'Time accounting '.uniqid(), article: ['timeUnit' => 15])->save();
 
-        // Znuny's own web service for it has no session route, so the connection sends its credentials.
-        $entries = $this->znuny(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')
+        $entries = $this->znuny($config, $urlVariable)
             ->timeAccounting()
             ->entries($login, now()->subHour(), now()->addHour());
 
@@ -352,23 +352,23 @@ final class ZnunyIntegrationTest extends TestCase
         $this->assertSame('Raw', $entry->queue);
         $this->assertLessThan(300, abs($entry->created->diffInSeconds(now())));
 
-        $this->assertCount(0, $this->znuny(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')
+        $this->assertCount(0, $this->znuny($config, $urlVariable)
             ->timeAccounting()
             ->entries($login, now()->subDays(3), now()->subDays(2)));
 
         $this->expectException(ZnunyAccessDeniedException::class);
 
-        $this->admin(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL')
+        $this->admin($config, $urlVariable)
             ->timeAccounting()
             ->entries($login, now()->subHour(), now()->addHour());
     }
 
     #[DataProvider('outOfOfficeWebServices')]
-    public function test_out_of_office_is_set_and_cleared(string $urlVariable): void
+    public function test_out_of_office_is_set_and_cleared(string $urlVariable, array $config): void
     {
         $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
         $password = (string) getenv('ZNUNY_INTEGRATION_PASSWORD');
-        $users = $this->admin(['auth' => 'credentials'], $urlVariable)->users();
+        $users = $this->admin($config, $urlVariable)->users();
 
         $users->setOutOfOffice($login, CarbonImmutable::parse('2032-03-04'), CarbonImmutable::parse('2032-03-11'));
 
@@ -393,7 +393,7 @@ final class ZnunyIntegrationTest extends TestCase
 
         $this->expectException(ZnunyAccessDeniedException::class);
 
-        $this->znuny(['auth' => 'credentials'], $urlVariable)->users()->clearOutOfOffice($login);
+        $this->znuny($config, $urlVariable)->users()->clearOutOfOffice($login);
     }
 
     /*
@@ -462,18 +462,33 @@ final class ZnunyIntegrationTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: string}> URL variable
+     * Znuny ships the operation in a web service of its own, which has no session route and
+     * builds the entries from the CSV string. The generated web service has the session
+     * routes and no mapping.
+     *
+     * @return array<string, array{0: string, 1: array<string, string>}> URL variable and connection settings
      */
     public static function outOfOfficeWebServices(): array
     {
         return [
-            "Znuny's web service with its inbound mapping" => ['ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL'],
-            'a web service without mapping' => ['ZNUNY_INTEGRATION_OUT_OF_OFFICE_PLAIN_URL'],
+            "Znuny's OutOfOffice web service, with credentials" => ['ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL', ['auth' => 'credentials']],
+            'a generated web service, with a session' => ['ZNUNY_INTEGRATION_ALL_OPERATIONS_URL', []],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: array<string, string>}> URL variable and connection settings
+     */
+    public static function timeAccountingWebServices(): array
+    {
+        return [
+            "Znuny's TimeAccountingREST web service, with credentials" => ['ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL', ['auth' => 'credentials']],
+            'a generated web service, with a session' => ['ZNUNY_INTEGRATION_ALL_OPERATIONS_URL', []],
         ];
     }
 
     #[DataProvider('outOfOfficeWebServices')]
-    public function test_znuny_sets_out_of_office_from_entries_and_csv(string $urlVariable): void
+    public function test_znuny_sets_out_of_office_from_entries_and_csv(string $urlVariable, array $config): void
     {
         $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
         $password = (string) getenv('ZNUNY_INTEGRATION_PASSWORD');
@@ -486,7 +501,7 @@ final class ZnunyIntegrationTest extends TestCase
                 .implode(',', array_map(fn (string $column): string => '"'.($entry[$column] ?? '').'"', $columns))."\n",
         ];
 
-        $admin = $this->admin(['auth' => 'credentials'], $urlVariable);
+        $admin = $this->admin($config, $urlVariable);
         $admin->call('OutOfOffice', $payload(['UserLogin' => $login, 'StartDate' => '2031-02-03', 'EndDate' => '2031-02-10', 'OutOfOffice' => 1]));
 
         // No operation reads the setting of another user; that user's own session data shows it.
@@ -501,7 +516,7 @@ final class ZnunyIntegrationTest extends TestCase
         $this->assertEquals(0, $this->freshSessionData($login, $password)['OutOfOffice']);
 
         try {
-            $this->znuny(['auth' => 'credentials'], $urlVariable)->call('OutOfOffice', $payload(['UserLogin' => $login, 'OutOfOffice' => 0]));
+            $this->znuny($config, $urlVariable)->call('OutOfOffice', $payload(['UserLogin' => $login, 'OutOfOffice' => 0]));
             $this->fail('An agent outside the group admin must be refused.');
         } catch (ZnunyException $e) {
             $this->assertSame('OutOfOffice.AuthFail', $e->getErrorCode());

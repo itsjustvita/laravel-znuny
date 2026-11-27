@@ -81,6 +81,43 @@ final class WebServiceDefinitionTest extends TestCase
         $this->assertSame(['GET', '/Ticket'], $this->routes($definition)['TicketSearch']);
     }
 
+    public function test_operations_znuny_ships_in_other_web_services_are_added_on_request(): void
+    {
+        $routes = RouteMap::fromConfig('generic-ticket-connector');
+        $definition = WebServiceDefinition::fromRoutes($routes, ['TimeAccountingGet', 'OutOfOffice'])->toArray();
+
+        $this->assertSame('Ticket::TimeAccountingGet', $this->types($definition)['TimeAccountingGet']);
+        $this->assertSame('User::OutOfOffice', $this->types($definition)['OutOfOffice']);
+        // The routes of Znuny's own TimeAccountingREST and OutOfOffice web services.
+        $this->assertSame(['POST', '/TimeAccountingGet'], $this->routes($definition)['TimeAccountingGet']);
+        $this->assertSame(['POST', '/OutOfOffice'], $this->routes($definition)['OutOfOffice']);
+        // Without Znuny's CSV mapping: the package sends the entries as well.
+        $this->assertSame([], $definition['Provider']['Operation']['OutOfOffice']['MappingInbound']);
+
+        $default = $this->types(WebServiceDefinition::fromRoutes($routes)->toArray());
+        $this->assertArrayNotHasKey('TimeAccountingGet', $default);
+        $this->assertArrayNotHasKey('OutOfOffice', $default);
+    }
+
+    public function test_an_optional_operation_the_routes_map_is_included_with_that_route(): void
+    {
+        $definition = WebServiceDefinition::fromRoutes(RouteMap::fromConfig([
+            'extends' => 'generic-ticket-connector',
+            'TimeAccountingGet' => 'GET /Time',
+        ]));
+
+        $this->assertSame(['GET', '/Time'], $this->routes($definition->toArray())['TimeAccountingGet']);
+        $this->assertSame([], $definition->skipped());
+    }
+
+    public function test_only_operations_znuny_ships_can_be_added(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('[QueueList] cannot be added. Znuny ships these operations outside its ticket web service: TimeAccountingGet, OutOfOffice.');
+
+        WebServiceDefinition::fromRoutes(RouteMap::fromConfig('generic-ticket-connector'), ['QueueList']);
+    }
+
     public function test_unknown_operations_are_skipped(): void
     {
         $definition = WebServiceDefinition::fromRoutes(RouteMap::fromConfig([

@@ -2,6 +2,7 @@
 
 namespace ItsJustVita\LaravelZnuny\WebService;
 
+use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 
 /**
@@ -22,7 +23,15 @@ final class WebServiceDefinition
         'TicketHistoryGet' => 'Ticket::TicketHistoryGet',
         'TicketSearch' => 'Ticket::TicketSearch',
         'TicketUpdate' => 'Ticket::TicketUpdate',
+        'TimeAccountingGet' => 'Ticket::TimeAccountingGet',
+        'OutOfOffice' => 'User::OutOfOffice',
     ];
+
+    /**
+     * Operations Znuny ships in web services of their own (TimeAccountingREST, OutOfOffice).
+     * They need special groups, so they are only added on request.
+     */
+    public const OPTIONAL_OPERATIONS = ['TimeAccountingGet', 'OutOfOffice'];
 
     /** Always part of the provider: the operations the package itself calls. */
     private const CORE_OPERATIONS = [
@@ -35,15 +44,32 @@ final class WebServiceDefinition
 
     /**
      * @param  array<string, mixed>|null  $requester
+     * @param  list<string>  $also  optional operations to add
      */
     private function __construct(
         private readonly RouteMap $routes,
         private readonly ?array $requester = null,
+        private readonly array $also = [],
     ) {}
 
-    public static function fromRoutes(RouteMap $routes): self
+    /**
+     * @param  array<array-key, string>  $also  names from OPTIONAL_OPERATIONS to add to the web service
+     *
+     * @throws InvalidArgumentException for a name that is none of them
+     */
+    public static function fromRoutes(RouteMap $routes, array $also = []): self
     {
-        return new self($routes);
+        foreach ($also as $operation) {
+            if (! in_array($operation, self::OPTIONAL_OPERATIONS, true)) {
+                throw new InvalidArgumentException(sprintf(
+                    '[%s] cannot be added. Znuny ships these operations outside its ticket web service: %s.',
+                    $operation,
+                    implode(', ', self::OPTIONAL_OPERATIONS),
+                ));
+            }
+        }
+
+        return new self($routes, null, array_values(array_unique($also)));
     }
 
     /**
@@ -78,7 +104,7 @@ final class WebServiceDefinition
             ];
         }
 
-        return new self($this->routes, [
+        return new self($this->routes, also: $this->also, requester: [
             'Invoker' => [
                 self::INVOKER => [
                     'Description' => 'Sends ticket events to the Laravel application',
@@ -111,6 +137,7 @@ final class WebServiceDefinition
     {
         $names = array_unique([
             ...self::CORE_OPERATIONS,
+            ...$this->also,
             ...array_intersect(array_keys($this->routes->all()), array_keys(self::OPERATION_TYPES)),
         ]);
         sort($names);

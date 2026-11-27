@@ -97,16 +97,12 @@ import_example() {
 import_example TimeAccountingREST TimeAccountingREST.yml
 import_example OutOfOffice OutOfOffice.yml
 
-# The same operation without Znuny's inbound mapping, as a hand-built web service has it.
-compose cp ./OutOfOfficePlain.yml znuny:/tmp/OutOfOfficePlain.yml
-console Admin::WebService::Add --name OutOfOfficePlain --source-path /tmp/OutOfOfficePlain.yml || true
-
 # The classic example (development/webservices) is not part of the release; fetch it from GitHub.
 fetch "${ZNUNY_GIT_REF}/development/webservices/GenericTicketConnectorREST.yml" /tmp/GenericTicketConnectorRESTClassic.yml
 console Admin::WebService::Add --name GenericTicketConnectorRESTClassic \
   --source-path /tmp/GenericTicketConnectorRESTClassic.yml || true
 
-# These two web services come from the package's own generator (php artisan znuny:webservice),
+# These web services come from the package's own generator (php artisan znuny:webservice),
 # so the suite also proves that generated files import and work on this Znuny version.
 (cd ../../.. && vendor/bin/testbench package:discover >/dev/null)
 import_generated() {
@@ -121,6 +117,9 @@ import_generated() {
 }
 
 import_generated OperationNameREST --routes=operation-name
+# Everything Znuny ships in one web service: the ticket connector plus the two operations of
+# TimeAccountingREST and OutOfOffice, the latter without Znuny's CSV mapping.
+import_generated AllOperationsREST --routes=generic-ticket-connector --also=TimeAccountingGet --also=OutOfOffice
 ZNUNY_WEBHOOK_TOKEN=integration-token import_generated LaravelWebhook --routes=operation-name \
   --webhooks=TicketCreate --webhook-url=http://host.docker.internal:8099 --with-token --sync
 
@@ -145,7 +144,7 @@ Znuny is ready:
   ZNUNY_INTEGRATION_OPERATION_NAME_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OperationNameREST
   ZNUNY_INTEGRATION_TIME_ACCOUNTING_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/TimeAccountingREST
   ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OutOfOffice
-  ZNUNY_INTEGRATION_OUT_OF_OFFICE_PLAIN_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/OutOfOfficePlain
+  ZNUNY_INTEGRATION_ALL_OPERATIONS_URL=http://localhost:8080/otrs/nph-genericinterface.pl/Webservice/AllOperationsREST
   ZNUNY_INTEGRATION_USERNAME=api-agent
   ZNUNY_INTEGRATION_PASSWORD=api-secret
   ZNUNY_INTEGRATION_ADMIN_USERNAME=api-admin

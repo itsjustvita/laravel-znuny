@@ -36,6 +36,27 @@ final class WebServiceCommandTest extends TestCase
         $this->assertSame('/Ticket/Search', $this->routes(SymfonyYaml::parse(Artisan::output()))['TicketSearch']);
     }
 
+    public function test_also_adds_the_operations_znuny_ships_in_other_web_services(): void
+    {
+        $this->assertSame(0, Artisan::call('znuny:webservice', [
+            '--routes' => 'generic-ticket-connector',
+            '--also' => ['TimeAccountingGet', 'OutOfOffice'],
+        ]));
+
+        $definition = SymfonyYaml::parse(Artisan::output());
+
+        $this->assertSame('/TimeAccountingGet', $this->routes($definition)['TimeAccountingGet']);
+        $this->assertSame('/OutOfOffice', $this->routes($definition)['OutOfOffice']);
+        $this->assertSame('User::OutOfOffice', $definition['Provider']['Operation']['OutOfOffice']['Type']);
+        $this->assertSame('/Session', $this->routes($definition)['SessionCreate']);
+    }
+
+    public function test_also_refuses_operations_znuny_does_not_ship(): void
+    {
+        $this->assertSame(1, Artisan::call('znuny:webservice', ['--routes' => 'generic-ticket-connector', '--also' => ['QueueList']]));
+        $this->assertStringContainsString('TimeAccountingGet, OutOfOffice', Artisan::output());
+    }
+
     public function test_an_unknown_connection_without_routes_fails(): void
     {
         $this->assertSame(1, Artisan::call('znuny:webservice', ['connection' => 'nope']));
