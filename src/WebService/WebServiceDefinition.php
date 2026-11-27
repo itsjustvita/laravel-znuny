@@ -5,6 +5,7 @@ namespace ItsJustVita\LaravelZnuny\WebService;
 use InvalidArgumentException;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Support\Setting;
+use SensitiveParameter;
 
 /**
  * A Znuny web service definition that matches the routes of a connection, optionally with a
@@ -82,7 +83,7 @@ final class WebServiceDefinition
      * @param  bool  $withSecrets  write the token or password; otherwise CHANGE-ME
      * @param  bool  $synchronous  deliver in the request instead of through the Znuny daemon
      */
-    public function withWebhooks(array $events, string $baseUrl, string $routePrefix, array $auth, bool $withSecrets, bool $synchronous): self
+    public function withWebhooks(array $events, string $baseUrl, string $routePrefix, #[SensitiveParameter] array $auth, bool $withSecrets, bool $synchronous): self
     {
         $secret = fn (string $key): string => $withSecrets ? (string) ($auth[$key] ?? '') : self::PLACEHOLDER;
         $type = strtolower((string) ($auth['type'] ?? 'token'));

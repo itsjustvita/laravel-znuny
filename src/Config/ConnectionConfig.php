@@ -9,6 +9,7 @@ use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Support\Redactor;
 use ItsJustVita\LaravelZnuny\Support\Setting;
+use SensitiveParameter;
 
 final readonly class ConnectionConfig
 {
@@ -57,7 +58,7 @@ final readonly class ConnectionConfig
         public string $name,
         public string $baseUrl,
         public string $username,
-        private string $password,
+        #[SensitiveParameter] private string $password,
         public RouteMap $routes,
         public string $auth,
         public string $userType,
@@ -70,7 +71,7 @@ final readonly class ConnectionConfig
         public int $batchSize,
         public string $timezone = 'UTC',
         public ?int $searchLimit = 500,
-        private array $options = [],
+        #[SensitiveParameter] private array $options = [],
     ) {}
 
     /**
@@ -118,7 +119,7 @@ final readonly class ConnectionConfig
      *
      * @internal
      */
-    public static function fromArray(string $name, array $config, array $http = [], ?string $timezone = null): self
+    public static function fromArray(string $name, #[SensitiveParameter] array $config, #[SensitiveParameter] array $http = [], ?string $timezone = null): self
     {
         $required = [
             'base_url' => trim((string) ($config['base_url'] ?? '')),
@@ -168,7 +169,7 @@ final readonly class ConnectionConfig
      *
      * @internal
      */
-    public function identityKey(string $secret = ''): string
+    public function identityKey(#[SensitiveParameter] string $secret = ''): string
     {
         $identity = implode("\0", [$this->baseUrl, $this->userType, $this->username, $this->password]);
 
@@ -236,7 +237,7 @@ final readonly class ConnectionConfig
      * @param  array<string, mixed>  $http
      * @return int<1, max>|null
      */
-    private static function searchLimit(string $connection, array $config, array $http): ?int
+    private static function searchLimit(string $connection, #[SensitiveParameter] array $config, #[SensitiveParameter] array $http): ?int
     {
         $value = 500;
 
@@ -279,7 +280,7 @@ final readonly class ConnectionConfig
      *
      * @return array<string, mixed>
      */
-    private static function optionsFrom(string $connection, mixed $global, mixed $own): array
+    private static function optionsFrom(string $connection, #[SensitiveParameter] mixed $global, #[SensitiveParameter] mixed $own): array
     {
         $options = [];
 
@@ -342,7 +343,7 @@ final readonly class ConnectionConfig
      * a configured one would replace the authentication the package sends in the body of
      * POST, PATCH and DELETE requests. The content type belongs to the request body.
      */
-    private static function checkHeaders(string $connection, mixed $headers): void
+    private static function checkHeaders(string $connection, #[SensitiveParameter] mixed $headers): void
     {
         if (! is_array($headers)) {
             throw new ZnunyConfigurationException(
@@ -371,7 +372,7 @@ final readonly class ConnectionConfig
      * A client certificate or key: the path of a file, or the path and its passphrase. A
      * missing file is reported here, when the connection is built, and not by the first request.
      */
-    private static function checkFile(string $connection, string $option, mixed $value): void
+    private static function checkFile(string $connection, string $option, #[SensitiveParameter] mixed $value): void
     {
         $file = is_array($value) ? ($value[0] ?? null) : $value;
 

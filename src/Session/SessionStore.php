@@ -3,6 +3,7 @@
 namespace ItsJustVita\LaravelZnuny\Session;
 
 use Illuminate\Contracts\Cache\Repository;
+use SensitiveParameter;
 
 /**
  * @internal Not covered by the package's stability promise.
@@ -19,7 +20,7 @@ class SessionStore
         return $this->cache->get($this->key($connection));
     }
 
-    public function put(string $connection, string $sessionId, int $ttl): void
+    public function put(string $connection, #[SensitiveParameter] string $sessionId, int $ttl): void
     {
         $this->cache->put($this->key($connection), $sessionId, $ttl);
     }

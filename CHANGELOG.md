@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-11-27
+
+### Security
+
+- The parameters that carry a password, a session ID, the settings of a connection or a prepared request are marked `#[\SensitiveParameter]`. A stack trace of one of the package's failures, and an error reporter that records the arguments of each call, now shows a placeholder for them instead of the value. Until now the arguments of the package's own calls could hold the password or the session ID where PHP records arguments (`zend.exception_ignore_args` off, as in PHP's development settings).
+
+### Changed
+
+- The test of the public API also pins which public members of the public classes are `@internal`, so that the stability promise cannot shrink or grow in passing.
+
 ## [1.0.0] - 2026-11-27
 
 The first stable release. It removes what 0.4.0 deprecated, corrects the API before it is frozen and says what semantic versioning covers from now on. See [UPGRADE.md](UPGRADE.md). The code is that of 1.0.0-rc.1.
@@ -232,7 +242,8 @@ Works out of the box with the `GenericTicketConnectorREST` example web service t
 
 - Initial release.
 
-[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/itsjustvita/laravel-znuny/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/itsjustvita/laravel-znuny/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/itsjustvita/laravel-znuny/compare/v0.3.1...v0.3.2

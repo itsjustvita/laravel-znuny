@@ -25,6 +25,7 @@ use ItsJustVita\LaravelZnuny\Routing\RouteMap;
 use ItsJustVita\LaravelZnuny\Session\SessionManager;
 use ItsJustVita\LaravelZnuny\Support\Redactor;
 use ItsJustVita\LaravelZnuny\Support\Setting;
+use SensitiveParameter;
 use stdClass;
 use Throwable;
 
@@ -60,7 +61,7 @@ class ZnunyClient
      */
     public function __construct(
         protected readonly string $connection,
-        array $config,
+        #[SensitiveParameter] array $config,
         protected readonly SessionManager $sessionManager,
         protected readonly ExceptionMapper $exceptionMapper = new ExceptionMapper,
     ) {
@@ -260,7 +261,7 @@ class ZnunyClient
      * @param  array<string, string>  $auth
      * @return array<array-key, mixed>
      */
-    protected function send(string $operation, array $payload, array $auth): array
+    protected function send(string $operation, array $payload, #[SensitiveParameter] array $auth): array
     {
         try {
             $request = $this->requests->build($operation, $payload, $auth);
@@ -356,7 +357,7 @@ class ZnunyClient
         return $json;
     }
 
-    protected function dispatch(PreparedRequest $request, string $operation): Response
+    protected function dispatch(#[SensitiveParameter] PreparedRequest $request, string $operation): Response
     {
         $repeatable = $request->method === 'GET' || in_array($operation, self::READ_OPERATIONS, true);
         $client = $this->httpClient($repeatable)->withHeaders($this->headersFor($request));
@@ -380,7 +381,7 @@ class ZnunyClient
      * @param  array<string, mixed>  ...$sources  the authentication and the payload
      * @return list<string>
      */
-    private function secretsOf(array ...$sources): array
+    private function secretsOf(#[SensitiveParameter] array ...$sources): array
     {
         $secrets = [];
 
@@ -403,7 +404,7 @@ class ZnunyClient
      *
      * @return array<array-key, mixed>
      */
-    private function headersFor(PreparedRequest $request): array
+    private function headersFor(#[SensitiveParameter] PreparedRequest $request): array
     {
         $own = array_change_key_case($request->headers, CASE_LOWER);
         $configured = $this->settings->options()['headers'] ?? [];
@@ -449,7 +450,7 @@ class ZnunyClient
      *
      * @param  array<string, mixed>  $redacted
      */
-    protected function failed(string $operation, PreparedRequest $request, array $redacted, ZnunyException $exception): ZnunyException
+    protected function failed(string $operation, #[SensitiveParameter] PreparedRequest $request, array $redacted, ZnunyException $exception): ZnunyException
     {
         foreach (array_reverse($this->handled) as $scope) {
             if ($scope['handles']($exception)) {
