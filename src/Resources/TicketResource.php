@@ -17,6 +17,7 @@ use ItsJustVita\LaravelZnuny\Events\ZnunyArticleAdded;
 use ItsJustVita\LaravelZnuny\Events\ZnunyTicketUpdated;
 use ItsJustVita\LaravelZnuny\Exceptions\TicketNotFoundException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyException;
 
 /**
  * @mixin TicketBuilder
@@ -328,8 +329,14 @@ class TicketResource extends Resource
      */
     protected function fetchChunk(array $ids, array $options): array
     {
+        // A rejected batch is split and fetched again, so the rejection is no failure yet.
+        $rejected = fn (ZnunyException $e): bool => $e instanceof ZnunyAccessDeniedException || $e instanceof TicketNotFoundException;
+
         try {
-            $rows = $this->client->call('TicketGet', ['TicketID' => $ids] + $options)['Ticket'] ?? [];
+            $rows = $this->client->expecting(
+                $rejected,
+                fn (): array => $this->client->call('TicketGet', ['TicketID' => $ids] + $options),
+            )['Ticket'] ?? [];
         } catch (ZnunyAccessDeniedException|TicketNotFoundException) {
             if (count($ids) === 1) {
                 return [];
