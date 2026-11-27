@@ -25,7 +25,6 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 - [Time accounting](#time-accounting)
 - [Out of office](#out-of-office)
 - [Calling any operation](#calling-any-operation)
-- [Lookups (deprecated)](#lookups-deprecated)
 - [Dynamic fields](#dynamic-fields)
 - [Webhooks (Znuny to Laravel)](#webhooks-znuny-to-laravel)
 - [Events](#events)
@@ -34,6 +33,7 @@ Works out of the box with the **GenericTicketConnectorREST** example web service
 - [Artisan commands](#artisan-commands)
 - [Troubleshooting](#troubleshooting)
 - [Testing your application](#testing-your-application)
+- [Stability](#stability)
 - [Upgrading](#upgrading)
 
 ## What this package covers
@@ -51,9 +51,11 @@ Everything else, such as operations of Znuny add-ons or your own, goes through [
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.3, 8.4 or 8.5
 - Laravel 12 or 13
-- Znuny 6.5 or 7.x with a Generic Interface web service that has a REST provider. Every change is tested against real Znuny 6.5, 7.0, 7.1, 7.2 and 7.3 instances. Znuny 6.0 and OTRS 6 work too: set `'auth_transport' => 'payload'` (they do not read authentication headers) and, for their example web service, `'routes' => 'generic-ticket-connector-classic'`.
+- Znuny 6.5 or 7.x with a Generic Interface web service that has a REST provider. Every change is tested against real Znuny 6.5, 7.0, 7.1, 7.2 and 7.3 instances. Znuny 6.0 and OTRS 6 are not tested, but known to work with `'auth_transport' => 'payload'` (they do not read authentication headers) and, for their example web service, `'routes' => 'generic-ticket-connector-classic'`.
+
+These are the versions CI tests. See [Stability](#stability) for what happens when one of them is no longer supported by its maker.
 
 ## Installation
 
@@ -129,7 +131,9 @@ A connection can also set `retries`, `retry_delay` (milliseconds), `batch_size` 
 ],
 ```
 
-Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. The authentication headers (`X-OTRS-Header-UserLogin`, `-CustomerUserLogin`, `-Password`, `-SessionID`) cannot be configured: Znuny reads them over the request the package sends.
+Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. The authentication headers (`X-OTRS-Header-UserLogin`, `-CustomerUserLogin`, `-Password`, `-SessionID`) and `Content-Type` cannot be configured: the package sets them, and Znuny reads the authentication headers over the request body. `cert` and `ssl_key` must name files that exist; that is checked when the connection is built.
+
+**A setting that is null or blank counts as not set and takes its default.** An empty variable in `.env`, such as `ZNUNY_TIMEOUT=`, therefore never means 0 or "off". Switches read `false`, `"false"`, `"off"`, `"no"` and `0` as off. Two settings differ: `search_limit` is switched off with `null` (`ZNUNY_SEARCH_LIMIT=null`), while a blank value is the default of 500; and a blank `webhooks.auth.type` rejects every webhook, so that the endpoint cannot open by accident.
 
 ### Routes
 
@@ -139,7 +143,7 @@ Znuny maps REST routes to operations per web service. Tell the package which rou
 |---|---|
 | `generic-ticket-connector` (default) | The example web service Znuny ships (`var/webservices/examples/`): `POST /Session`, `GET`/`DELETE /Session/:SessionID`, `POST /Ticket`, `GET /Ticket/:TicketID`, `POST /Ticket/Search`, `PATCH /Ticket/:TicketID`, `GET /Ticket/History/:TicketID` |
 | `generic-ticket-connector-classic` | The older example (`development/webservices/`) that many OTRS and Znuny installations were set up from: like the default, but `GET /Ticket` (search), `GET /TicketHistory/:TicketID` and `GET /TicketList` |
-| `operation-name` | Routes named after the operations: `POST /<Operation>`, plus `POST /TicketGet/:TicketID`, `POST /TicketUpdate/:TicketID` and `POST /QueueGet/:QueueID` |
+| `operation-name` | Routes named after the operations: `POST /<Operation>`, plus `POST /TicketGet/:TicketID` and `POST /TicketUpdate/:TicketID` |
 | array | Your own mapping in Znuny's notation `"METHOD /Path/:Param"`, optionally starting from a preset with `extends` |
 
 ```php
@@ -248,7 +252,7 @@ $ticket  = Znuny::tickets()->findByNumber('2026110610000017');   // the number c
 $history = Znuny::tickets()->history('12345');     // Collection<HistoryEntry>
 ```
 
-A `pendingTime` in `create()` and `update()` can be any `DateTimeInterface`; it is converted to Znuny's [time zone](#time-zone) and read to the minute. `$ticket->pendingUntil` is the pending time while the ticket is in a pending state, `null` otherwise. `findByNumber()` matches the exact number only: wildcards never match, so a number a customer enters returns that ticket or none. Whether the ticket belongs to that customer is still for your application to check.
+A ticket ID can be a string, as Znuny returns it, or an integer; tickets and events carry it as a string. A `pendingTime` in `create()` and `update()` can be any `DateTimeInterface`; it is converted to Znuny's [time zone](#time-zone) and read to the minute. `$ticket->pendingUntil` is the pending time while the ticket is in a pending state, `null` otherwise. `findByNumber()` matches the exact number only: wildcards never match, so a number a customer enters returns that ticket or none. Whether the ticket belongs to that customer is still for your application to check.
 
 `save()` reads the new ticket back from Znuny. If that fails, for example because the user may create tickets in a queue but not read them, the ticket still exists: `save()` returns it with its ID, its number and the attributes you sent (without articles and dates) and logs a warning, so that your application does not create it again.
 
@@ -441,24 +445,9 @@ $result = Znuny::call('FAQSearch', ['Title' => 'VPN*']);
 $result = Znuny::connection('tenant-a')->call('ConfigItemSearch', ['ConfigItem' => ['Number' => '1000*']]);
 ```
 
-`call()` returns Znuny's decoded response as an array.
+`call()` returns Znuny's decoded response as an array. The package cannot know whether an operation of yours only reads, so it repeats it after a timeout or server error only on a `GET` route; map a reading operation to one (`'QueueList' => 'GET /Queues'`) to have it repeated.
 
-## Lookups (deprecated)
-
-> **Deprecated since 0.4.0, removed in 1.0.** These helpers need operations Znuny does not ship, in a response format only this package defines. They keep working until 1.0 and trigger a deprecation notice (`E_USER_DEPRECATED`). Use `Znuny::call('QueueList')` and so on for your custom operations, and `Znuny::tickets()->whereCustomerId($id)->get()` instead of `customers()->tickets($id)`. `Znuny::flush()`, `flushAll()`, `znuny:cache-clear` and the `cache` block of the config go with them.
-
-Znuny has no operations for listing queues, states, priorities, types or customer users. If your web service exposes such custom operations, these helpers use them. The lists (`all()`, `findByName()`) are cached, see `cache.ttl`; `queues()->find()` and `customers()->find()` ask Znuny every time:
-
-| Method | Operation | Expected response |
-|---|---|---|
-| `Znuny::queues()->all()`, `findByName()` | `QueueList` | `{"Queue": [{"QueueID", "Name", "GroupID", "ValidID", "Comment"}]}` |
-| `Znuny::queues()->find($id)` | `QueueGet` (`QueueID`) | `{"Queue": [{...}]}` |
-| `Znuny::states()->all()` | `StateList` | `{"State": [{"StateID", "Name", "TypeName", "ValidID"}]}` |
-| `Znuny::priorities()->all()` | `PriorityList` | `{"Priority": [{"PriorityID", "Name", "ValidID"}]}` |
-| `Znuny::types()->all()` | `TypeList` | `{"Type": [{"TypeID", "Name", "ValidID"}]}` |
-| `Znuny::customers()->find($id)` | `CustomerUserGet` (`CustomerUserID`) | `{"CustomerUser": [{"CustomerID", "UserLogin", "UserEmail", ...}]}` |
-
-If the web service does not expose an operation you get a `ZnunyRouteNotFoundException`. Map the operations in `routes` if they use other paths.
+Until 1.0 the package had lookup helpers for queues, states, priorities, types and customer users, which need operations Znuny does not ship. [UPGRADE.md](UPGRADE.md) shows the `call()` that replaces each.
 
 ## Dynamic fields
 
@@ -550,7 +539,7 @@ Route::post('tenants/{tenant}/znuny', WebhookController::class)->middleware('znu
 |---|---|
 | `ZnunyRequestSent` | before every HTTP call (`connection`, `operation`, `method`, `path`, redacted `payload`) |
 | `ZnunyResponseReceived` | after a successful response (`responseTimeMs`, `status`, `response`) |
-| `ZnunyRequestFailed` | when a call fails (`exception`); not for an expired session that is replaced |
+| `ZnunyRequestFailed` | when a failure reaches your application (`exception`) |
 | `ZnunySessionRefreshed` | after an expired session was replaced |
 | `ZnunyTicketCreated` | after `create()->save()` |
 | `ZnunyTicketUpdated` | after `update()` (`changes`, `dynamicFields`) |
@@ -558,6 +547,8 @@ Route::post('tenants/{tenant}/znuny', WebhookController::class)->middleware('znu
 | `ZnunyWebhookReceived` | when Znuny calls the webhook endpoint |
 
 Passwords, session IDs and tokens are replaced with `[REDACTED]` in event payloads, logs and exceptions.
+
+`ZnunyRequestFailed` and an error entry in the log mean that a failure reached your application. A failure the package deals with itself is logged as information and fires no event: an expired session that is replaced, a batch of tickets that Znuny rejected and the package split, a new ticket that could not be read back after `save()` (which logs a warning), and a session that was already gone at `logout()`.
 
 ## Logging
 
@@ -575,7 +566,7 @@ The package logs to the channel named in `znuny.logging.channel` (`ZNUNY_LOG_CHA
 ],
 ```
 
-`znuny.logging.log_requests` (info), `log_responses` (debug, with status and duration; attachment contents are shortened) and `log_errors` (error) control what is written. An expired session that is replaced is information, not an error. Set `ZNUNY_LOGGING_ENABLED=false` to turn logging off.
+`znuny.logging.log_requests` (info), `log_responses` (debug, with status and duration; attachment contents are shortened) and `log_errors` (error) control what is written. Set `ZNUNY_LOGGING_ENABLED=false` to turn logging off.
 
 ## Exceptions
 
@@ -593,9 +584,7 @@ ZnunyException (abstract, extends RuntimeException)
 │   ├── InvalidPriorityException
 │   └── InvalidDynamicFieldException
 ├── ZnunyNotFoundException
-│   ├── TicketNotFoundException
-│   ├── CustomerNotFoundException
-│   └── QueueNotFoundException
+│   └── TicketNotFoundException
 ├── ZnunySearchLimitExceededException    // a search without limit() matches more than search_limit tickets
 ├── ZnunyRateLimitException
 ├── ZnunyServerException                 // HTTP 5xx, unexpected responses
@@ -610,7 +599,6 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 |---|---|
 | `znuny:test-connection [connection]` | Shows the connection settings, logs in, runs a `TicketSearch` and a `TicketGet` to check routing and permissions, and compares the time zone setting with the dates Znuny returns |
 | `znuny:routes [connection]` | Prints the effective route map |
-| `znuny:cache-clear [connection] [--resource=queues] [--all]` | Clears cached lookups (deprecated with them) |
 | `znuny:generate-fields [--output=path]` | Generates a typed dynamic field helper from the config |
 | `znuny:webservice [connection] [--routes=preset] [--also=operation] [--webhooks=events] [--webhook-url=url] [--with-token] [--sync] [--output=path]` | Generates the Znuny web service definition for the connection's routes, optionally with `TimeAccountingGet`, `OutOfOffice` and a webhook requester |
 
@@ -623,6 +611,7 @@ Every exception carries `getOperation()`, `getErrorCode()`, `getConnection()`, `
 | `ZnunyConnectionException` with "Empty reply from server" | The web service named in `base_url` does not exist in Znuny. |
 | `ZnunyAccessDeniedException` for a ticket that does not exist | Znuny checks permissions before existence, so a missing ticket is reported as access denied. |
 | A search returns exactly 500 tickets although `search_limit` is off | Znuny cut the result off. Remove `ZNUNY_SEARCH_LIMIT=null` to get an exception instead. See [Incomplete results](#incomplete-results). |
+| `ZnunySearchLimitExceededException` after upgrading to 1.0 | An empty `ZNUNY_SEARCH_LIMIT=` used to switch the check off and is the default of 500 now. Write `ZNUNY_SEARCH_LIMIT=null` to keep it off. |
 | `ZnunySearchLimitExceededException` | A search without `limit()` matches more than `search_limit` tickets. Narrow it down, call `limit()`, or raise `ZNUNY_SEARCH_LIMIT`. See [Incomplete results](#incomplete-results). |
 | `ZnunyRouteNotFoundException` for `POST /Session` when calling time accounting or out of office | Znuny's `TimeAccountingREST` and `OutOfOffice` web services have no session route. Give that connection `'auth' => 'credentials'`. See [Time accounting](#time-accounting). |
 | `setOutOfOffice()` succeeds but the agent is not out of office | Znuny skips an entry that matches no agent or several and still reports success. Check the login; Znuny's log names the entry. See [Out of office](#out-of-office). |
@@ -658,6 +647,8 @@ Znuny::assertNotCalled('TicketUpdate');
 - An operation without a response throws a `StrayZnunyCallException`, so a forgotten fake shows up in the test.
 - The fake replaces `ZnunyManager` in the container as well, needs no configured connection and keeps the configured time zone, search limit and batch size. `Znuny::recorded()` returns all calls with their connection and payload.
 
+Laravel's facade mocking and Mockery work as well, because the manager, the resources and the builders are not final: `Znuny::shouldReceive('tickets')->andReturn(Mockery::mock(TicketResource::class))`.
+
 The package uses Laravel's HTTP client, so `Http::fake()` works too, if you want to test at the HTTP level:
 
 ```php
@@ -669,9 +660,46 @@ Http::fake([
 $ticket = Znuny::tickets()->find('42');
 ```
 
+## Stability
+
+The package follows [semantic versioning](https://semver.org). From 1.0 on, a release that breaks one of the following has a new major version.
+
+**Covered.** For a class named here, every public member is covered unless it is marked `@internal`:
+
+- the `Znuny` facade and the public methods of `ZnunyManager`;
+- the resources `tickets()`, `session()`, `timeAccounting()` and `users()`, and the builders they return: public methods and documented behaviour;
+- of `ZnunyClient`: `call()`, `ping()`, `sessionId()`, `logout()`, `connection()`, `settings()` and `routes()`, with the properties and reading methods of the `ConnectionConfig`, `RouteMap` and `Route` they return;
+- the data objects `Ticket`, `Article`, `Attachment`, `DynamicField`, `HistoryEntry`, `SessionUser` and `TimeAccountingEntry`: public properties and methods, and construction with named arguments;
+- the events: class names, public properties and methods, and construction with named arguments;
+- the exceptions: class names, their hierarchy, construction, getters, setters and `context()`;
+- the config keys, their defaults and the environment variables;
+- the artisan commands: names, arguments, options and exit codes;
+- webhooks: the route name and middleware alias `znuny.webhook`, `WebhookController` as a route action, and `ZnunyWebhookReceived`;
+- testing: `Znuny::fake()`, `fakeTickets()`, `fakeSessionUser()`, `sequence()`, the assertions, `recorded()` and `StrayZnunyCallException`;
+- the names of the route presets.
+
+**Not covered:**
+
+- everything marked `@internal`;
+- protected and private members, and subclasses of the package's classes;
+- the positional order of constructor parameters;
+- the wording of log entries, exception messages and command output, and the exact content of a generated web service file;
+- what `Znuny::call()` returns: that is Znuny's response.
+
+**Policy:**
+
+- A deprecation is announced at least one minor release before the removal, with `@deprecated`, a deprecation notice and an entry in [UPGRADE.md](UPGRADE.md).
+- Support for a version of PHP, Laravel or Znuny that its maker no longer supports can end in a minor release; the CHANGELOG names it, and Composer keeps your application on the last release that fits it.
+- Fixes go into the latest 1.x release. There is no long-term support branch.
+- CI tests PHP 8.3 to 8.5, Laravel 12 and 13, and Znuny 6.5, 7.0, 7.1, 7.2 and 7.3.
+
 ## Upgrading
 
 See [UPGRADE.md](UPGRADE.md) and [CHANGELOG.md](CHANGELOG.md).
+
+## Contributing and security
+
+[CONTRIBUTING.md](CONTRIBUTING.md) says what belongs in the package and how to work on it. Please report a vulnerability privately, as [SECURITY.md](SECURITY.md) describes.
 
 ## License
 

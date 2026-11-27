@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+The first stable release. It removes what 0.4.0 deprecated, corrects the API before it is frozen and says what semantic versioning covers from now on. See [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- A "Stability" section in the README: what a minor release will not break, what is not covered, and the policy for deprecations and supported versions. Classes outside the promise are marked `@internal`, and a test fails when a new class is neither public nor internal.
+- Ticket IDs can be integers in every method of `tickets()`.
+- `SECURITY.md`, `CONTRIBUTING.md`, issue templates and a pull request template.
+
+### Changed
+
+- **Breaking:** a setting that is null or blank counts as not set everywhere. An empty `ZNUNY_SEARCH_LIMIT=` is the default of 500 instead of switching the limit off (`null` still does); an empty `ZNUNY_LOGGING_ENABLED=` no longer switches logging off; empty `ZNUNY_AUTH=`, `ZNUNY_USER_TYPE=` and `ZNUNY_AUTH_TRANSPORT=` take their defaults instead of failing; switches read `"off"` and `"no"` as off.
+- **Breaking:** `HistoryEntry::$createTime` is `$created` and `$createBy` is `$createdBy`.
+- **Breaking:** every data object throws an `Error` for an undefined property, as `Ticket` did; a renamed property's message names the new one.
+- **Breaking:** a custom operation is repeated after timeouts and server errors on a `GET` route only; the package no longer keeps a list of custom reading operations. The `operation-name` preset no longer contains the `QueueGet` route.
+- **Breaking:** `cert` and `ssl_key` in `options` must name existing files, `headers` must map names to values, and `Content-Type` cannot be configured.
+- **Breaking:** `session()->user()` throws a `ZnunyServerException` when Znuny sends no session data.
+- `users()->outOfOffice()` trims `login`, `email` and `search` and refuses a range whose start is after its end.
+- `composer.json` no longer sets `minimum-stability: dev`.
+
+### Removed
+
+- **Breaking:** the lookups deprecated in 0.4.0: `Znuny::queues()`, `states()`, `priorities()`, `types()`, `customers()`, `flush()`, `flushAll()`, the command `znuny:cache-clear`, the `cache` config block, the classes behind them, and `QueueNotFoundException` and `CustomerNotFoundException`. Custom operations are called with `Znuny::call()`; their not-found errors raise `ZnunyNotFoundException`.
+
+### Fixed
+
+- A failure the package handles itself is no longer logged as an error and no longer fires `ZnunyRequestFailed`: a rejected batch that `findMany()` splits, a new ticket that cannot be read back after `save()`, a session already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode.
+
 ## [0.4.0] - 2026-11-27
 
 Every operation Znuny ships now has a typed method, tested against Znuny 6.5 to 7.3. What does not rest on stock Znuny is deprecated. Four breaking changes; see [UPGRADE.md](UPGRADE.md).

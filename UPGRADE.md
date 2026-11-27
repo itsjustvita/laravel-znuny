@@ -1,5 +1,63 @@
 # Upgrade guide
 
+## 0.4.x → 1.0
+
+1.0 removes what 0.4.0 deprecated, corrects a few names before the API is frozen, and applies one rule to blank settings. From 1.0 on the package follows semantic versioning; the README's "Stability" section says what that covers. Nothing has to change in Znuny.
+
+### The lookups are gone
+
+`Znuny::queues()`, `states()`, `priorities()`, `types()`, `customers()`, `flush()`, `flushAll()`, the command `znuny:cache-clear` and the `cache` block of the config are removed, with their classes (`Data\Queue`, `State`, `Priority`, `Type`, `Customer`, the five resources and `Caching\CacheManager`). They needed operations Znuny does not ship. A `cache` block that is still in your published config file is ignored; you can delete it, and `ZNUNY_CACHE_ENABLED` with it.
+
+| Removed | Use instead |
+|---|---|
+| `Znuny::queues()->all()` | `Znuny::call('QueueList')['Queue']` (the response of your operation, as an array) |
+| `Znuny::queues()->find($id)` | `Znuny::call('QueueGet', ['QueueID' => $id])` |
+| `Znuny::states()->all()`, `priorities()->all()`, `types()->all()` | `Znuny::call('StateList')`, `call('PriorityList')`, `call('TypeList')` |
+| `Znuny::customers()->find($id)` | `Znuny::call('CustomerUserGet', ['CustomerUserID' => $id])` |
+| `Znuny::customers()->tickets($id)` | `Znuny::tickets()->whereCustomerId($id)->get()` |
+| the lookup cache, `flush()`, `znuny:cache-clear` | Laravel's cache around your own `call()`, e.g. `Cache::remember('queues', 3600, fn () => Znuny::call('QueueList'))` |
+
+Two things change for those custom operations:
+
+- **Exceptions.** `QueueNotFoundException` and `CustomerNotFoundException` are gone. A not-found error of a custom operation raises their parent, `ZnunyNotFoundException`. `TicketNotFoundException` stays.
+- **Retries.** `QueueList`, `QueueGet`, `StateList`, `PriorityList`, `TypeList` and `CustomerUserGet` were repeated after timeouts and server errors, because the package knew they only read. It no longer knows your operations: a custom operation is repeated on a `GET` route only. Map a reading operation to one, or repeat it yourself. The `operation-name` preset no longer contains `POST /QueueGet/:QueueID`; add the route to your connection if you use it.
+
+### `HistoryEntry` says `created` and `createdBy`
+
+`$entry->createTime` is now `$entry->created`, and `$entry->createBy` is `$entry->createdBy`, as on the other data objects. The keys of `toArray()` (`CreateTime`, `CreateBy`) are unchanged.
+
+### Data objects fail on undefined properties
+
+Reading a property that a data object does not have throws an `Error` instead of returning null with a warning, on `Ticket` (as before), `Article`, `Attachment`, `DynamicField`, `HistoryEntry`, `SessionUser` and `TimeAccountingEntry`. For a renamed property the message names the new one. `isset()` and `??` on such a property are false and do not throw.
+
+### A blank setting counts as not set
+
+A setting that is null or a blank string now takes its default everywhere. Three of them behaved differently:
+
+| Setting | 0.4 | 1.0 |
+|---|---|---|
+| `ZNUNY_SEARCH_LIMIT=` (empty) | the search limit was off | the default of 500. Write `ZNUNY_SEARCH_LIMIT=null` to keep it off; searches that match more than 500 tickets otherwise throw a `ZnunySearchLimitExceededException` |
+| `ZNUNY_LOGGING_ENABLED=` (empty) | logging was off | logging is on. Write `false` to turn it off |
+| `ZNUNY_AUTH=`, `ZNUNY_USER_TYPE=`, `ZNUNY_AUTH_TRANSPORT=` (empty) | a `ZnunyConfigurationException` | the defaults `session`, `agent`, `auto` |
+
+Switches (`logging.enabled`, the `log_*` settings, `session.auto_retry_on_expired`, `webhooks.enabled`) read `"false"`, `"off"`, `"no"` and `0` as off; the strings `"off"` and `"no"` used to count as on. A blank `webhooks.auth.type` still rejects every webhook.
+
+### Handled failures are no longer reported as errors
+
+`ZnunyRequestFailed` and an error entry in the log now mean that a failure reached your application. They no longer appear when the package deals with the failure itself: a batch of tickets Znuny rejected and the package split (`findMany()`, `get()`, `paginate()`, `lazy()`), a new ticket that could not be read back after `save()` (the warning stays), a session that was already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode. They are logged as information. If you counted these events or alerted on these entries, expect fewer.
+
+### Stricter checks of what you pass in
+
+- `options`: `cert` and `ssl_key` must name existing files, checked when the connection is built instead of by the first request; `headers` must map names to values; `Content-Type` cannot be configured.
+- `users()->outOfOffice()`: `login`, `email` and `search` are trimmed; an entry whose `from` is after its `until` is refused.
+- `session()->user()` throws a `ZnunyServerException` when Znuny's answer has no session data, instead of returning a user without login.
+
+### Other things you may notice
+
+- Ticket IDs can be passed as integers to every method of `tickets()`.
+- `composer.json` no longer sets `minimum-stability: dev`. This does not affect your application.
+- Classes that are not part of the public API are marked `@internal`. If your code extends or constructs one of them, the README's "Stability" section says what is safe to rely on.
+
 ## 0.3.x → 0.4.0
 
 0.4.0 gives every operation Znuny ships a typed method (see the CHANGELOG) and deprecates what does not rest on stock Znuny. Four changes can break existing code. Nothing has to change in Znuny or in your config file.
@@ -27,14 +85,7 @@ A `DateTimeInterface` as a dynamic field value, on create, update or in `whereDy
 
 `Znuny::queues()`, `states()`, `priorities()`, `types()`, `customers()`, `flush()`, `flushAll()`, the command `znuny:cache-clear` and the `cache` block of the config are deprecated and will be removed in 1.0. They need operations Znuny does not ship, in a response format only this package defines. They keep working and trigger `E_USER_DEPRECATED`, which Laravel writes to the deprecations log channel.
 
-| Deprecated | Use instead |
-|---|---|
-| `Znuny::queues()->all()` | `Znuny::call('QueueList')['Queue']` (the response of your operation, as an array) |
-| `Znuny::queues()->find($id)` | `Znuny::call('QueueGet', ['QueueID' => $id])` |
-| `Znuny::states()->all()`, `priorities()->all()`, `types()->all()` | `Znuny::call('StateList')`, `call('PriorityList')`, `call('TypeList')` |
-| `Znuny::customers()->find($id)` | `Znuny::call('CustomerUserGet', ['CustomerUserID' => $id])` |
-| `Znuny::customers()->tickets($id)` | `Znuny::tickets()->whereCustomerId($id)->get()` |
-| the lookup cache, `flush()`, `znuny:cache-clear` | Laravel's cache around your own `call()`, e.g. `Cache::remember('queues', 3600, fn () => Znuny::call('QueueList'))` |
+The section "0.4.x → 1.0" above lists what replaces each of them.
 
 ### Other things you may notice
 
