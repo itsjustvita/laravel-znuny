@@ -65,7 +65,7 @@ final class UserResourceTest extends TestCase
     {
         $this->fakeZnuny();
 
-        Znuny::users()->outOfOffice([
+        Znuny::users()->updateOutOfOffice([
             ['login' => ' jane.agent ', 'enabled' => false],
             ['email' => "\tbob@example.com ", 'enabled' => false],
             ['search' => ' Miller ', 'enabled' => false],
@@ -101,7 +101,7 @@ final class UserResourceTest extends TestCase
     {
         $this->fakeZnuny();
 
-        Znuny::users()->outOfOffice([
+        Znuny::users()->updateOutOfOffice([
             ['login' => 'jane.agent', 'from' => CarbonImmutable::parse('2026-07-01'), 'until' => CarbonImmutable::parse('2026-07-14')],
             ['email' => 'bob@example.com', 'enabled' => true],
             ['search' => 'Miller', 'enabled' => false],
@@ -146,7 +146,7 @@ final class UserResourceTest extends TestCase
         Http::fake();
 
         try {
-            Znuny::users()->outOfOffice($entries);
+            Znuny::users()->updateOutOfOffice($entries);
             $this->fail('The entries must be refused.');
         } catch (InvalidArgumentException $e) {
             $this->assertStringContainsString($hint, $e->getMessage());

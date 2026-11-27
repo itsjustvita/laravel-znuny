@@ -28,7 +28,9 @@ Two things change for those custom operations:
 
 ### Data objects fail on undefined properties
 
-Reading a property that a data object does not have throws an `Error` instead of returning null with a warning, on `Ticket` (as before), `Article`, `Attachment`, `DynamicField`, `HistoryEntry`, `SessionUser` and `TimeAccountingEntry`. For a renamed property the message names the new one. `isset()` and `??` on such a property are false and do not throw.
+Reading a property that a data object does not have throws an `Error` instead of returning null with a warning, on `Ticket` (as before), `Article`, `Attachment`, `DynamicField`, `HistoryEntry`, `SessionUser` and `TimeAccountingEntry`. For a renamed property the message names the new one. `isset()` and `??` on an undefined property are false and do not throw.
+
+A renamed property fails wherever it is read, so that code written for an earlier release does not go on with null: `$entry->createTime ?? null`, `data_get($entry, 'createTime')` and the collection helpers that read by name, such as `pluck('createBy')`, `sortBy('createTime')`, `where()` and `groupBy()`, throw the same `Error`. That also holds for `$ticket->customerUserID ?? $default`, which gave the default in 0.4. Search your code for `createTime`, `createBy` and `customerUserID`, as property names and as strings.
 
 ### A blank setting counts as not set
 
@@ -42,6 +44,11 @@ A setting that is null or a blank string now takes its default everywhere. Three
 
 Switches (`logging.enabled`, the `log_*` settings, `session.auto_retry_on_expired`, `webhooks.enabled`) read `"false"`, `"off"`, `"no"` and `0` as off; the strings `"off"` and `"no"` used to count as on. A blank `webhooks.auth.type` still rejects every webhook.
 
+Two consequences, if your config file reads these switches from the environment:
+
+- A switch that is blank takes its default, and that default is on for `logging.log_requests`, `logging.log_errors` and `session.auto_retry_on_expired`. Blank used to be off. With `log_requests` on, the package logs each request with its payload (secrets redacted).
+- A switch only reads `true`/`false`, `1`/`0`, `"on"`/`"off"` and `"yes"`/`"no"`. Any other text takes the default: `ZNUNY_WEBHOOKS_ENABLED=enabled` used to register the webhook route and no longer does.
+
 ### Handled failures are no longer reported as errors
 
 `ZnunyRequestFailed` and an error entry in the log now mean that a failure reached your application. They no longer appear when the package deals with the failure itself: a batch of tickets Znuny rejected and the package split (`findMany()`, `get()`, `paginate()`, `lazy()`), a new ticket that could not be read back after `save()` (the warning stays), a session that was already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode. They are logged as information. If you counted these events or alerted on these entries, expect fewer.
@@ -49,12 +56,27 @@ Switches (`logging.enabled`, the `log_*` settings, `session.auto_retry_on_expire
 ### Stricter checks of what you pass in
 
 - `options`: `cert` and `ssl_key` must name existing files, checked when the connection is built instead of by the first request; `headers` must map names to values; `Content-Type` cannot be configured.
-- `users()->outOfOffice()`: `login`, `email` and `search` are trimmed; an entry whose `from` is after its `until` is refused.
+- `users()->updateOutOfOffice()` (see below): `login`, `email` and `search` are trimmed; an entry whose `from` is after its `until` is refused.
 - `session()->user()` throws a `ZnunyServerException` when Znuny's answer has no session data, instead of returning a user without login.
+
+### Smaller renames and changed types
+
+| 0.4 | 1.0 |
+|---|---|
+| `Znuny::users()->outOfOffice([...])` | `Znuny::users()->updateOutOfOffice([...])`. The method writes; its old name read like a getter |
+| `lazy()` returns a `Generator` | `lazy()` returns a `LazyCollection`. `foreach` works as before, and so do `filter()`, `map()`, `take()` and going through it twice. Code that called `current()`, `next()` or `valid()` on the result, or declared its type as `Generator`, uses `->getIterator()` |
+| `Znuny::client()->settings()->password`, `->options` | no longer public properties, so that logging or dumping the settings does not write secrets out. The package's own accessors `password()` and `options()` are internal |
+
+### Mocking in your tests
+
+`Znuny::fake()`, `Http::fake()`, `Znuny::shouldReceive()` and mocks of the resources work as before, and `Znuny::partialMock()` works now. One thing no longer does: a real `TicketResource` or `SessionResource` on top of a fully mocked `ZnunyClient`, because the resources call methods of the client that are internal. Use `Znuny::fake()`, or mock the resource.
 
 ### Other things you may notice
 
 - Ticket IDs can be passed as integers to every method of `tickets()`.
+- An option in `options` that is null or blank counts as not set, and in a connection it removes the global option of that name.
+- `Znuny::fake()` ignores `options` and `verify_ssl`, so certificate files that only exist in production do not stop a test.
+- A call to Znuny made by one of your event listeners is reported as a failure of its own (`ZnunyRequestFailed`, error entry), even while the package is handling another failure.
 - `composer.json` no longer sets `minimum-stability: dev`. This does not affect your application.
 - Classes that are not part of the public API are marked `@internal`. If your code extends or constructs one of them, the README's "Stability" section says what is safe to rely on.
 

@@ -36,11 +36,13 @@ trait HasAttributes
     }
 
     /**
-     * Without this, isset() and ?? on an undefined property would call __get() and fail.
+     * An undefined property is not set, so isset() and ?? on it stay quiet. A renamed one
+     * counts as set: then ??, data_get() and the collection helpers built on it (pluck(),
+     * sortBy(), where()) reach __get() and fail with the new name, instead of going on with null.
      */
     public function __isset(string $name): bool
     {
-        return false;
+        return isset(static::renamedProperties()[$name]);
     }
 
     /**

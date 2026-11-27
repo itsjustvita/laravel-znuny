@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestFailed;
 use ItsJustVita\LaravelZnuny\Events\ZnunyRequestSent;
+use ItsJustVita\LaravelZnuny\Exceptions\ZnunyAccessDeniedException;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyServerException;
 use ItsJustVita\LaravelZnuny\Tests\TestCase;
 use Znuny;
@@ -106,9 +107,36 @@ final class HandledFailuresTest extends TestCase
 
         $this->assertCount(2, Znuny::tickets()->findMany(['1', '2', '3']));
 
-        $this->assertSame(1, min($nested, 1));
+        $this->assertGreaterThanOrEqual(1, $nested);
         $this->assertSame([], $this->logged('error'));
         $this->assertSame([], $this->failed);
+    }
+
+    public function test_a_listeners_own_failure_is_an_error_although_the_package_is_handling_another(): void
+    {
+        $this->fakeThreeTickets(Http::response(self::DENIED));
+
+        // Application code that runs while the package fetches a batch: its failures are its own.
+        $caught = 0;
+        Event::listen(function (ZnunyRequestSent $event) use (&$caught): void {
+            static $done = false;
+
+            if ($event->operation === 'TicketGet' && ! $done) {
+                $done = true;
+
+                try {
+                    Znuny::tickets()->find('2');
+                } catch (ZnunyAccessDeniedException) {
+                    $caught++;
+                }
+            }
+        });
+
+        $this->assertCount(2, Znuny::tickets()->findMany(['1', '2', '3']));
+
+        $this->assertSame(1, $caught);
+        $this->assertSame(['Znuny error'], $this->logged('error'));
+        $this->assertCount(1, $this->failed);
     }
 
     public function test_a_created_ticket_that_cannot_be_read_back_logs_a_warning_only(): void

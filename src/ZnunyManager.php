@@ -24,12 +24,16 @@ class ZnunyManager
     /** @var array<string, mixed>|null */
     protected ?array $runtimeConfig = null;
 
+    /** Not set when the constructor did not run, as in a partial mock. */
+    protected ?Application $app = null;
+
     /**
      * @internal
      */
-    public function __construct(
-        protected readonly Application $app,
-    ) {}
+    public function __construct(Application $app)
+    {
+        $this->app = $app;
+    }
 
     public function connection(?string $name = null): self
     {
@@ -138,7 +142,16 @@ class ZnunyManager
 
     protected function config(string $key, mixed $default = null): mixed
     {
-        return $this->app->make('config')->get($key, $default);
+        return $this->application()->make('config')->get($key, $default);
+    }
+
+    /**
+     * The application: the one the constructor got, or the current one when the constructor
+     * did not run, as in a partial mock (Znuny::partialMock(), $this->partialMock()).
+     */
+    protected function application(): Application
+    {
+        return $this->app ?? app();
     }
 
     protected function defaultConnection(): string

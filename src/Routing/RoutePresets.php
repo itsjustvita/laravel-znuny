@@ -49,7 +49,11 @@ final class RoutePresets
         ],
     ];
 
-    /** @return array<string, string> */
+    /**
+     * @return array<string, string>
+     *
+     * @internal
+     */
     public static function get(string $name): array
     {
         if (! isset(self::PRESETS[$name])) {
@@ -63,7 +67,11 @@ final class RoutePresets
         return self::PRESETS[$name];
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<string>
+     *
+     * @internal
+     */
     public static function names(): array
     {
         return array_keys(self::PRESETS);

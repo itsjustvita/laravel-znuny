@@ -109,9 +109,9 @@ final class ConnectionConfigTest extends TestCase
             ['options' => ['proxy' => 'http://proxy.global:3128', 'force_ip_resolve' => 'v4']],
         );
 
-        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'force_ip_resolve' => 'v4'], $config->options);
-        $this->assertSame([], $this->make()->options);
-        $this->assertSame([], $this->make(['options' => null], ['options' => []])->options);
+        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'force_ip_resolve' => 'v4'], $config->options());
+        $this->assertSame([], $this->make()->options());
+        $this->assertSame([], $this->make(['options' => null], ['options' => []])->options());
     }
 
     public function test_every_accepted_http_option_is_kept(): void
@@ -129,7 +129,7 @@ final class ConnectionConfigTest extends TestCase
                 'version' => '1.1',
             ];
 
-            $this->assertSame($options, $this->make(['options' => $options])->options);
+            $this->assertSame($options, $this->make(['options' => $options])->options());
             $this->assertSame(array_keys($options), ConnectionConfig::HTTP_OPTIONS);
         } finally {
             unlink($file);
@@ -182,8 +182,41 @@ final class ConnectionConfigTest extends TestCase
 
     public function test_headers_may_be_null(): void
     {
-        $this->assertSame(['proxy' => 'http://proxy.a:3128'], $this->make(['options' => ['proxy' => 'http://proxy.a:3128', 'headers' => null]])->options);
-        $this->assertSame([], $this->make(['options' => ['headers' => []]])->options['headers']);
+        $this->assertSame(['proxy' => 'http://proxy.a:3128'], $this->make(['options' => ['proxy' => 'http://proxy.a:3128', 'headers' => null]])->options());
+        $this->assertSame([], $this->make(['options' => ['headers' => []]])->options()['headers']);
+    }
+
+    public function test_an_option_that_is_null_or_blank_counts_as_not_set(): void
+    {
+        // What 'cert' => env('ZNUNY_CLIENT_CERT') gives without the variable, or with an empty one.
+        $options = ['cert' => null, 'ssl_key' => '', 'proxy' => '  ', 'headers' => null, 'auth' => null];
+
+        $this->assertSame([], $this->make(['options' => $options])->options());
+        $this->assertSame([], $this->make([], ['options' => $options])->options());
+    }
+
+    public function test_a_connections_blank_option_removes_the_global_one(): void
+    {
+        $config = $this->make(
+            ['options' => ['proxy' => null, 'headers' => null, 'version' => '']],
+            ['options' => ['proxy' => 'http://proxy.global:3128', 'headers' => ['X-Global' => '1'], 'version' => '1.1', 'force_ip_resolve' => 'v4']],
+        );
+
+        $this->assertSame(['force_ip_resolve' => 'v4'], $config->options());
+    }
+
+    public function test_the_password_and_the_request_options_are_not_readable_properties(): void
+    {
+        $config = $this->make(['password' => 'top-secret', 'options' => ['auth' => ['proxyuser', 'proxy-secret']]]);
+
+        // Someone who logs or dumps the settings of a connection must not write its secrets out.
+        $this->assertStringNotContainsString('secret', (string) json_encode($config));
+        $this->assertStringNotContainsString('secret', print_r($config, true));
+        $this->assertArrayNotHasKey('password', get_object_vars($config));
+        $this->assertArrayNotHasKey('options', get_object_vars($config));
+        $this->assertSame('top-secret', $config->password());
+        $this->assertSame(['auth' => ['proxyuser', 'proxy-secret']], $config->options());
+        $this->assertSame('agent', $config->username);
     }
 
     public function test_refused_options_are_refused_in_the_global_config_too(): void

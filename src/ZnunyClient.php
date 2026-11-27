@@ -120,7 +120,7 @@ class ZnunyClient
         $this->sessionManager->invalidate($this->identityKey());
         $sessionId = $this->sessionId();
 
-        event(new ZnunySessionRefreshed(connection: $this->connection));
+        $this->fire(new ZnunySessionRefreshed(connection: $this->connection));
 
         return $this->send($operation, $payload, ['SessionID' => $sessionId]);
     }
@@ -221,7 +221,7 @@ class ZnunyClient
     }
 
     /**
-     * Key under which the session and cached lookups of this connection are stored.
+     * Key under which the session of this connection is stored.
      *
      * @internal
      */
@@ -251,7 +251,7 @@ class ZnunyClient
     {
         return [
             $this->settings->loginKey() => $this->settings->username,
-            'Password' => $this->settings->password,
+            'Password' => $this->settings->password(),
         ];
     }
 
@@ -271,7 +271,7 @@ class ZnunyClient
         $data = array_merge($auth, $payload);
         $redacted = Redactor::redact($data);
 
-        event(new ZnunyRequestSent(
+        $this->fire(new ZnunyRequestSent(
             connection: $this->connection,
             operation: $operation,
             payload: $redacted,
@@ -336,7 +336,7 @@ class ZnunyClient
             ));
         }
 
-        event(new ZnunyResponseReceived(
+        $this->fire(new ZnunyResponseReceived(
             connection: $this->connection,
             operation: $operation,
             responseTimeMs: $elapsed,
@@ -406,7 +406,7 @@ class ZnunyClient
     private function headersFor(PreparedRequest $request): array
     {
         $own = array_change_key_case($request->headers, CASE_LOWER);
-        $configured = $this->settings->options['headers'] ?? [];
+        $configured = $this->settings->options()['headers'] ?? [];
 
         return array_merge(
             array_filter(
@@ -424,6 +424,23 @@ class ZnunyClient
         $decoded = json_decode($response->body(), true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Dispatch one of the client's events. Listeners are application code: when one of them
+     * calls Znuny and that call fails, the failure is the application's, whatever the package
+     * is handling for the call that fired the event.
+     */
+    private function fire(object $event): void
+    {
+        $handled = $this->handled;
+        $this->handled = [];
+
+        try {
+            event($event);
+        } finally {
+            $this->handled = $handled;
+        }
     }
 
     /**
@@ -447,7 +464,7 @@ class ZnunyClient
             }
         }
 
-        event(new ZnunyRequestFailed(
+        $this->fire(new ZnunyRequestFailed(
             connection: $this->connection,
             operation: $operation,
             exception: $exception,
@@ -523,7 +540,7 @@ class ZnunyClient
 
         // The connection's own request options (proxy, client certificate, ...). They cannot
         // name "verify" or a timeout: ConnectionConfig accepts a fixed list only.
-        $options = array_diff_key($this->settings->options, ['headers' => true]);
+        $options = array_diff_key($this->settings->options(), ['headers' => true]);
 
         if ($options !== []) {
             $client = $client->withOptions($options);

@@ -4,6 +4,7 @@ namespace ItsJustVita\LaravelZnuny\Testing;
 
 use Closure;
 use Illuminate\Contracts\Foundation\Application;
+use ItsJustVita\LaravelZnuny\Config\ConnectionConfig;
 use ItsJustVita\LaravelZnuny\ZnunyClient;
 use ItsJustVita\LaravelZnuny\ZnunyManager;
 use PHPUnit\Framework\Assert as PHPUnit;
@@ -25,6 +26,8 @@ class FakeZnunyManager extends ZnunyManager
 
     /**
      * @param  array<string, mixed>  $responses  by operation name; "*" answers every other operation
+     *
+     * @internal Use Znuny::fake().
      */
     public function __construct(Application $app, array $responses = [])
     {
@@ -89,7 +92,9 @@ class FakeZnunyManager extends ZnunyManager
     /**
      * The connection's configuration as far as it exists, so its time zone, search limit and
      * batch size apply as on a real connection, completed with placeholders for the base URL
-     * and credentials that tests usually leave out.
+     * and credentials that tests usually leave out. The fake sends nothing, so what only
+     * concerns the transport is left out: a certificate, key or CA file that exists on the
+     * production servers must not stop a test.
      *
      * @return array<string, mixed>
      */
@@ -105,6 +110,10 @@ class FakeZnunyManager extends ZnunyManager
                 $config[$key] = $placeholder;
             }
         }
+
+        // A blank option removes the global one of the same name.
+        $config['options'] = array_fill_keys(ConnectionConfig::HTTP_OPTIONS, null);
+        $config['verify_ssl'] = true;
 
         return $config;
     }

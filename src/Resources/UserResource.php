@@ -26,7 +26,7 @@ class UserResource extends Resource
      */
     public function setOutOfOffice(string $login, DateTimeInterface $from, DateTimeInterface $until): void
     {
-        $this->outOfOffice([['login' => $login, 'from' => $from, 'until' => $until]]);
+        $this->updateOutOfOffice([['login' => $login, 'from' => $from, 'until' => $until]]);
     }
 
     /**
@@ -37,7 +37,7 @@ class UserResource extends Resource
      */
     public function clearOutOfOffice(string $login): void
     {
-        $this->outOfOffice([['login' => $login, 'enabled' => false]]);
+        $this->updateOutOfOffice([['login' => $login, 'enabled' => false]]);
     }
 
     /**
@@ -48,7 +48,7 @@ class UserResource extends Resource
      *
      * @param  array<array-key, mixed>  $entries  list<array{login?: string, email?: string, search?: string, from?: DateTimeInterface, until?: DateTimeInterface, enabled?: bool}>
      */
-    public function outOfOffice(array $entries): void
+    public function updateOutOfOffice(array $entries): void
     {
         if ($entries === []) {
             throw new InvalidArgumentException('Pass at least one out-of-office entry.');

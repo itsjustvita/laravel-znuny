@@ -45,7 +45,7 @@ The package has a typed method for an operation if, and only if, Znuny ships tha
 | `SessionCreate`, `SessionGet`, `SessionRemove` | the automatic login, `session()->user()`, `session()->logout()` | `GenericTicketConnectorREST` | |
 | `TicketCreate`, `TicketGet`, `TicketSearch`, `TicketUpdate`, `TicketHistoryGet` | `tickets()` | `GenericTicketConnectorREST` | permissions on the queues |
 | `TimeAccountingGet` | `timeAccounting()->entries()` | `TimeAccountingREST` | `rw` in the group `timeaccounting_webservice` |
-| `OutOfOffice` | `users()->setOutOfOffice()`, `clearOutOfOffice()`, `outOfOffice()` | `OutOfOffice` | an agent with `rw` in the group `admin` |
+| `OutOfOffice` | `users()->setOutOfOffice()`, `clearOutOfOffice()`, `updateOutOfOffice()` | `OutOfOffice` | an agent with `rw` in the group `admin` |
 
 Everything else, such as operations of Znuny add-ons or your own, goes through [`Znuny::call()`](#calling-any-operation) with the same routing, authentication, error handling, events and logging.
 
@@ -131,7 +131,7 @@ A connection can also set `retries`, `retry_delay` (milliseconds), `batch_size` 
 ],
 ```
 
-Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. The authentication headers (`X-OTRS-Header-UserLogin`, `-CustomerUserLogin`, `-Password`, `-SessionID`) and `Content-Type` cannot be configured: the package sets them, and Znuny reads the authentication headers over the request body. `cert` and `ssl_key` must name files that exist; that is checked when the connection is built.
+Accepted are `proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve` and `version`; `http.options` sets them for all connections, and a connection's own options replace those key by key. An option that is null or blank is not set, so `'cert' => env('ZNUNY_CLIENT_CERT')` is no certificate where the variable is missing; in a connection it removes the global option of that name. Any other option is rejected: certificate verification and the timeouts are only changed through `verify_ssl`, `timeout` and `connect_timeout`. The authentication headers (`X-OTRS-Header-UserLogin`, `-CustomerUserLogin`, `-Password`, `-SessionID`) and `Content-Type` cannot be configured: the package sets them, and Znuny reads the authentication headers over the request body. `cert` and `ssl_key` must name files that exist; that is checked when the connection is built.
 
 **A setting that is null or blank counts as not set and takes its default.** An empty variable in `.env`, such as `ZNUNY_TIMEOUT=`, therefore never means 0 or "off". Switches read `false`, `"false"`, `"off"`, `"no"` and `0` as off. Two settings differ: `search_limit` is switched off with `null` (`ZNUNY_SEARCH_LIMIT=null`), while a blank value is the default of 500; and a blank `webhooks.auth.type` rejects every webhook, so that the endpoint cannot open by accident.
 
@@ -291,6 +291,9 @@ foreach (Znuny::tickets()->whereQueue('Support')->lazy(chunkSize: 100) as $ticke
     // processes tickets chunk by chunk
 }
 
+// lazy() is a LazyCollection: only the chunks that are needed are fetched
+$urgent = Znuny::tickets()->whereQueue('Support')->lazy()->first(fn ($ticket) => $ticket->priority === '5 very high');
+
 // Any TicketSearch parameter:
 Znuny::tickets()->where('CreatedUserIDs', [3, 4])->ids();
 
@@ -424,7 +427,7 @@ Znuny::users()->setOutOfOffice('agent-login', now()->addDay(), now()->addWeeks(2
 Znuny::users()->clearOutOfOffice('agent-login');
 
 // Several agents at once, also by e-mail address or Znuny's user search:
-Znuny::users()->outOfOffice([
+Znuny::users()->updateOutOfOffice([
     ['email' => 'jane@example.com', 'from' => $from, 'until' => $until],
     ['search' => 'Miller', 'enabled' => false],
 ]);
@@ -539,7 +542,7 @@ Route::post('tenants/{tenant}/znuny', WebhookController::class)->middleware('znu
 |---|---|
 | `ZnunyRequestSent` | before every HTTP call (`connection`, `operation`, `method`, `path`, redacted `payload`) |
 | `ZnunyResponseReceived` | after a successful response (`responseTimeMs`, `status`, `response`) |
-| `ZnunyRequestFailed` | when a failure reaches your application (`exception`) |
+| `ZnunyRequestFailed` | when a request fails and the failure reaches your application (`exception`) |
 | `ZnunySessionRefreshed` | after an expired session was replaced |
 | `ZnunyTicketCreated` | after `create()->save()` |
 | `ZnunyTicketUpdated` | after `update()` (`changes`, `dynamicFields`) |
@@ -548,7 +551,7 @@ Route::post('tenants/{tenant}/znuny', WebhookController::class)->middleware('znu
 
 Passwords, session IDs and tokens are replaced with `[REDACTED]` in event payloads, logs and exceptions.
 
-`ZnunyRequestFailed` and an error entry in the log mean that a failure reached your application. A failure the package deals with itself is logged as information and fires no event: an expired session that is replaced, a batch of tickets that Znuny rejected and the package split, a new ticket that could not be read back after `save()` (which logs a warning), and a session that was already gone at `logout()`.
+`ZnunyRequestFailed` and an error entry in the log mean that a request failed and the failure reached your application. A failure the package deals with itself is logged as information and fires no event: an expired session that is replaced, a batch of tickets that Znuny rejected and the package split, a new ticket that could not be read back after `save()` (which logs a warning), a session that was already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode. A call that one of your listeners makes is your application's: its failure is reported even while the package is handling another.
 
 ## Logging
 
@@ -647,7 +650,7 @@ Znuny::assertNotCalled('TicketUpdate');
 - An operation without a response throws a `StrayZnunyCallException`, so a forgotten fake shows up in the test.
 - The fake replaces `ZnunyManager` in the container as well, needs no configured connection and keeps the configured time zone, search limit and batch size. `Znuny::recorded()` returns all calls with their connection and payload.
 
-Laravel's facade mocking and Mockery work as well, because the manager, the resources and the builders are not final: `Znuny::shouldReceive('tickets')->andReturn(Mockery::mock(TicketResource::class))`.
+Laravel's facade mocking and Mockery work as well, because the manager, the client, the resources and the builders are not final: `Znuny::shouldReceive('tickets')->andReturn(Mockery::mock(TicketResource::class))`, `Znuny::partialMock()`. Mock the class your code talks to. A real resource on top of a mocked `ZnunyClient` does not work: the resources call methods of the client that are internal.
 
 The package uses Laravel's HTTP client, so `Http::fake()` works too, if you want to test at the HTTP level:
 
@@ -664,19 +667,20 @@ $ticket = Znuny::tickets()->find('42');
 
 The package follows [semantic versioning](https://semver.org). From 1.0 on, a release that breaks one of the following has a new major version.
 
-**Covered.** For a class named here, every public member is covered unless it is marked `@internal`:
+**Covered.** For a class named here, every public member is covered unless it is marked `@internal`; the list names what people use most, it does not limit the cover:
 
 - the `Znuny` facade and the public methods of `ZnunyManager`;
 - the resources `tickets()`, `session()`, `timeAccounting()` and `users()`, and the builders they return: public methods and documented behaviour;
-- of `ZnunyClient`: `call()`, `ping()`, `sessionId()`, `logout()`, `connection()`, `settings()` and `routes()`, with the properties and reading methods of the `ConnectionConfig`, `RouteMap` and `Route` they return;
+- of `ZnunyClient`: `call()`, `ping()`, `sessionId()`, `logout()`, `connection()`, `settings()` and `routes()`, with the properties, constants and reading methods of the `ConnectionConfig`, `RouteMap` and `Route` they return (the password and the request options of a connection are internal);
 - the data objects `Ticket`, `Article`, `Attachment`, `DynamicField`, `HistoryEntry`, `SessionUser` and `TimeAccountingEntry`: public properties and methods, and construction with named arguments;
 - the events: class names, public properties and methods, and construction with named arguments;
 - the exceptions: class names, their hierarchy, construction, getters, setters and `context()`;
 - the config keys, their defaults and the environment variables;
 - the artisan commands: names, arguments, options and exit codes;
 - webhooks: the route name and middleware alias `znuny.webhook`, `WebhookController` as a route action, and `ZnunyWebhookReceived`;
-- testing: `Znuny::fake()`, `fakeTickets()`, `fakeSessionUser()`, `sequence()`, the assertions, `recorded()` and `StrayZnunyCallException`;
-- the names of the route presets.
+- `ZnunyServiceProvider` and its `registerWebhookRoutes()`;
+- testing: `Znuny::fake()`, `fakeTickets()`, `fakeSessionUser()`, `sequence()`, the assertions and `recorded()` of the `FakeZnunyManager` that `fake()` returns, `StrayZnunyCallException`, and `FakeResponseSequence` as what `sequence()` returns, without its methods;
+- the names of the route presets and the constants of `RoutePresets`.
 
 **Not covered:**
 

@@ -90,17 +90,15 @@ final class TicketTest extends TestCase
     {
         $ticket = Ticket::fromZnunyResponse(['TicketID' => '1', 'CustomerUserID' => 'jane']);
 
-        // 0.3 kept $customerUserID working with a deprecation notice and announced its removal for 0.4.0.
-        $this->assertFalse(isset($ticket->customerUserID));
-        $this->assertSame('unknown', $ticket->customerUserID ?? 'unknown');
-        $this->assertSame([null], collect([$ticket])->pluck('customerUserID')->all());
-
-        try {
-            $ticket->customerUserID;
-            $this->fail('Reading the removed property must fail.');
-        } catch (\Error $e) {
-            // The message says where the value went.
-            $this->assertStringContainsString('$customerUserId', $e->getMessage());
+        // 0.3 kept $customerUserID working with a deprecation notice; 0.4.0 removed it.
+        foreach ([fn () => $ticket->customerUserID, fn () => $ticket->customerUserID ?? 'unknown', fn () => collect([$ticket])->pluck('customerUserID')] as $read) {
+            try {
+                $read();
+                $this->fail('Reading the removed property must fail.');
+            } catch (\Error $e) {
+                // The message says where the value went.
+                $this->assertStringContainsString('$customerUserId', $e->getMessage());
+            }
         }
     }
 

@@ -422,7 +422,7 @@ final class ZnunyIntegrationTest extends TestCase
         $this->assertEquals(0, $this->freshSessionData($login, $password)['OutOfOffice']);
 
         // By e-mail address, and an entry that matches nobody: Znuny reports success for both.
-        $users->outOfOffice([
+        $users->updateOutOfOffice([
             ['email' => $this->freshSessionData($login, $password)['UserEmail'], 'enabled' => true],
             ['login' => 'no-such-agent-'.uniqid(), 'enabled' => true],
         ]);
@@ -445,7 +445,7 @@ final class ZnunyIntegrationTest extends TestCase
         // intact if the comma and the quotes of the first stayed inside its field.
         $users = $this->admin(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL')->users();
 
-        $users->outOfOffice([
+        $users->updateOutOfOffice([
             ['search' => 'Nobody, "at all"', 'enabled' => true],
             ['login' => $login, 'from' => CarbonImmutable::parse('2034-05-06'), 'until' => CarbonImmutable::parse('2034-05-13')],
         ]);

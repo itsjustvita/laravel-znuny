@@ -10,17 +10,22 @@ The first stable release. It removes what 0.4.0 deprecated, corrects the API bef
 
 - A "Stability" section in the README: what a minor release will not break, what is not covered, and the policy for deprecations and supported versions. Classes outside the promise are marked `@internal`, and a test fails when a new class is neither public nor internal.
 - Ticket IDs can be integers in every method of `tickets()`.
+- `Znuny::partialMock()` and Laravel's `partialMock()` work for the manager.
 - `SECURITY.md`, `CONTRIBUTING.md`, issue templates and a pull request template.
 
 ### Changed
 
 - **Breaking:** a setting that is null or blank counts as not set everywhere. An empty `ZNUNY_SEARCH_LIMIT=` is the default of 500 instead of switching the limit off (`null` still does); an empty `ZNUNY_LOGGING_ENABLED=` no longer switches logging off; empty `ZNUNY_AUTH=`, `ZNUNY_USER_TYPE=` and `ZNUNY_AUTH_TRANSPORT=` take their defaults instead of failing; switches read `"off"` and `"no"` as off.
 - **Breaking:** `HistoryEntry::$createTime` is `$created` and `$createBy` is `$createdBy`.
-- **Breaking:** every data object throws an `Error` for an undefined property, as `Ticket` did; a renamed property's message names the new one.
+- **Breaking:** every data object throws an `Error` for an undefined property, as `Ticket` did. A renamed property's message names the new one, and it fails wherever it is read, also with `??`, `data_get()` and collection helpers such as `pluck()` and `sortBy()`, instead of reading as null.
+- **Breaking:** `lazy()` returns a `LazyCollection` instead of a `Generator`.
+- **Breaking:** `users()->outOfOffice()` is `users()->updateOutOfOffice()`.
+- **Breaking:** the password and the request options of a connection are no longer public properties of `ConnectionConfig`, so that logging or dumping `settings()` does not write them out.
 - **Breaking:** a custom operation is repeated after timeouts and server errors on a `GET` route only; the package no longer keeps a list of custom reading operations. The `operation-name` preset no longer contains the `QueueGet` route.
-- **Breaking:** `cert` and `ssl_key` in `options` must name existing files, `headers` must map names to values, and `Content-Type` cannot be configured.
+- **Breaking:** `cert` and `ssl_key` in `options` must name existing files, `headers` must map names to values, and `Content-Type` cannot be configured. An option that is null or blank counts as not set; in a connection it removes the global option.
 - **Breaking:** `session()->user()` throws a `ZnunyServerException` when Znuny sends no session data.
-- `users()->outOfOffice()` trims `login`, `email` and `search` and refuses a range whose start is after its end.
+- `users()->updateOutOfOffice()` trims `login`, `email` and `search` and refuses a range whose start is after its end.
+- `Znuny::fake()` ignores `options` and `verify_ssl`: files that only exist in production do not stop a test.
 - `composer.json` no longer sets `minimum-stability: dev`.
 
 ### Removed
@@ -29,7 +34,7 @@ The first stable release. It removes what 0.4.0 deprecated, corrects the API bef
 
 ### Fixed
 
-- A failure the package handles itself is no longer logged as an error and no longer fires `ZnunyRequestFailed`: a rejected batch that `findMany()` splits, a new ticket that cannot be read back after `save()`, a session already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode.
+- A failure the package handles itself is no longer logged as an error and no longer fires `ZnunyRequestFailed`: a rejected batch that `findMany()` splits, a new ticket that cannot be read back after `save()`, a session already gone at `logout()`, and a dropped session during `session()->user()` in credentials mode. A failing call made by an event listener is still reported.
 
 ## [0.4.0] - 2026-11-27
 

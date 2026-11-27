@@ -236,6 +236,19 @@ final class ZnunyFakeTest extends TestCase
         Znuny::session()->logout();
     }
 
+    public function test_the_fake_ignores_transport_settings_that_only_fit_production(): void
+    {
+        // Files that exist on the production servers, not where the tests run.
+        config([
+            'znuny.connections.default.verify_ssl' => '/etc/ssl/only-in-production-ca.pem',
+            'znuny.connections.default.options' => ['cert' => '/etc/ssl/only-in-production.pem', 'ssl_key' => ['/etc/ssl/only-in-production.key', 'passphrase']],
+        ]);
+
+        Znuny::fake(['TicketGet' => Znuny::fakeTickets(['TicketID' => '42'])]);
+
+        $this->assertSame('42', Znuny::tickets()->find('42')->id);
+    }
+
     public function test_nothing_is_sent_over_http(): void
     {
         Event::fake([ZnunyRequestSent::class]);

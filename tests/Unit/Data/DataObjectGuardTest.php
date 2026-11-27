@@ -67,20 +67,32 @@ final class DataObjectGuardTest extends TestCase
         ];
     }
 
+    /**
+     * Code written for an earlier release must not go on with null: sorting by the old name
+     * would silently not sort, filtering by it would silently find nothing.
+     */
     #[DataProvider('renamed')]
-    public function test_a_renamed_property_names_its_successor(object $object, string $old, string $new): void
+    public function test_a_renamed_property_fails_wherever_it_is_read(object $object, string $old, string $new): void
     {
-        // Code written for an earlier release: quiet where it asked, loud where it read.
-        $this->assertSame('fallback', $object->{$old} ?? 'fallback');
-        $this->assertFalse(isset($object->{$old}));
-        $this->assertSame([null], collect([$object])->pluck($old)->all());
+        $message = 'Undefined property: '.$object::class.'::$'.$old.' (renamed to $'.$new.')';
         $this->assertNotNull($object->{$new});
 
-        try {
-            $object->{$old};
-            $this->fail('Reading a renamed property must fail.');
-        } catch (Error $e) {
-            $this->assertSame('Undefined property: '.$object::class.'::$'.$old.' (renamed to $'.$new.')', $e->getMessage());
+        $reads = [
+            'a plain read' => fn () => $object->{$old},
+            'the null coalescing operator' => fn () => $object->{$old} ?? 'fallback',
+            'data_get()' => fn () => data_get($object, $old, 'fallback'),
+            'pluck()' => fn () => collect([$object])->pluck($old)->all(),
+            'sortBy()' => fn () => collect([$object, $object])->sortBy($old)->all(),
+            'where()' => fn () => collect([$object])->where($old, 'x')->all(),
+        ];
+
+        foreach ($reads as $how => $read) {
+            try {
+                $read();
+                $this->fail("Reading a renamed property with {$how} must fail.");
+            } catch (Error $e) {
+                $this->assertSame($message, $e->getMessage(), $how);
+            }
         }
     }
 }

@@ -7,6 +7,7 @@ use Exception;
 use ItsJustVita\LaravelZnuny\Exceptions\ZnunyConfigurationException;
 use ItsJustVita\LaravelZnuny\Http\RequestBuilder;
 use ItsJustVita\LaravelZnuny\Routing\RouteMap;
+use ItsJustVita\LaravelZnuny\Support\Redactor;
 use ItsJustVita\LaravelZnuny\Support\Setting;
 
 final readonly class ConnectionConfig
@@ -56,7 +57,7 @@ final readonly class ConnectionConfig
         public string $name,
         public string $baseUrl,
         public string $username,
-        public string $password,
+        private string $password,
         public RouteMap $routes,
         public string $auth,
         public string $userType,
@@ -69,8 +70,46 @@ final readonly class ConnectionConfig
         public int $batchSize,
         public string $timezone = 'UTC',
         public ?int $searchLimit = 500,
-        public array $options = [],
+        private array $options = [],
     ) {}
+
+    /**
+     * The password of the account. Not a public property, like the request options: someone
+     * who logs or serializes the settings of a connection must not write its secrets out.
+     *
+     * @internal
+     */
+    public function password(): string
+    {
+        return $this->password;
+    }
+
+    /**
+     * The request options, see HTTP_OPTIONS. They can hold proxy credentials and the
+     * passphrase of a key.
+     *
+     * @return array<string, mixed>
+     *
+     * @internal
+     */
+    public function options(): array
+    {
+        return $this->options;
+    }
+
+    /**
+     * What dump(), dd() and print_r() show.
+     *
+     * @return array<string, mixed>
+     */
+    public function __debugInfo(): array
+    {
+        return [
+            ...get_object_vars($this),
+            'password' => Redactor::REDACTED,
+            'options' => array_map(static fn (): string => Redactor::REDACTED, $this->options),
+        ];
+    }
 
     /**
      * @param  array<string, mixed>  $config  one entry of znuny.connections (or a runtime config)
@@ -112,7 +151,7 @@ final readonly class ConnectionConfig
             batchSize: max(1, Setting::integer($owner, 'batch_size', 50, $config['batch_size'] ?? null, $http['batch_size'] ?? null)),
             timezone: self::timezoneFor($name, $config['timezone'] ?? null, $timezone),
             searchLimit: self::searchLimit($name, $config, $http),
-            options: self::options($name, $http['options'] ?? null, $config['options'] ?? null),
+            options: self::optionsFrom($name, $http['options'] ?? null, $config['options'] ?? null),
         );
     }
 
@@ -122,7 +161,7 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * Cache key for this connection's session and lookups. It covers the target and the
+     * Cache key for this connection's session. It covers the target and the
      * credentials, so connections that share a name (or a login with another password)
      * never share cached data. $secret (the app key) keeps the credentials from being
      * guessed from the key.
@@ -235,10 +274,12 @@ final readonly class ConnectionConfig
 
     /**
      * The request options of the connection: the global ones, replaced key by key by its own.
+     * An option that is null or blank is not set, as every setting: 'cert' => env('...') without
+     * the variable is no certificate, and for a connection it removes what the global options set.
      *
      * @return array<string, mixed>
      */
-    private static function options(string $connection, mixed $global, mixed $own): array
+    private static function optionsFrom(string $connection, mixed $global, mixed $own): array
     {
         $options = [];
 
@@ -274,11 +315,13 @@ final readonly class ConnectionConfig
                     ));
                 }
 
-                if ($key === 'headers') {
-                    if ($value === null) {
-                        continue;
-                    }
+                if (Setting::isBlank($value)) {
+                    unset($options[$key]);
 
+                    continue;
+                }
+
+                if ($key === 'headers') {
                     self::checkHeaders($connection, $value);
                 }
 
