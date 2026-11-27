@@ -84,12 +84,14 @@ class UserResource extends Resource
                 continue;
             }
 
+            $value = trim($entry[$key]);
+
             // Znuny's own web service reads the entries from CSV lines and drops lines that start with "#".
-            if (preg_match('/[\r\n]/', $entry[$key]) === 1) {
+            if (preg_match('/[\r\n]/', $value) === 1) {
                 throw new InvalidArgumentException("The [{$key}] of out-of-office entry {$position} must not contain a line break.");
             }
 
-            $users[$znunyKey] = $entry[$key];
+            $users[$znunyKey] = $value;
         }
 
         if (count($users) !== 1) {
@@ -118,6 +120,11 @@ class UserResource extends Resource
             }
 
             $mapped[$znunyKey] = ZnunyTime::day($entry[$key]);
+        }
+
+        // Days are compared, so a range within one day is fine whatever its times of day.
+        if (isset($mapped['StartDate'], $mapped['EndDate']) && $mapped['StartDate'] > $mapped['EndDate']) {
+            throw new InvalidArgumentException("The [from] of out-of-office entry {$position} is after its [until].");
         }
 
         $mapped['OutOfOffice'] = ($entry['enabled'] ?? true) ? 1 : 0;

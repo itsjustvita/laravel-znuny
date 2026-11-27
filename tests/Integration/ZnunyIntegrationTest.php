@@ -436,6 +436,31 @@ final class ZnunyIntegrationTest extends TestCase
         $this->znuny($config, $urlVariable)->users()->clearOutOfOffice($login);
     }
 
+    public function test_out_of_office_entries_with_special_characters_stay_separate(): void
+    {
+        $login = (string) getenv('ZNUNY_INTEGRATION_USERNAME');
+        $password = (string) getenv('ZNUNY_INTEGRATION_PASSWORD');
+
+        // Znuny's own web service reads the entries from CSV. The second entry only arrives
+        // intact if the comma and the quotes of the first stayed inside its field.
+        $users = $this->admin(['auth' => 'credentials'], 'ZNUNY_INTEGRATION_OUT_OF_OFFICE_URL')->users();
+
+        $users->outOfOffice([
+            ['search' => 'Nobody, "at all"', 'enabled' => true],
+            ['login' => $login, 'from' => CarbonImmutable::parse('2034-05-06'), 'until' => CarbonImmutable::parse('2034-05-13')],
+        ]);
+
+        $data = $this->freshSessionData($login, $password);
+
+        $this->assertEquals(1, $data['OutOfOffice']);
+        $this->assertEquals([2034, 5, 6], [$data['OutOfOfficeStartYear'], $data['OutOfOfficeStartMonth'], $data['OutOfOfficeStartDay']]);
+        $this->assertEquals([2034, 5, 13], [$data['OutOfOfficeEndYear'], $data['OutOfOfficeEndMonth'], $data['OutOfOfficeEndDay']]);
+
+        $users->clearOutOfOffice($login);
+
+        $this->assertEquals(0, $this->freshSessionData($login, $password)['OutOfOffice']);
+    }
+
     /*
      * What Znuny itself does with the operations the package wraps. These tests call Znuny
      * directly, so a change in Znuny shows up here and not as a puzzling failure elsewhere.

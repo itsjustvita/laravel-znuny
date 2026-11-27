@@ -106,28 +106,34 @@ final class ConnectionConfigTest extends TestCase
     {
         $config = $this->make(
             ['options' => ['proxy' => 'http://proxy.a:3128']],
-            ['options' => ['proxy' => 'http://proxy.global:3128', 'cert' => '/etc/ssl/client.pem']],
+            ['options' => ['proxy' => 'http://proxy.global:3128', 'force_ip_resolve' => 'v4']],
         );
 
-        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'cert' => '/etc/ssl/client.pem'], $config->options);
+        $this->assertSame(['proxy' => 'http://proxy.a:3128', 'force_ip_resolve' => 'v4'], $config->options);
         $this->assertSame([], $this->make()->options);
         $this->assertSame([], $this->make(['options' => null], ['options' => []])->options);
     }
 
     public function test_every_accepted_http_option_is_kept(): void
     {
-        $options = [
-            'proxy' => 'http://proxy.internal:3128',
-            'cert' => ['/etc/ssl/client.pem', 'passphrase'],
-            'ssl_key' => '/etc/ssl/client.key',
-            'headers' => ['X-Forwarded-Auth' => 'abc'],
-            'auth' => ['user', 'password'],
-            'force_ip_resolve' => 'v4',
-            'version' => '1.1',
-        ];
+        $file = (string) tempnam(sys_get_temp_dir(), 'znuny-cert-');
 
-        $this->assertSame($options, $this->make(['options' => $options])->options);
-        $this->assertSame(array_keys($options), ConnectionConfig::HTTP_OPTIONS);
+        try {
+            $options = [
+                'proxy' => 'http://proxy.internal:3128',
+                'cert' => [$file, 'passphrase'],
+                'ssl_key' => $file,
+                'headers' => ['X-Forwarded-Auth' => 'abc'],
+                'auth' => ['user', 'password'],
+                'force_ip_resolve' => 'v4',
+                'version' => '1.1',
+            ];
+
+            $this->assertSame($options, $this->make(['options' => $options])->options);
+            $this->assertSame(array_keys($options), ConnectionConfig::HTTP_OPTIONS);
+        } finally {
+            unlink($file);
+        }
     }
 
     /**
@@ -148,6 +154,12 @@ final class ConnectionConfigTest extends TestCase
             'a string from .env' => ['proxy=http://proxy.internal:3128', 'must be an array of named options'],
             'a list without names' => [['http://proxy.internal:3128'], 'must be an array of named options'],
             'headers that are no array' => [['headers' => 'X-Api: 1'], '[headers] in [options] must be an array'],
+            'headers as a list of lines' => [['headers' => ['X-Api: 1']], 'must map header names to values'],
+            'the content type' => [['headers' => ['Content-Type' => 'text/plain']], 'cannot set the header [Content-Type]'],
+            'the content type in lower case' => [['headers' => ['content-type' => 'text/plain']], 'cannot set the header [content-type]'],
+            'a certificate that does not exist' => [['cert' => '/no/such/file.pem'], 'the [cert] file [/no/such/file.pem]'],
+            'a key that does not exist' => [['ssl_key' => ['/no/such/key.pem', 'passphrase']], 'the [ssl_key] file [/no/such/key.pem]'],
+            'a certificate that is no path' => [['cert' => 42], 'the [cert] file'],
             // Znuny reads these headers into the request, over the body the package sends.
             'the password header' => [['headers' => ['X-OTRS-Header-Password' => 'x']], 'cannot set the header [X-OTRS-Header-Password]'],
             'the session header in lower case' => [['headers' => ['x-otrs-header-sessionid' => 'x']], 'cannot set the header [x-otrs-header-sessionid]'],
@@ -166,6 +178,12 @@ final class ConnectionConfigTest extends TestCase
         $this->expectExceptionMessage($hint);
 
         $this->make(['options' => $options]);
+    }
+
+    public function test_headers_may_be_null(): void
+    {
+        $this->assertSame(['proxy' => 'http://proxy.a:3128'], $this->make(['options' => ['proxy' => 'http://proxy.a:3128', 'headers' => null]])->options);
+        $this->assertSame([], $this->make(['options' => ['headers' => []]])->options['headers']);
     }
 
     public function test_refused_options_are_refused_in_the_global_config_too(): void

@@ -265,13 +265,15 @@ final readonly class ConnectionConfig
                 }
 
                 if ($key === 'headers') {
-                    if (! is_array($value)) {
-                        throw new ZnunyConfigurationException(
-                            "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
-                        );
+                    if ($value === null) {
+                        continue;
                     }
 
-                    self::refuseAuthenticationHeaders($connection, $value);
+                    self::checkHeaders($connection, $value);
+                }
+
+                if ($key === 'cert' || $key === 'ssl_key') {
+                    self::checkFile($connection, $key, $value);
                 }
 
                 $options[$key] = $value;
@@ -282,22 +284,51 @@ final readonly class ConnectionConfig
     }
 
     /**
-     * Znuny copies the X-OTRS-Header-* authentication headers into the request, over its
-     * body. A configured one would therefore replace the authentication the package sends
-     * in the body of POST, PATCH and DELETE requests.
-     *
-     * @param  array<array-key, mixed>  $headers
+     * Headers must map names to values, and must not be ones the package sets itself. Znuny
+     * copies the X-OTRS-Header-* authentication headers into the request, over its body, so
+     * a configured one would replace the authentication the package sends in the body of
+     * POST, PATCH and DELETE requests. The content type belongs to the request body.
      */
-    private static function refuseAuthenticationHeaders(string $connection, array $headers): void
+    private static function checkHeaders(string $connection, mixed $headers): void
     {
-        $own = array_map(strtolower(...), array_values(RequestBuilder::AUTH_HEADERS));
+        if (! is_array($headers)) {
+            throw new ZnunyConfigurationException(
+                "Znuny connection [{$connection}]: [headers] in [options] must be an array of header names and values."
+            );
+        }
+
+        $own = [...array_map(strtolower(...), array_values(RequestBuilder::AUTH_HEADERS)), 'content-type'];
 
         foreach (array_keys($headers) as $header) {
-            if (in_array(strtolower((string) $header), $own, true)) {
+            if (! is_string($header)) {
                 throw new ZnunyConfigurationException(
-                    "Znuny connection [{$connection}] cannot set the header [{$header}] in [options]: the package sends the authentication itself."
+                    "Znuny connection [{$connection}]: [headers] in [options] must map header names to values, e.g. ['X-Api' => '1']."
                 );
             }
+
+            if (in_array(strtolower($header), $own, true)) {
+                throw new ZnunyConfigurationException(
+                    "Znuny connection [{$connection}] cannot set the header [{$header}] in [options]: the package sets it itself."
+                );
+            }
+        }
+    }
+
+    /**
+     * A client certificate or key: the path of a file, or the path and its passphrase. A
+     * missing file is reported here, when the connection is built, and not by the first request.
+     */
+    private static function checkFile(string $connection, string $option, mixed $value): void
+    {
+        $file = is_array($value) ? ($value[0] ?? null) : $value;
+
+        if (! is_string($file) || ! is_file($file)) {
+            throw new ZnunyConfigurationException(sprintf(
+                'Znuny connection [%s]: the [%s] file [%s] in [options] does not exist.',
+                $connection,
+                $option,
+                is_string($file) ? $file : get_debug_type($file),
+            ));
         }
     }
 
