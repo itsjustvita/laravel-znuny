@@ -4,6 +4,37 @@ All notable changes to this project are documented in this file. The format is b
 
 ## [Unreleased]
 
+Every operation Znuny ships now has a typed method, tested against Znuny 6.5 to 7.3. What does not rest on stock Znuny is deprecated. Four breaking changes; see [UPGRADE.md](UPGRADE.md).
+
+### Added
+
+- `Znuny::session()->user()`: the user of the connection (`SessionGet`) as a `SessionUser` with `id`, `login`, `firstName`, `lastName`, `fullName`, `email`, `type` and every other session value. Secrets in the session data (a customer's password hash, two-factor keys, passwords inside the customer backend's configuration) are left out of the object and redacted in logs and events.
+- `Znuny::session()->logout()` (`SessionRemove`): ends the session in Znuny; the next call logs in again.
+- `Znuny::timeAccounting()->entries($login, $from, $until)` (`TimeAccountingGet`): the time units an agent booked, as `TimeAccountingEntry` objects.
+- `Znuny::users()->setOutOfOffice()`, `clearOutOfOffice()` and `outOfOffice()` (`OutOfOffice`). The request works with Znuny's own `OutOfOffice` web service and with a generated one.
+- `php artisan znuny:webservice --also=TimeAccountingGet --also=OutOfOffice` adds the two operations, which Znuny ships in web services of their own, to the generated web service.
+- Dates in dynamic fields: a `DateTimeInterface` is sent in Znuny's format and time zone on create, update and in `whereDynamicField()`. New validation types `date` and `datetime`; a field declared `date` is sent as a day. `$ticket->dynamicField('Name')` returns a dynamic field by name, `->date()` reads its value as a `CarbonImmutable`.
+- `options` on a connection and under `http`: Guzzle request options for a proxy, a client certificate, extra headers or HTTP authentication (`proxy`, `cert`, `ssl_key`, `headers`, `auth`, `force_ip_resolve`, `version`). Other options are rejected, so they cannot weaken certificate verification or the timeouts.
+- `Znuny::fakeSessionUser()` builds a `SessionGet` response for tests.
+- A route placeholder such as `:SessionID` is filled from the authentication when the payload has no value for it, so `Znuny::call('SessionGet')` describes the connection's own session.
+- The README lists which Znuny operation each method uses, the web service Znuny ships it in and the permission it needs.
+
+### Changed
+
+- **Breaking:** `paginate()` without a page returns the page of the current request (`?page=`) instead of page 1.
+- **Breaking:** `TimeAccountingGet.NoPermission` and the `OutOfOffice.AuthFail` answers for a user who may not call the operation raise `ZnunyAccessDeniedException`.
+- **Breaking:** a `DateTimeInterface` as dynamic field value is sent as `Y-m-d H:i:s` in Znuny's time zone instead of an ISO 8601 string, which Znuny rejected.
+- `TimeAccountingGet` is repeated after timeouts and server errors, like the other reading operations.
+- The integration suite sets up Znuny's `TimeAccountingREST` and `OutOfOffice` web services, a generated web service with all ten operations, an administrator and dynamic fields of type Date and Date / Time, and pins what Znuny itself answers for the operations the package wraps.
+
+### Deprecated
+
+- `Znuny::queues()`, `states()`, `priorities()`, `types()`, `customers()`, `flush()`, `flushAll()`, `znuny:cache-clear` and the `cache` config block. They need operations Znuny does not ship. They work until 1.0 and trigger a deprecation notice; UPGRADE.md lists the replacements.
+
+### Removed
+
+- **Breaking:** `Ticket::$customerUserID`, deprecated since 0.3.0. Use `$customerUserId`.
+
 ## [0.3.2] - 2026-11-26
 
 Fixes from a review of the whole package. The first one matters for every Laravel 13 application that uses the lookup helpers.
