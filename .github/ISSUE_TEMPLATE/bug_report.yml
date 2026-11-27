@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in the package does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Please do not report a security problem here; see the security policy.
+  - type: input
+    id: package
+    attributes:
+      label: Package version
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: PHP and Laravel version
+      placeholder: "PHP 8.4, Laravel 13"
+    validations:
+      required: true
+  - type: input
+    id: znuny
+    attributes:
+      label: Znuny version
+      placeholder: "7.3.8"
+    validations:
+      required: true
+  - type: dropdown
+    id: webservice
+    attributes:
+      label: Web service
+      options:
+        - Znuny's GenericTicketConnectorREST (Ready2Adopt)
+        - Generated with php artisan znuny:webservice
+        - The older example from development/webservices
+        - My own
+    validations:
+      required: true
+  - type: input
+    id: settings
+    attributes:
+      label: Route preset and auth mode
+      description: The "routes" and "auth" settings of the connection. php artisan znuny:test-connection prints them.
+      placeholder: "generic-ticket-connector, session"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code to reproduce it
+      description: The call that fails, and the exception with its message and error code.
+      render: php
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed passwords, session IDs, tokens and customer data from everything above.
+          required: true
